@@ -1,0 +1,15 @@
+# RewriteEngine to serve Laravel's public/ folder when the app is uploaded
+# to /public_html/admin as the document root (without changing cPanel docroot).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteRule ^(.*)/$ /$1 [L,R=301]
+
+    # Send everything inside /admin to the Laravel public/ folder
+    RewriteCond %{REQUEST_URI} !^/admin/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes

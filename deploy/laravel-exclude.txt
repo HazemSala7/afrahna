@@ -1,0 +1,4 @@
+# Files and directories to exclude when deploying Laravel via FTPS.
+# WinSCP synchronize mask format. Use ;| separators.
+# https://winscp.net/eng/docs/file_mask
+node_modules/; .git/; .github/; .vscode/; .idea/; tests/; .phpunit.result.cache; .env; .env.example; .env.*; storage/logs/*; storage/framework/cache/data/*; storage/framework/sessions/*; storage/framework/views/*; storage/framework/testing/*; *.log; *.sqlite; *.zip; *.rar; *.7z; .DS_Store; Thumbs.db; deploy/; phpunit.xml; package-lock.json; webpack.mix.js; vite.config.js

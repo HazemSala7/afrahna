@@ -1,0 +1,131 @@
+import 'package:flutter/material.dart';
+
+import '../../core/models/models.dart';
+import '../../core/services/services.dart';
+import '../../core/theme.dart';
+import '../../widgets/app_widgets.dart';
+import '../vendors/vendors_page.dart';
+
+class CategoriesPage extends StatefulWidget {
+  const CategoriesPage({super.key});
+
+  @override
+  State<CategoriesPage> createState() => _CategoriesPageState();
+}
+
+class _CategoriesPageState extends State<CategoriesPage> {
+  late Future<List<CategoryModel>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = CategoryService().list();
+  }
+
+  void _refresh() {
+    setState(() => _future = CategoryService().list());
+  }
+
+  IconData _iconFor(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('قاع') || n.contains('hall')) return Icons.holiday_village_rounded;
+    if (n.contains('صور') || n.contains('photo')) return Icons.photo_camera_rounded;
+    if (n.contains('dj') || n.contains('موسيق') || n.contains('music')) return Icons.music_note_rounded;
+    if (n.contains('فستان') || n.contains('dress')) return Icons.checkroom_rounded;
+    if (n.contains('سيار') || n.contains('car')) return Icons.directions_car_rounded;
+    if (n.contains('طعام') || n.contains('cater') || n.contains('caterer')) return Icons.restaurant_rounded;
+    if (n.contains('زهور') || n.contains('flower') || n.contains('florist')) return Icons.local_florist_rounded;
+    if (n.contains('مكياج') || n.contains('makeup')) return Icons.face_retouching_natural;
+    if (n.contains('دعو') || n.contains('invit')) return Icons.mail_rounded;
+    return Icons.category_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppScaffold(
+      appBar: const PinkAppBar(title: 'جميع الخدمات', showBack: false),
+      body: FutureBuilder<List<CategoryModel>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const CenteredLoader();
+          }
+          if (snap.hasError) {
+            return ErrorState(
+                message: snap.error.toString(), onRetry: _refresh);
+          }
+          final items = snap.data ?? const [];
+          if (items.isEmpty) {
+            return const EmptyState(message: 'لا توجد فئات بعد');
+          }
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: .85,
+            ),
+            itemCount: items.length,
+            itemBuilder: (_, i) {
+              final c = items[i];
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VendorsPage(category: c),
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.cardShadow,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(_iconFor(c.name),
+                            color: AppColors.primary, size: 28),
+                      ),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          c.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
