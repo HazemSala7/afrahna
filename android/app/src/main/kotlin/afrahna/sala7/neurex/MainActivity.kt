@@ -1,4 +1,4 @@
-package com.example.afrahna
+package afrahna.sala7.neurex
 
 import io.flutter.embedding.android.FlutterActivity
 
