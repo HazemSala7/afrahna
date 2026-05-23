@@ -1,0 +1,23 @@
+=========================================
+Google Play - Short Description (max 80)
+=========================================
+
+[Arabic - 70 chars]
+نظّم فرحك بسهولة: قاعات، خدمات، وحجوزات في تطبيق واحد.
+
+[English - 68 chars]
+Plan your wedding with ease: venues, services & bookings in one app.
+
+
+=========================================
+App Name (max 30 chars)
+=========================================
+أفراحنا - Afrahna
+
+
+=========================================
+Category & Tags
+=========================================
+Primary category : Lifestyle
+Secondary category : Events
+Tags : wedding planner, weddings, افراح, قاعات, حجوزات, event planning, زفاف
