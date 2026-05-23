@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>أفراحنا</string>
+	<string>Afrahna</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -67,8 +67,10 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>يحتاج التطبيق إلى الميكروفون لتفعيل المساعد الذكي الصوتي.</string>
+	<string>We need access to your microphone to enable voice input for our AI chat assistant. Your voice data is used only for speech recognition during your chat sessions.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera for video chat and media features in the app. Camera access is only used when you explicitly enable it.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>يستخدم التطبيق التعرّف على الكلام لتحويل صوتك إلى نص ضمن المساعد الذكي.</string>
+	<string>We need access to speech recognition to convert your voice input into text for the AI chat assistant.</string>
 </dict>
 </plist>
