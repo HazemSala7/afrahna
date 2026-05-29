@@ -5,6 +5,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/vendors_page.dart';
+import 'category_tabs_page.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -19,11 +20,13 @@ class _CategoriesPageState extends State<CategoriesPage> {
   @override
   void initState() {
     super.initState();
-    _future = CategoryService().list();
+    // Load the full tree so we know which top-level categories have children
+    // (and can pass them straight to the tabs page without a second request).
+    _future = CategoryService().list(tree: true);
   }
 
   void _refresh() {
-    setState(() => _future = CategoryService().list());
+    setState(() => _future = CategoryService().list(tree: true));
   }
 
   IconData _iconFor(String name) {
@@ -74,7 +77,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => VendorsPage(category: c),
+                    builder: (_) => c.hasChildren
+                        ? CategoryTabsPage(parent: c)
+                        : VendorsPage(category: c),
                   ),
                 ),
                 child: Container(

@@ -1,0 +1,16 @@
+option batch abort
+option confirm off
+open ftpes://afrahna:Roro2004%24@ftp.afrahna.co:21/ -certificate=*
+option transfer binary
+
+put "d:\Apps\Afrahna\afrahna\server-admin\database\migrations\2026_05_29_000005_create_invitations_tables.php" "/public_html/admin/database/migrations/2026_05_29_000005_create_invitations_tables.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Models\InvitationTemplate.php" "/public_html/admin/app/Models/InvitationTemplate.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Models\Invitation.php" "/public_html/admin/app/Models/Invitation.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Http\Controllers\Api\InvitationController.php" "/public_html/admin/app/Http/Controllers/Api/InvitationController.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Http\Controllers\PublicInvitationController.php" "/public_html/admin/app/Http/Controllers/PublicInvitationController.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\resources\views\invitations\show.blade.php" "/public_html/admin/resources/views/invitations/show.blade.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\routes\api.php" "/public_html/admin/routes/api.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\routes\web.php" "/public_html/admin/routes/web.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\public\_run_migrate.php" "/public_html/admin/public/_run_migrate.php"
+
+exit

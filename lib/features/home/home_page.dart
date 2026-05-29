@@ -10,11 +10,16 @@ import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../account/account_page.dart';
 import '../assistant/assistant_page.dart';
-import '../bookings/bookings_page.dart';
+import '../calendar/calendar_page.dart';
 import '../categories/categories_page.dart';
+import '../categories/category_tabs_page.dart';
+import '../coordinator/coordinator_page.dart';
 import '../favorites/favorites_page.dart';
+import '../invitations/invitations_page.dart';
 import '../notifications/notifications_page.dart';
 import '../offers/offers_page.dart';
+import '../reels/reels_page.dart';
+import '../tasks/tasks_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
 
@@ -33,12 +38,12 @@ class _HomePageState extends State<HomePage> {
     // In an RTL Row, the first child is rendered at the start (visual RIGHT).
     // For natural Arabic UX we want: حسابي (account) on the RIGHT
     // and بحث (search) on the LEFT, with الرئيسية in the centre.
-    // So children order (start→end / right→left): حسابي، المفضلة، الرئيسية، المحفوظات، بحث.
+    // Children order (start→end / right→left): حسابي، المفضلة، الرئيسية، ريلز، بحث.
     final pages = <Widget>[
       const AccountPage(),          // 0 - حسابي (rightmost)
       const FavoritesPage(),        // 1 - المفضلة
       const _HomeTab(),             // 2 - الرئيسية (centre)
-      const BookingsPage(),         // 3 - المحفوظات / مناسباتي
+      const ReelsPage(),            // 3 - ريلز
       const _SearchTab(),           // 4 - بحث (leftmost)
     ];
 
@@ -91,7 +96,7 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   void _load() {
-    _categoriesFuture = CategoryService().list();
+    _categoriesFuture = CategoryService().list(tree: true);
     _promosFuture = PromotionService().list();
     _topVendorsFuture = VendorService().list();
     _featuredVendorsFuture =
@@ -130,16 +135,12 @@ class _HomeTabState extends State<_HomeTab> {
               ),
               const SizedBox(height: 18),
               FadeSlideIn(
-                delay: const Duration(milliseconds: 140),
-                child: CountdownCard(
-                  title: 'موسم الأعراس يبدأ — لا تفوّت العروض',
-                  target: DateTime.now()
-                      .add(const Duration(days: 30)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FadeSlideIn(
                 delay: const Duration(milliseconds: 200),
+                child: _CategoriesGrid(future: _categoriesFuture),
+              ),
+              const SizedBox(height: 22),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 260),
                 child: const _SectionHeader(
                   title: 'الإعلانات',
                   emoji: '📣',
@@ -147,13 +148,8 @@ class _HomeTabState extends State<_HomeTab> {
               ),
               const SizedBox(height: 10),
               FadeSlideIn(
-                delay: const Duration(milliseconds: 220),
-                child: _HeroBanner(future: _slidersFuture),
-              ),
-              const SizedBox(height: 22),
-              FadeSlideIn(
                 delay: const Duration(milliseconds: 300),
-                child: _CategoriesGrid(future: _categoriesFuture),
+                child: _HeroBanner(future: _slidersFuture),
               ),
               const SizedBox(height: 15),
               FadeSlideIn(
@@ -172,6 +168,15 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 440),
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture),
+              ),
+              const SizedBox(height: 22),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 460),
+                child: CountdownCard(
+                  title: 'موسم الأعراس يبدأ — لا تفوّت العروض',
+                  target: DateTime.now()
+                      .add(const Duration(days: 30)),
+                ),
               ),
               const SizedBox(height: 22),
               FadeSlideIn(
@@ -672,18 +677,58 @@ IconData _iconForCategory(String name) {
   return Icons.category_rounded;
 }
 
-class _CategoriesGrid extends StatelessWidget {
+class _CategoriesGrid extends StatefulWidget {
   const _CategoriesGrid({required this.future});
   final Future<List<CategoryModel>> future;
 
   @override
+  State<_CategoriesGrid> createState() => _CategoriesGridState();
+}
+
+class _CategoriesGridState extends State<_CategoriesGrid> {
+  final ScrollController _controller = ScrollController();
+  Timer? _hintTimer;
+  bool _userInteracted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Subtle periodic "nudge" so users notice the list is scrollable.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startHintLoop());
+  }
+
+  void _startHintLoop() {
+    _hintTimer?.cancel();
+    _hintTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || _userInteracted) return;
+      if (!_controller.hasClients) return;
+      final max = _controller.position.maxScrollExtent;
+      if (max <= 0) return;
+      final current = _controller.offset;
+      final target = current < 1 ? 28.0 : 0.0;
+      await _controller.animateTo(
+        target,
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _hintTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<CategoryModel>>(
-      future: future,
+      future: widget.future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const SizedBox(
-            height: 200,
+            height: 96,
             child: Center(
               child: SizedBox(
                 width: 22,
@@ -695,12 +740,14 @@ class _CategoriesGrid extends StatelessWidget {
           );
         }
         final all = snap.data ?? const <CategoryModel>[];
-        // Show all categories, plus a "more" tile only if there are more
-        // than what fits comfortably on 2 rows (10 items).
-        final showMore = all.length > 10;
-        final visible = showMore ? all.take(9).toList() : all;
+        if (all.isEmpty) return const SizedBox.shrink();
 
-        final tiles = <Widget>[
+        const showMoreThreshold = 12;
+        final showMore = all.length > showMoreThreshold;
+        final visible =
+            showMore ? all.take(showMoreThreshold - 1).toList() : all;
+
+        final items = <Widget>[
           for (final c in visible)
             _CategoryTile(
               label: c.name,
@@ -708,7 +755,9 @@ class _CategoriesGrid extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => VendorsPage(category: c),
+                  builder: (_) => c.hasChildren
+                      ? CategoryTabsPage(parent: c)
+                      : VendorsPage(category: c),
                 ),
               ),
             ),
@@ -718,31 +767,38 @@ class _CategoriesGrid extends StatelessWidget {
               icon: Icons.apps_rounded,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const CategoriesPage()),
+                MaterialPageRoute(builder: (_) => const CategoriesPage()),
               ),
             ),
         ];
 
-        if (tiles.isEmpty) return const SizedBox.shrink();
+        const tileSize = 84.0;
+        const spacing = 10.0;
 
-        // Use LayoutBuilder + Wrap so the grid takes only the space it needs
-        // (no empty trailing cells), and the tile width adapts to 5 columns.
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 8.0;
-            const cols = 5;
-            final tileWidth =
-                (constraints.maxWidth - spacing * (cols - 1)) / cols;
-            return Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final t in tiles)
-                  SizedBox(width: tileWidth, height: tileWidth, child: t),
-              ],
-            );
-          },
+        return SizedBox(
+          height: tileSize,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is UserScrollNotification) {
+                _userInteracted = true;
+                _hintTimer?.cancel();
+              }
+              return false;
+            },
+            child: ListView.separated(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: spacing),
+              itemBuilder: (_, i) => SizedBox(
+                width: tileSize,
+                height: tileSize,
+                child: items[i],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -1584,11 +1640,25 @@ class _QuickActionsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = <_QuickAction>[
       _QuickAction(
-          icon: Icons.checklist_rtl_rounded, label: 'قائمة المهام'),
-      _QuickAction(icon: Icons.calendar_month, label: 'التقويم الذكي'),
-      _QuickAction(icon: Icons.assignment_rounded, label: 'منسق المناسبة'),
+        icon: Icons.checklist_rtl_rounded,
+        label: 'قائمة المهام',
+        builder: (_) => const TasksPage(),
+      ),
       _QuickAction(
-          icon: Icons.mail_rounded, label: 'دعوات إلكترونية'),
+        icon: Icons.calendar_month,
+        label: 'التقويم الذكي',
+        builder: (_) => const CalendarPage(),
+      ),
+      _QuickAction(
+        icon: Icons.assignment_rounded,
+        label: 'منسق المناسبة',
+        builder: (_) => const CoordinatorPage(),
+      ),
+      _QuickAction(
+        icon: Icons.mail_rounded,
+        label: 'دعوات إلكترونية',
+        builder: (_) => const InvitationsPage(),
+      ),
     ];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
@@ -1607,9 +1677,10 @@ class _QuickActionsRow extends StatelessWidget {
 }
 
 class _QuickAction {
-  _QuickAction({required this.icon, required this.label});
+  _QuickAction({required this.icon, required this.label, this.builder});
   final IconData icon;
   final String label;
+  final WidgetBuilder? builder;
 }
 
 class _QuickActionTile extends StatelessWidget {
@@ -1622,10 +1693,14 @@ class _QuickActionTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('قريباً ✨'),
-            backgroundColor: AppColors.primary,
-          ));
+          if (action.builder != null) {
+            Navigator.of(context).push(MaterialPageRoute(builder: action.builder!));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('قريباً ✨'),
+              backgroundColor: AppColors.primary,
+            ));
+          }
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
@@ -1875,15 +1950,15 @@ class _BottomNav extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   // In an RTL Row, the first child renders at the start (visual RIGHT).
-  // Desired visual L→R: بحث | المحفوظات | الرئيسية | المفضلة | حسابي
-  // Children order (start→end / right→left) = حسابي, المفضلة, الرئيسية, المحفوظات, بحث.
+  // Desired visual L→R: بحث | ريلز | الرئيسية | المفضلة | حسابي
+  // Children order (start→end / right→left) = حسابي, المفضلة, الرئيسية, ريلز, بحث.
   static const _items = <_NavItem>[
     _NavItem('حسابي', Icons.person_outline_rounded, Icons.person_rounded),
     _NavItem('المفضلة', Icons.favorite_outline_rounded,
         Icons.favorite_rounded),
     _NavItem('الرئيسية', Icons.home_rounded, Icons.home_rounded),
-    _NavItem('المحفوظات', Icons.bookmark_outline_rounded,
-        Icons.bookmark_rounded),
+    _NavItem('ريلز', Icons.movie_filter_outlined,
+        Icons.movie_filter_rounded),
     _NavItem('بحث', Icons.search_rounded, Icons.search_rounded),
   ];
 
