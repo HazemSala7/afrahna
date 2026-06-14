@@ -109,6 +109,18 @@ class AuthService {
     }
   }
 
+  /// Permanently deletes the authenticated user's account on the server, then
+  /// clears the local session. Throws on failure (session is kept intact).
+  Future<void> deleteAccount() async {
+    try {
+      final res = await _dio.delete('/auth/account');
+      if (res.statusCode != 200) throw _err(res.data);
+      await AuthStorage.instance.clear();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<AuthResult> _persist(dynamic data) async {
     final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
     final token = (map['token'] ?? map['access_token'] ?? '').toString();

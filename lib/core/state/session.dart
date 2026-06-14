@@ -99,4 +99,20 @@ class SessionController extends ChangeNotifier {
     _status = AuthStatus.signedOut;
     notifyListeners();
   }
+
+  /// Permanently deletes the user's account, then signs out locally.
+  Future<bool> deleteAccount() async {
+    try {
+      await PushNotificationService.instance.unregisterToken();
+      await _auth.deleteAccount();
+      _user = null;
+      _status = AuthStatus.signedOut;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 }
