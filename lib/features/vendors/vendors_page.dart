@@ -7,10 +7,16 @@ import '../../widgets/app_widgets.dart';
 import 'vendor_details_page.dart';
 
 class VendorsPage extends StatefulWidget {
-  const VendorsPage({super.key, this.category, this.title});
+  const VendorsPage({
+    super.key,
+    this.category,
+    this.title,
+    this.featuredOnly = false,
+  });
 
   final CategoryModel? category;
   final String? title;
+  final bool featuredOnly;
 
   @override
   State<VendorsPage> createState() => _VendorsPageState();
@@ -31,6 +37,7 @@ class _VendorsPageState extends State<VendorsPage> {
     _future = VendorService().list(
       categoryId: widget.category?.id,
       query: _query.isEmpty ? null : _query,
+      featured: widget.featuredOnly ? true : null,
     );
   }
 

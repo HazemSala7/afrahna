@@ -5,8 +5,10 @@ import '../../core/models/models.dart';
 import '../../core/services/local_favorites.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../bookings/booking_create_page.dart';
+import '../home/home_page.dart';
 import '../services/service_details_page.dart';
 import 'story_viewer_page.dart';
 
@@ -80,6 +82,32 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
 
   String _digits(String s) => s.replaceAll(RegExp(r'\D'), '');
 
+  /// Leaves this profile and returns to the home shell on the chosen tab.
+  void _goToTab(int index) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => HomePage(initialTab: index)),
+      (route) => false,
+    );
+  }
+
+  Future<void> _openRatingSheet(VendorModel vendor) async {
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RatingSheet(vendor: vendor),
+    );
+    if (submitted == true && mounted) {
+      setState(() {
+        _reviewsFuture = ReviewService().listForVendor(widget.vendorId);
+        _vendorFuture = VendorService().show(widget.vendorId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('شكراً! تم إرسال تقييمك')),
+      );
+    }
+  }
+
   static String _firstChar(String name) {
     final t = name.trim();
     if (t.isEmpty) return '★';
@@ -126,7 +154,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                           ),
                         ),
                         // top padding leaves room for the floating logo
-                        padding: const EdgeInsets.fromLTRB(18, 92, 18, 0),
+                        padding: const EdgeInsets.fromLTRB(18, 60, 18, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -235,16 +263,37 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                                 );
                               }
                               final reviews = rSnap.data ?? const [];
-                              if (reviews.isEmpty) {
-                                return const _EmptyBox(
-                                  icon: Icons.rate_review_outlined,
-                                  text: 'كن أول من يقيّم هذا المزوّد ✨',
-                                );
-                              }
                               return Column(
                                 children: [
-                                  for (final r in reviews.take(5))
-                                    _ReviewCard(review: r),
+                                  if (reviews.isEmpty)
+                                    const _EmptyBox(
+                                      icon: Icons.rate_review_outlined,
+                                      text: 'كن أول من يقيّم هذا المزوّد ✨',
+                                    )
+                                  else
+                                    for (final r in reviews.take(5))
+                                      _ReviewCard(review: r),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.primary,
+                                        side: const BorderSide(
+                                            color: AppColors.primary),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                          Icons.star_rounded, size: 20),
+                                      label: const Text('أضف تقييمك'),
+                                      onPressed: () => _openRatingSheet(vendor),
+                                    ),
+                                  ),
                                 ],
                               );
                             },
@@ -366,6 +415,10 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
           );
         },
       ),
+      bottomNavigationBar: AppBottomNav(
+        current: -1,
+        onTap: _goToTab,
+      ),
     );
   }
 
@@ -486,19 +539,37 @@ class _IdentityHeader extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        if (vendor.category != null)
-          Text(
-            '${vendor.category!.name}'
-            '${vendor.city != null ? ' · ${vendor.city!.name}' : ''}',
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-            ),
-          ),
-        const SizedBox(height: 10),
-        if (vendor.rating != null) _GoldStars(rating: vendor.rating!),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (vendor.category != null)
+              Flexible(
+                child: Text(
+                  '${vendor.category!.name}'
+                  '${vendor.city != null ? ' · ${vendor.city!.name}' : ''}',
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            if (vendor.category != null && vendor.rating != null) ...[
+              const SizedBox(width: 10),
+              Container(
+                width: 1,
+                height: 14,
+                color: AppColors.textMuted.withValues(alpha: 0.35),
+              ),
+              const SizedBox(width: 10),
+            ],
+            if (vendor.rating != null) _GoldStars(rating: vendor.rating!),
+          ],
+        ),
       ],
     );
   }
@@ -843,9 +914,147 @@ class _GoldStars extends StatelessWidget {
 }
 
 // ============================================================
+// RATING SHEET (submit a review)
+// ============================================================
+class _RatingSheet extends StatefulWidget {
+  const _RatingSheet({required this.vendor});
+  final VendorModel vendor;
+
+  @override
+  State<_RatingSheet> createState() => _RatingSheetState();
+}
+
+class _RatingSheetState extends State<_RatingSheet> {
+  int _rating = 0;
+  final _comment = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_rating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اختر عدد النجوم أولاً')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ReviewService().create(
+        vendorId: widget.vendor.id,
+        rating: _rating.toDouble(),
+        comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textMuted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'قيّم ${widget.vendor.name}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 17,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (int i = 1; i <= 5; i++)
+                  IconButton(
+                    onPressed: _saving
+                        ? null
+                        : () => setState(() => _rating = i),
+                    icon: Icon(
+                      i <= _rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 38,
+                      color: const Color(0xFFE6B450),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _comment,
+              maxLines: 3,
+              enabled: !_saving,
+              decoration: InputDecoration(
+                hintText: 'اكتب تعليقك (اختياري)',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('إرسال التقييم'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
 // STORIES SECTION
 // ============================================================
-
 class _StoriesSection extends StatelessWidget {
   const _StoriesSection({required this.vendor, required this.future});
   final VendorModel vendor;

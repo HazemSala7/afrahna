@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "795005198830",
+    "project_id": "afrahna-88a2c",
+    "storage_bucket": "afrahna-88a2c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795005198830:android:42a45ab226ac19aedeaeff",
+        "android_client_info": {
+          "package_name": "afrahna.sala7.neurex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEj9fxIjmRtfEl4rzmL05J9HTkg80tDMI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

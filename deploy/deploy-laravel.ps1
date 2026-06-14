@@ -41,7 +41,7 @@ if (-not $winscp) {
 
 # --- Paths -------------------------------------------------------------------
 $repoRoot   = Split-Path -Parent $PSScriptRoot
-$localPath  = Join-Path $repoRoot 'afrahna-admin'
+$localPath  = Join-Path $repoRoot 'server-admin'
 $credPath   = Join-Path $PSScriptRoot '.ftp-credentials.json'
 $excludeTxt = Join-Path $PSScriptRoot 'laravel-exclude.txt'
 $htaccess   = Join-Path $PSScriptRoot 'htaccess-root.txt'

@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/location_service.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
+import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../account/account_page.dart';
 import '../assistant/assistant_page.dart';
@@ -24,14 +27,17 @@ import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.initialTab = 2});
+
+  /// Tab to show when the shell is first built (2 = الرئيسية).
+  final int initialTab;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentTab = 2; // الرئيسية = الوسط (افتراضي)
+  late int _currentTab = widget.initialTab; // الرئيسية = الوسط (افتراضي)
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +69,7 @@ class _HomePageState extends State<HomePage> {
           : null,
       floatingActionButtonLocation:
           FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: _BottomNav(
+      bottomNavigationBar: AppBottomNav(
         current: _currentTab,
         onTap: (i) => setState(() => _currentTab = i),
       ),
@@ -89,10 +95,13 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<VendorModel>> _featuredVendorsFuture;
   late Future<List<SliderModel>> _slidersFuture;
 
+  Position? _userPos;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadLocation();
   }
 
   void _load() {
@@ -102,6 +111,13 @@ class _HomeTabState extends State<_HomeTab> {
     _featuredVendorsFuture =
         VendorService().list(featured: true, perPage: 12);
     _slidersFuture = SliderService().list();
+  }
+
+  Future<void> _loadLocation() async {
+    final pos = await LocationService.instance.current();
+    if (mounted && pos != null) {
+      setState(() => _userPos = pos);
+    }
   }
 
   Future<void> _refresh() async {
@@ -140,14 +156,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
               const SizedBox(height: 22),
               FadeSlideIn(
-                delay: const Duration(milliseconds: 260),
-                child: const _SectionHeader(
-                  title: 'الإعلانات',
-                  emoji: '📣',
-                ),
-              ),
-              const SizedBox(height: 10),
-              FadeSlideIn(
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               ),
@@ -159,7 +167,12 @@ class _HomeTabState extends State<_HomeTab> {
                   emoji: '🏆',
                   onSeeAll: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const VendorsPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const VendorsPage(
+                        title: 'الشركات المميّزة',
+                        featuredOnly: true,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -167,7 +180,7 @@ class _HomeTabState extends State<_HomeTab> {
               FadeSlideIn(
                 delay: const Duration(milliseconds: 440),
                 child: _FeaturedVendorsCarousel(
-                    future: _featuredVendorsFuture),
+                    future: _featuredVendorsFuture, userPos: _userPos),
               ),
               const SizedBox(height: 22),
               FadeSlideIn(
@@ -210,7 +223,7 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 12),
               FadeSlideIn(
                 delay: const Duration(milliseconds: 580),
-                child: _TopRatedRow(future: _topVendorsFuture),
+                child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
               ),
               const SizedBox(height: 22),
               FadeSlideIn(
@@ -237,7 +250,7 @@ class _TopBar extends StatelessWidget {
     return Row(
       children: [
         // start (right in RTL) → invisible spacer to keep logo centered
-        const SizedBox(width: 44, height: 44),
+        const SizedBox(width: 40, height: 40),
         const Spacer(),
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -246,31 +259,31 @@ class _TopBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   child: Image.asset(
                     AppAssets.logo,
-                    width: 36,
-                    height: 36,
+                    width: 28,
+                    height: 28,
                     fit: BoxFit.cover,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
                   'أفراحنا',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: AppColors.primaryDark,
                         fontWeight: FontWeight.w900,
-                        fontSize: 22,
+                        fontSize: 18,
                       ),
                 ),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               'كل مناسباتك في مكان واحد',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 10,
                   ),
             ),
           ],
@@ -1075,8 +1088,9 @@ class _OfferCard extends StatelessWidget {
 // ===========================================================================
 
 class _FeaturedVendorsCarousel extends StatelessWidget {
-  const _FeaturedVendorsCarousel({required this.future});
+  const _FeaturedVendorsCarousel({required this.future, this.userPos});
   final Future<List<VendorModel>> future;
+  final Position? userPos;
 
   @override
   Widget build(BuildContext context) {
@@ -1097,8 +1111,8 @@ class _FeaturedVendorsCarousel extends StatelessWidget {
           }
           final items = (snap.data ?? const <VendorModel>[])
               .where((v) => v.isFeatured)
-              .toList()
-            ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+              .toList();
+          _sortByProximity(items, userPos);
           if (items.isEmpty) {
             return _EmptyMini(text: 'لا توجد شركات مميّزة حالياً');
           }
@@ -1110,6 +1124,49 @@ class _FeaturedVendorsCarousel extends StatelessWidget {
             itemBuilder: (_, i) => _FeaturedVendorCard(vendor: items[i]),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Cover area for vendor cards. Shows the cover photo cropped to fill, or—when
+/// there is no cover—a warm gradient with the logo centered and shown in full
+/// (BoxFit.contain) so it is never cropped at the edges.
+class _CardCover extends StatelessWidget {
+  const _CardCover({required this.vendor});
+  final VendorModel vendor;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCover = (vendor.cover ?? '').isNotEmpty;
+    if (hasCover) {
+      return AppNetworkImage(
+        url: vendor.cover,
+        fallbackIcon: Icons.storefront,
+      );
+    }
+    final hasLogo = (vendor.logo ?? '').isNotEmpty;
+    if (hasLogo) {
+      return AppNetworkImage(
+        url: vendor.logo,
+        fit: BoxFit.cover,
+        fallbackIcon: Icons.storefront,
+      );
+    }
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFD9B68A),
+            Color(0xFFB8835A),
+            Color(0xFF8B5A3C),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.storefront, color: Colors.white, size: 40),
       ),
     );
   }
@@ -1145,7 +1202,7 @@ class _FeaturedVendorCard extends StatelessWidget {
         width: 280,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.zero,
           boxShadow: const [
             BoxShadow(
               color: Color(0x338B5A3C),
@@ -1168,10 +1225,7 @@ class _FeaturedVendorCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  AppNetworkImage(
-                    url: vendor.cover ?? vendor.logo,
-                    fallbackIcon: Icons.storefront,
-                  ),
+                  _CardCover(vendor: vendor),
                   // gradient overlay for legibility
                   const DecoratedBox(
                     decoration: BoxDecoration(
@@ -1222,9 +1276,13 @@ class _FeaturedVendorCard extends StatelessWidget {
                             ],
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: AppNetworkImage(
-                            url: vendor.logo,
-                            fallbackIcon: Icons.storefront,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: AppNetworkImage(
+                              url: vendor.logo,
+                              fit: BoxFit.contain,
+                              fallbackIcon: Icons.storefront,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1500,9 +1558,30 @@ class _VerifiedBadge extends StatelessWidget {
 // TOP RATED ROW
 // ===========================================================================
 
+/// Sorts vendors so that, when the user's location is known, nearer vendors
+/// come first (those without coordinates fall to the end), then by rating.
+/// Without a location it falls back to rating only.
+void _sortByProximity(List<VendorModel> items, Position? userPos) {
+  if (userPos == null) {
+    items.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    return;
+  }
+  items.sort((a, b) {
+    final da = LocationService.distanceMeters(userPos, a.latitude, a.longitude);
+    final db = LocationService.distanceMeters(userPos, b.latitude, b.longitude);
+    if (da == null && db == null) {
+      return (b.rating ?? 0).compareTo(a.rating ?? 0);
+    }
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da.compareTo(db);
+  });
+}
+
 class _TopRatedRow extends StatelessWidget {
-  const _TopRatedRow({required this.future});
+  const _TopRatedRow({required this.future, this.userPos});
   final Future<List<VendorModel>> future;
+  final Position? userPos;
 
   @override
   Widget build(BuildContext context) {
@@ -1521,9 +1600,8 @@ class _TopRatedRow extends StatelessWidget {
               ),
             );
           }
-          final all = snap.data ?? const <VendorModel>[];
-          final items = [...all]
-            ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+          final items = [...(snap.data ?? const <VendorModel>[])];
+          _sortByProximity(items, userPos);
           final top = items.take(8).toList();
           if (top.isEmpty) {
             return _EmptyMini(text: 'لا يوجد مزوّدون بعد');
@@ -1557,7 +1635,7 @@ class _TopRatedCard extends StatelessWidget {
         width: 195,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.zero,
           boxShadow: [
             BoxShadow(
               color: AppColors.cardShadow,
@@ -1572,10 +1650,7 @@ class _TopRatedCard extends StatelessWidget {
           children: [
             Expanded(
               flex: 5,
-              child: AppNetworkImage(
-                url: vendor.cover ?? vendor.logo,
-                fallbackIcon: Icons.storefront,
-              ),
+              child: _CardCover(vendor: vendor),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -1942,127 +2017,9 @@ class _SearchResultTile extends StatelessWidget {
 // ===========================================================================
 // BOTTOM NAV
 // ===========================================================================
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.current, required this.onTap});
-
-  final int current;
-  final ValueChanged<int> onTap;
-
-  // In an RTL Row, the first child renders at the start (visual RIGHT).
-  // Desired visual L→R: بحث | ريلز | الرئيسية | المفضلة | حسابي
-  // Children order (start→end / right→left) = حسابي, المفضلة, الرئيسية, ريلز, بحث.
-  static const _items = <_NavItem>[
-    _NavItem('حسابي', Icons.person_outline_rounded, Icons.person_rounded),
-    _NavItem('المفضلة', Icons.favorite_outline_rounded,
-        Icons.favorite_rounded),
-    _NavItem('الرئيسية', Icons.home_rounded, Icons.home_rounded),
-    _NavItem('ريلز', Icons.movie_filter_outlined,
-        Icons.movie_filter_rounded),
-    _NavItem('بحث', Icons.search_rounded, Icons.search_rounded),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 30,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(_items.length, (i) {
-            return Expanded(
-              child: _NavButton(
-                item: _items[i],
-                active: current == i,
-                onTap: () => onTap(i),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem {
-  const _NavItem(this.label, this.icon, this.activeIcon);
-  final String label;
-  final IconData icon;
-  final IconData activeIcon;
-}
-
-class _NavButton extends StatelessWidget {
-  const _NavButton({
-    required this.item,
-    required this.active,
-    required this.onTap,
-  });
-
-  final _NavItem item;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? AppColors.primaryLight : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.18),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              active ? item.activeIcon : item.icon,
-              color: active ? AppColors.primary : AppColors.textMuted,
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? AppColors.primary : AppColors.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// The bottom navigation bar now lives in `widgets/app_bottom_nav.dart`
+// (AppBottomNav) so it can be reused on full-screen pages such as the vendor
+// profile.
 
 // ===========================================================================
 // API DEBUG PANEL (visible in debug builds only)

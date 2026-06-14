@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
+
 import '../api/api_client.dart';
 import '../api/auth_storage.dart';
 import '../models/models.dart';
@@ -189,6 +191,9 @@ class VendorService {
     String? query,
     bool? featured,
     bool? verified,
+    int? userId,
+    int? delegateId,
+    bool? activeOnly,
     int? perPage,
   }) async {
     try {
@@ -199,6 +204,9 @@ class VendorService {
         if (query != null && query.isNotEmpty) 'q': query,
         if (featured == true) 'featured': 1,
         if (verified == true) 'verified': 1,
+        if (userId != null) 'user_id': userId,
+        if (delegateId != null) 'delegate_id': delegateId,
+        if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
         if (perPage != null) 'per_page': perPage,
       });
       return _unwrapList(res.data).map(VendorModel.fromJson).toList();
@@ -230,6 +238,41 @@ class VendorService {
     try {
       final res = await _dio.put('/vendors/$id', data: data);
       return VendorModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// UPLOAD (multipart file upload — images, etc.)
+// ---------------------------------------------------------------------------
+
+class UploadService {
+  final _dio = ApiClient.instance.dio;
+
+  /// Uploads a local file to the server and returns its public URL.
+  /// [folder] groups files server-side, e.g. "vendors/logos".
+  Future<String> uploadFile(String filePath, {String folder = 'general'}) async {
+    try {
+      final form = FormData.fromMap({
+        'folder': folder,
+        'file': await MultipartFile.fromFile(filePath),
+      });
+      final res = await _dio.post('/uploads', data: form);
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        throw toApiException(DioException(
+          requestOptions: res.requestOptions,
+          response: res,
+        ));
+      }
+      final body = res.data;
+      final url = body is Map ? (body['url'] ?? '').toString() : '';
+      if (url.isEmpty) {
+        throw ApiException('تعذّر رفع الملف');
+      }
+      return url;
     } catch (e) {
       throw toApiException(e);
     }
@@ -459,7 +502,7 @@ class ReviewService {
     try {
       final res = await _dio.post('/reviews', data: {
         'vendor_id': vendorId,
-        'rating': rating,
+        'rating': rating.round(),
         if (comment != null && comment.isNotEmpty) 'comment': comment,
       });
       return ReviewModel.fromJson(_unwrapObject(res.data));
