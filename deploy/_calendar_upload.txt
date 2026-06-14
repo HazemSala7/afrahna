@@ -1,0 +1,12 @@
+option batch abort
+option confirm off
+open ftpes://afrahna:Roro2004%24@ftp.afrahna.co:21/ -certificate=*
+option transfer binary
+
+put "d:\Apps\Afrahna\afrahna\server-admin\database\migrations\2026_05_29_000003_create_events_table.php" "/public_html/admin/database/migrations/2026_05_29_000003_create_events_table.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Models\Event.php" "/public_html/admin/app/Models/Event.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Http\Controllers\Api\EventController.php" "/public_html/admin/app/Http/Controllers/Api/EventController.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\routes\api.php" "/public_html/admin/routes/api.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\public\_run_migrate.php" "/public_html/admin/public/_run_migrate.php"
+
+exit

@@ -149,17 +149,13 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             if (p.isEmpty) return;
                             _launch(Uri.parse('tel:$p'));
                           },
-                          onWhatsApp: () {
-                            final p = _digits(vendor.phone ?? '');
-                            if (p.isEmpty) return;
-                            _launch(Uri.parse('https://wa.me/$p'));
-                          },
                           onMap: () {
                             final q = Uri.encodeComponent(
                                 vendor.address ?? vendor.name);
                             _launch(Uri.parse(
                                 'https://www.google.com/maps/search/?api=1&query=$q'));
                           },
+                          onOpenSocial: _launch,
                         ),
                         const SizedBox(height: 22),
                         _Section(
@@ -968,6 +964,16 @@ class _StatsStrip extends StatelessWidget {
             const VerticalDivider(
                 color: Color(0x22B8835A), thickness: 1, width: 1),
             Expanded(
+              child: _Stat(
+                value: _formatCompact(vendor.viewsCount),
+                label: 'مشاهدة',
+                icon: Icons.visibility_outlined,
+                iconColor: const Color(0xFF6B8E7F),
+              ),
+            ),
+            const VerticalDivider(
+                color: Color(0x22B8835A), thickness: 1, width: 1),
+            Expanded(
               child: FutureBuilder<List<ServiceModel>>(
                 future: servicesFuture,
                 builder: (_, snap) => _Stat(
@@ -982,6 +988,17 @@ class _StatsStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Format an int like 1234 → "1.2K", 1_000_000 → "1M". Used for view counts.
+String _formatCompact(int n) {
+  if (n < 1000) return '$n';
+  if (n < 1000000) {
+    final v = n / 1000;
+    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}K';
+  }
+  final v = n / 1000000;
+  return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}M';
 }
 
 class _Stat extends StatelessWidget {
@@ -1033,52 +1050,354 @@ class _ContactActions extends StatelessWidget {
   const _ContactActions({
     required this.vendor,
     required this.onCall,
-    required this.onWhatsApp,
     required this.onMap,
+    required this.onOpenSocial,
   });
   final VendorModel vendor;
   final VoidCallback onCall;
-  final VoidCallback onWhatsApp;
   final VoidCallback onMap;
+  final void Function(Uri uri) onOpenSocial;
 
   @override
   Widget build(BuildContext context) {
     final hasPhone = (vendor.phone ?? '').isNotEmpty;
     final hasAddress = (vendor.address ?? '').isNotEmpty;
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.phone_rounded,
-            label: 'اتصال',
-            enabled: hasPhone,
-            color: AppColors.primary,
-            onTap: onCall,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primaryLight.withOpacity(.6)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.chat_rounded,
-            label: 'واتساب',
-            enabled: hasPhone,
-            color: const Color(0xFF25D366),
-            onTap: onWhatsApp,
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  icon: Icons.phone_rounded,
+                  label: 'اتصال',
+                  enabled: hasPhone,
+                  color: AppColors.primary,
+                  onTap: onCall,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ActionButton(
+                  icon: Icons.location_on_rounded,
+                  label: 'الموقع',
+                  enabled: hasAddress || vendor.name.isNotEmpty,
+                  color: const Color(0xFFE57373),
+                  onTap: onMap,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.location_on_rounded,
-            label: 'الموقع',
-            enabled: hasAddress || vendor.name.isNotEmpty,
-            color: const Color(0xFFE57373),
-            onTap: onMap,
-          ),
-        ),
-      ],
+          _SocialRow(vendor: vendor, onOpen: onOpenSocial),
+        ],
+      ),
     );
   }
+}
+
+class _SocialRow extends StatelessWidget {
+  const _SocialRow({required this.vendor, required this.onOpen});
+
+  final VendorModel vendor;
+  final void Function(Uri uri) onOpen;
+
+  static String _digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+
+  static String _handle(String v) {
+    var s = v.trim();
+    if (s.startsWith('@')) s = s.substring(1);
+    return s;
+  }
+
+  Uri? _instagramUri(String v) {
+    final s = v.trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http://') || s.startsWith('https://')) return Uri.parse(s);
+    return Uri.parse('https://www.instagram.com/${_handle(s)}/');
+  }
+
+  Uri? _tiktokUri(String v) {
+    final s = v.trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http://') || s.startsWith('https://')) return Uri.parse(s);
+    return Uri.parse('https://www.tiktok.com/@${_handle(s)}');
+  }
+
+  Uri? _snapchatUri(String v) {
+    final s = v.trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http://') || s.startsWith('https://')) return Uri.parse(s);
+    return Uri.parse('https://www.snapchat.com/add/${_handle(s)}');
+  }
+
+  Uri? _facebookUri(String v) {
+    final s = v.trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http://') || s.startsWith('https://')) return Uri.parse(s);
+    return Uri.parse('https://www.facebook.com/${_handle(s)}');
+  }
+
+  Uri? _whatsappUri(String v) {
+    final d = _digits(v);
+    if (d.isEmpty) return null;
+    return Uri.parse('https://wa.me/$d');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <_SocialItem>[];
+
+    final wa = vendor.whatsapp ?? '';
+    if (wa.isNotEmpty) {
+      final uri = _whatsappUri(wa);
+      if (uri != null) {
+        items.add(_SocialItem(
+          icon: Icons.chat_rounded,
+          label: 'واتساب',
+          gradient: const LinearGradient(
+            colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          glow: const Color(0xFF25D366),
+          uri: uri,
+        ));
+      }
+    }
+
+    final ig = vendor.instagram ?? '';
+    if (ig.isNotEmpty) {
+      final uri = _instagramUri(ig);
+      if (uri != null) {
+        items.add(_SocialItem(
+          icon: Icons.camera_alt_rounded,
+          label: 'إنستغرام',
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFFF58529),
+              Color(0xFFDD2A7B),
+              Color(0xFF8134AF),
+              Color(0xFF515BD4),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          glow: const Color(0xFFDD2A7B),
+          uri: uri,
+        ));
+      }
+    }
+
+    final tt = vendor.tiktok ?? '';
+    if (tt.isNotEmpty) {
+      final uri = _tiktokUri(tt);
+      if (uri != null) {
+        items.add(_SocialItem(
+          icon: Icons.music_note_rounded,
+          label: 'تيك توك',
+          gradient: const LinearGradient(
+            colors: [Color(0xFF010101), Color(0xFF222222)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          glow: const Color(0xFF25F4EE),
+          uri: uri,
+        ));
+      }
+    }
+
+    final sc = vendor.snapchat ?? '';
+    if (sc.isNotEmpty) {
+      final uri = _snapchatUri(sc);
+      if (uri != null) {
+        items.add(_SocialItem(
+          icon: Icons.chat_bubble_rounded,
+          label: 'سناب شات',
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFFC00), Color(0xFFFFE600)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          iconColor: Colors.black,
+          glow: const Color(0xFFFFFC00),
+          uri: uri,
+        ));
+      }
+    }
+
+    final fb = vendor.facebook ?? '';
+    if (fb.isNotEmpty) {
+      final uri = _facebookUri(fb);
+      if (uri != null) {
+        items.add(_SocialItem(
+          icon: Icons.facebook_rounded,
+          label: 'فيسبوك',
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1877F2), Color(0xFF0A5BCB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          glow: const Color(0xFF1877F2),
+          uri: uri,
+        ));
+      }
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 1,
+                  color: AppColors.primaryLight.withOpacity(.7),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.share_rounded,
+                        size: 16, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Text(
+                      'تابعنا على',
+                      style: TextStyle(
+                        color: AppColors.textDark,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  height: 1,
+                  color: AppColors.primaryLight.withOpacity(.7),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final it in items)
+                Expanded(
+                  child: Center(
+                    child: _SocialTile(
+                        item: it, onTap: () => onOpen(it.uri)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialTile extends StatefulWidget {
+  const _SocialTile({required this.item, required this.onTap});
+  final _SocialItem item;
+  final VoidCallback onTap;
+
+  @override
+  State<_SocialTile> createState() => _SocialTileState();
+}
+
+class _SocialTileState extends State<_SocialTile> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final it = widget.item;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: SizedBox(
+          width: 58,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: it.gradient,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: it.glow.withOpacity(.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Icon(it.icon, color: it.iconColor, size: 22),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                it.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialItem {
+  _SocialItem({
+    required this.icon,
+    required this.label,
+    required this.gradient,
+    required this.glow,
+    required this.uri,
+    this.iconColor = Colors.white,
+  });
+  final IconData icon;
+  final String label;
+  final Gradient gradient;
+  final Color glow;
+  final Color iconColor;
+  final Uri uri;
 }
 
 class _ActionButton extends StatelessWidget {

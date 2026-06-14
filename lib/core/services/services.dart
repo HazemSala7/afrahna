@@ -148,9 +148,26 @@ class CityService {
 class CategoryService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<CategoryModel>> list() async {
+  /// Returns top-level categories. Pass [tree] = true to also include
+  /// nested subcategories on each parent.
+  Future<List<CategoryModel>> list({bool tree = false}) async {
     try {
-      final res = await _dio.get('/categories');
+      final res = await _dio.get('/categories', queryParameters: {
+        if (tree) 'tree': 1,
+      });
+      return _unwrapList(res.data).map(CategoryModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Returns the direct children (subcategories) of [parentId].
+  Future<List<CategoryModel>> children(int parentId) async {
+    try {
+      final res = await _dio.get('/categories', queryParameters: {
+        'parent_id': parentId,
+        'per_page': 200,
+      });
       return _unwrapList(res.data).map(CategoryModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -167,6 +184,7 @@ class VendorService {
 
   Future<List<VendorModel>> list({
     int? categoryId,
+    int? parentCategoryId,
     int? cityId,
     String? query,
     bool? featured,
@@ -176,6 +194,7 @@ class VendorService {
     try {
       final res = await _dio.get('/vendors', queryParameters: {
         if (categoryId != null) 'category_id': categoryId,
+        if (parentCategoryId != null) 'parent_category_id': parentCategoryId,
         if (cityId != null) 'city_id': cityId,
         if (query != null && query.isNotEmpty) 'q': query,
         if (featured == true) 'featured': 1,
@@ -191,6 +210,25 @@ class VendorService {
   Future<VendorModel> show(int id) async {
     try {
       final res = await _dio.get('/vendors/$id');
+      return VendorModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Returns the vendor profile owned by the currently-authenticated user.
+  Future<VendorModel> mine() async {
+    try {
+      final res = await _dio.get('/vendors/mine');
+      return VendorModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<VendorModel> update(int id, Map<String, dynamic> data) async {
+    try {
+      final res = await _dio.put('/vendors/$id', data: data);
       return VendorModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -221,6 +259,74 @@ class ServiceService {
     try {
       final res = await _dio.get('/services/$id');
       return ServiceModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ServiceModel> create({
+    required int vendorId,
+    required String nameAr,
+    required String nameEn,
+    required double price,
+    String? descriptionAr,
+    String? descriptionEn,
+    double? discountPrice,
+    String? duration,
+    String? image,
+    bool isActive = true,
+  }) async {
+    try {
+      final res = await _dio.post('/services', data: {
+        'vendor_id': vendorId,
+        'name_ar': nameAr,
+        'name_en': nameEn,
+        'price': price,
+        if (descriptionAr != null) 'description_ar': descriptionAr,
+        if (descriptionEn != null) 'description_en': descriptionEn,
+        if (discountPrice != null) 'discount_price': discountPrice,
+        if (duration != null) 'duration': duration,
+        if (image != null) 'image': image,
+        'is_active': isActive,
+      });
+      return ServiceModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ServiceModel> update(int id, {
+    String? nameAr,
+    String? nameEn,
+    String? descriptionAr,
+    String? descriptionEn,
+    double? price,
+    double? discountPrice,
+    String? duration,
+    String? image,
+    bool? isActive,
+  }) async {
+    try {
+      final res = await _dio.put('/services/$id', data: {
+        if (nameAr != null) 'name_ar': nameAr,
+        if (nameEn != null) 'name_en': nameEn,
+        if (descriptionAr != null) 'description_ar': descriptionAr,
+        if (descriptionEn != null) 'description_en': descriptionEn,
+        if (price != null) 'price': price,
+        if (discountPrice != null) 'discount_price': discountPrice,
+        if (duration != null) 'duration': duration,
+        if (image != null) 'image': image,
+        if (isActive != null) 'is_active': isActive,
+      });
+      return ServiceModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/services/$id');
     } catch (e) {
       throw toApiException(e);
     }

@@ -1,0 +1,17 @@
+option batch abort
+option confirm off
+open ftpes://afrahna:Roro2004%24@ftp.afrahna.co:21/ -certificate=*
+option transfer binary
+
+# Tasks backend
+put "d:\Apps\Afrahna\afrahna\server-admin\database\migrations\2026_05_29_000002_create_tasks_and_templates.php" "/public_html/admin/database/migrations/2026_05_29_000002_create_tasks_and_templates.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Models\Task.php" "/public_html/admin/app/Models/Task.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Models\TaskTemplate.php" "/public_html/admin/app/Models/TaskTemplate.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Http\Controllers\Api\TaskController.php" "/public_html/admin/app/Http/Controllers/Api/TaskController.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\app\Http\Controllers\Api\TaskTemplateController.php" "/public_html/admin/app/Http/Controllers/Api/TaskTemplateController.php"
+put "d:\Apps\Afrahna\afrahna\server-admin\routes\api.php" "/public_html/admin/routes/api.php"
+
+# Migration trigger
+put "d:\Apps\Afrahna\afrahna\server-admin\public\_run_migrate.php" "/public_html/admin/public/_run_migrate.php"
+
+exit

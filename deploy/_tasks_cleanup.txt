@@ -1,0 +1,5 @@
+option batch abort
+option confirm off
+open ftpes://afrahna:Roro2004%24@ftp.afrahna.co:21/ -certificate=*
+rm /public_html/admin/public/_run_migrate.php
+exit

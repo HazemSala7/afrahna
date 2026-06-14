@@ -1,0 +1,5 @@
+open ftps://afrahna:Roro2004%24@ftp.afrahna.co:21/ -explicit -certificate=*
+option batch abort
+option confirm off
+synchronize remote "D:\Apps\Afrahna\afrahna\afrahna-admin-panel\out" /public_html/dashboard -mirror
+exit

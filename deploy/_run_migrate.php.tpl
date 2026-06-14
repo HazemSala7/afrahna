@@ -1,0 +1,39 @@
+<?php
+// ONE-SHOT migration runner for the views_count change.
+// Auto-deleted by the deploy script after a successful run.
+// Requires a token so a random visitor can't trigger it.
+header('Content-Type: text/plain; charset=utf-8');
+
+$expected = '__TOKEN__';
+$got = $_GET['t'] ?? '';
+if (!hash_equals($expected, $got)) {
+    http_response_code(403);
+    exit("forbidden\n");
+}
+
+try {
+    chdir(__DIR__ . '/..');
+    require __DIR__ . '/../vendor/autoload.php';
+    $app = require_once __DIR__ . '/../bootstrap/app.php';
+    /** @var \Illuminate\Contracts\Console\Kernel $kernel */
+    $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+    $kernel->bootstrap();
+
+    echo "=== php artisan migrate --force ===\n";
+    $status = $kernel->call('migrate', ['--force' => true]);
+    echo \Illuminate\Support\Facades\Artisan::output();
+    echo "exit: $status\n\n";
+
+    echo "=== php artisan optimize:clear ===\n";
+    $kernel->call('optimize:clear');
+    echo \Illuminate\Support\Facades\Artisan::output();
+
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+        echo "\nopcache_reset() called\n";
+    }
+    echo "\nOK\n";
+} catch (\Throwable $e) {
+    http_response_code(500);
+    echo "ERROR: " . $e->getMessage() . "\n" . $e->getTraceAsString();
+}

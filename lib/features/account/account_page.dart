@@ -6,8 +6,10 @@ import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../auth/login_page.dart';
 import '../bookings/bookings_page.dart';
+import '../delegate/delegate_dashboard_page.dart';
 import '../favorites/favorites_page.dart';
 import '../notifications/notifications_page.dart';
+import '../posts/vendor_posts_page.dart';
 
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
@@ -152,6 +154,24 @@ class _SignedInView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        if (user.isDelegate)
+          _MenuTile(
+            icon: Icons.badge,
+            label: 'لوحة المندوب',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DelegateDashboardPage()),
+            ),
+          ),
+        if (user.isVendor)
+          _MenuTile(
+            icon: Icons.dynamic_feed,
+            label: 'محتواي (منشورات وريلز ودورات)',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VendorPostsPage()),
+            ),
+          ),
         _MenuTile(
           icon: Icons.calendar_month,
           label: 'مناسباتي',
