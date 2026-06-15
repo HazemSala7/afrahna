@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../widgets/image_upload_field.dart';
+import '../../widgets/map_picker_page.dart';
 
 /// Lets the vendor owner edit their public profile (the same fields shown
 /// in the admin panel vendor form).
@@ -30,12 +33,13 @@ class _EditVendorPageState extends State<EditVendorPage> {
   final _facebook = TextEditingController();
   final _website = TextEditingController();
   final _address = TextEditingController();
-  final _latitude = TextEditingController();
-  final _longitude = TextEditingController();
   final _minPrice = TextEditingController();
   final _maxPrice = TextEditingController();
-  final _logo = TextEditingController();
-  final _cover = TextEditingController();
+
+  String? _logoUrl;
+  String? _coverUrl;
+  double? _latitude;
+  double? _longitude;
 
   bool _saving = false;
 
@@ -57,8 +61,10 @@ class _EditVendorPageState extends State<EditVendorPage> {
     _address.text = v.address ?? '';
     _minPrice.text = v.minPrice?.toString() ?? '';
     _maxPrice.text = v.maxPrice?.toString() ?? '';
-    _logo.text = v.logo ?? '';
-    _cover.text = v.cover ?? '';
+    _logoUrl = v.logo;
+    _coverUrl = v.cover;
+    _latitude = v.latitude;
+    _longitude = v.longitude;
   }
 
   @override
@@ -66,7 +72,7 @@ class _EditVendorPageState extends State<EditVendorPage> {
     for (final c in [
       _nameAr, _nameEn, _descAr, _descEn, _phone, _email,
       _whatsapp, _instagram, _tiktok, _snapchat, _facebook, _website,
-      _address, _latitude, _longitude, _minPrice, _maxPrice, _logo, _cover,
+      _address, _minPrice, _maxPrice,
     ]) {
       c.dispose();
     }
@@ -96,12 +102,12 @@ class _EditVendorPageState extends State<EditVendorPage> {
         if (_trim(_facebook) != null) 'facebook': _trim(_facebook),
         if (_trim(_website) != null) 'website': _trim(_website),
         if (_trim(_address) != null) 'address': _trim(_address),
-        if (_trim(_latitude) != null) 'latitude': double.tryParse(_latitude.text.trim()),
-        if (_trim(_longitude) != null) 'longitude': double.tryParse(_longitude.text.trim()),
+        if (_latitude != null) 'latitude': _latitude,
+        if (_longitude != null) 'longitude': _longitude,
         if (_trim(_minPrice) != null) 'min_price': double.tryParse(_minPrice.text.trim()),
         if (_trim(_maxPrice) != null) 'max_price': double.tryParse(_maxPrice.text.trim()),
-        if (_trim(_logo) != null) 'logo': _trim(_logo),
-        if (_trim(_cover) != null) 'cover_image': _trim(_cover),
+        if (_logoUrl != null && _logoUrl!.isNotEmpty) 'logo': _logoUrl,
+        if (_coverUrl != null && _coverUrl!.isNotEmpty) 'cover_image': _coverUrl,
       };
       await VendorService().update(widget.vendor.id, data);
       if (!mounted) return;
@@ -114,6 +120,58 @@ class _EditVendorPageState extends State<EditVendorPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _pickLocation() async {
+    final LatLng? result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerPage(
+          initial: (_latitude != null && _longitude != null)
+              ? LatLng(_latitude!, _longitude!)
+              : null,
+        ),
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _latitude = result.latitude;
+      _longitude = result.longitude;
+    });
+  }
+
+  Widget _locationField() {
+    final hasLoc = _latitude != null && _longitude != null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('الموقع على الخريطة',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+            ),
+            icon: const Icon(Icons.map_outlined),
+            label: Text(hasLoc ? 'تغيير الموقع' : 'تحديد الموقع على الخريطة'),
+            onPressed: _pickLocation,
+          ),
+          if (hasLoc)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'الإحداثيات: ${_latitude!.toStringAsFixed(6)}, '
+                '${_longitude!.toStringAsFixed(6)}',
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _field(TextEditingController c, String label,
@@ -160,13 +218,25 @@ class _EditVendorPageState extends State<EditVendorPage> {
             _field(_website, 'الموقع الإلكتروني', type: TextInputType.url),
             const Divider(height: 24),
             _field(_address, 'العنوان'),
-            _field(_latitude, 'خط العرض', type: const TextInputType.numberWithOptions(decimal: true, signed: true)),
-            _field(_longitude, 'خط الطول', type: const TextInputType.numberWithOptions(decimal: true, signed: true)),
+            _locationField(),
             _field(_minPrice, 'أقل سعر', type: TextInputType.number),
             _field(_maxPrice, 'أعلى سعر', type: TextInputType.number),
             const Divider(height: 24),
-            _field(_logo, 'رابط الشعار'),
-            _field(_cover, 'رابط صورة الغلاف'),
+            ImageUploadField(
+              label: 'الشعار',
+              url: _logoUrl,
+              folder: 'vendors/logos',
+              height: 120,
+              fallbackIcon: Icons.storefront_outlined,
+              onChanged: (url) => setState(() => _logoUrl = url),
+            ),
+            ImageUploadField(
+              label: 'صورة الغلاف',
+              url: _coverUrl,
+              folder: 'vendors/covers',
+              fallbackIcon: Icons.image_outlined,
+              onChanged: (url) => setState(() => _coverUrl = url),
+            ),
             const SizedBox(height: 12),
             FilledButton(
               style: FilledButton.styleFrom(

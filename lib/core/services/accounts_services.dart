@@ -1,6 +1,7 @@
+import 'package:dio/dio.dart';
+
 import '../api/api_client.dart';
 import '../models/models.dart';
-
 // ---------------------------------------------------------------------------
 // Unwrap helpers (kept local to avoid coupling to services.dart privates).
 // ---------------------------------------------------------------------------
@@ -91,11 +92,27 @@ class CommissionsResponse {
   final CommissionsTotals totals;
 }
 
+/// A shop (vendor) that has no owner account yet and can be linked to a new
+/// advertiser during registration.
+class AvailableShop {
+  AvailableShop({required this.id, required this.name});
+  final int id;
+  final String name;
+
+  factory AvailableShop.fromJson(Map<String, dynamic> json) {
+    final ar = (json['name_ar'] ?? '').toString();
+    final en = (json['name_en'] ?? '').toString();
+    return AvailableShop(
+      id: (json['id'] as num).toInt(),
+      name: ar.isNotEmpty ? ar : en,
+    );
+  }
+}
+
 class DelegateService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<UserModel>> myClients({String? search, int perPage = 30}) async {
-    try {
+  Future<List<UserModel>> myClients({String? search, int perPage = 30}) async {    try {
       final res = await _dio.get('/delegate/clients', queryParameters: {
         if (search != null && search.isNotEmpty) 'search': search,
         'per_page': perPage,
@@ -136,6 +153,19 @@ class DelegateService {
     }
   }
 
+  /// Shops (vendors) that have no owner account yet — selectable when linking
+  /// a new advertiser to an existing shop.
+  Future<List<AvailableShop>> availableShops({String? search}) async {
+    try {
+      final res = await _dio.get('/delegate/available-shops', queryParameters: {
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
+      return _unwrapList(res.data).map(AvailableShop.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<DelegateRegisterClientResult> registerClient({
     required String name,
     required String phone,
@@ -150,6 +180,9 @@ class DelegateService {
     required DateTime startDate,
     required DateTime endDate,
     String? notes,
+    required String shopMode,
+    String? shopName,
+    int? vendorId,
   }) async {
     try {
       final res = await _dio.post('/delegate/clients', data: {
@@ -166,7 +199,11 @@ class DelegateService {
         'start_date': _date(startDate),
         'end_date': _date(endDate),
         if (notes != null && notes.isNotEmpty) 'notes': notes,
+        'shop_mode': shopMode,
+        if (shopName != null && shopName.isNotEmpty) 'shop_name': shopName,
+        if (vendorId != null) 'vendor_id': vendorId,
       });
+      _throwIfError(res);
       final map = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : <String, dynamic>{};
       return DelegateRegisterClientResult(
         client: UserModel.fromJson(Map<String, dynamic>.from(map['client'] as Map)),
@@ -176,6 +213,30 @@ class DelegateService {
     } catch (e) {
       throw toApiException(e);
     }
+  }
+
+  /// Dio accepts any status < 500 without throwing, so 4xx responses (e.g.
+  /// validation 422) arrive here as a normal response with an error body.
+  /// Surface the real server message instead of crashing while parsing.
+  void _throwIfError(Response res) {
+    final status = res.statusCode ?? 0;
+    if (status >= 200 && status < 300) return;
+    final body = res.data;
+    String message = 'حدث خطأ ما';
+    Map<String, dynamic>? errors;
+    if (body is Map) {
+      if (body['errors'] is Map) {
+        errors = Map<String, dynamic>.from(body['errors'] as Map);
+        final first = errors.values
+            .map((v) => v is List && v.isNotEmpty ? v.first : v)
+            .firstWhere((v) => v != null, orElse: () => null);
+        if (first != null) message = first.toString();
+      }
+      if (message == 'حدث خطأ ما' && body['message'] != null) {
+        message = body['message'].toString();
+      }
+    }
+    throw ApiException(message, statusCode: status, errors: errors);
   }
 
   String _date(DateTime d) =>

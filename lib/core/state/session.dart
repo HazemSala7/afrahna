@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../api/auth_storage.dart';
 import '../models/models.dart';
+import '../services/push_notifications.dart';
 import '../services/services.dart';
 
 enum AuthStatus { unknown, signedIn, signedOut }
@@ -39,6 +41,7 @@ class SessionController extends ChangeNotifier {
     try {
       _user = await _auth.me();
       _status = AuthStatus.signedIn;
+      unawaited(PushNotificationService.instance.registerToken());
     } catch (_) {
       await AuthStorage.instance.clear();
       _user = null;
@@ -53,6 +56,7 @@ class SessionController extends ChangeNotifier {
       final result = await _auth.login(phone: phone, password: password);
       _user = result.user;
       _status = AuthStatus.signedIn;
+      unawaited(PushNotificationService.instance.registerToken());
       notifyListeners();
       return true;
     } catch (e) {
@@ -78,6 +82,7 @@ class SessionController extends ChangeNotifier {
       );
       _user = result.user;
       _status = AuthStatus.signedIn;
+      unawaited(PushNotificationService.instance.registerToken());
       notifyListeners();
       return true;
     } catch (e) {
@@ -88,9 +93,26 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await PushNotificationService.instance.unregisterToken();
     await _auth.logout();
     _user = null;
     _status = AuthStatus.signedOut;
     notifyListeners();
+  }
+
+  /// Permanently deletes the user's account, then signs out locally.
+  Future<bool> deleteAccount() async {
+    try {
+      await PushNotificationService.instance.unregisterToken();
+      await _auth.deleteAccount();
+      _user = null;
+      _status = AuthStatus.signedOut;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 }

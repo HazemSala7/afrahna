@@ -229,6 +229,53 @@ class _SignedInView extends StatelessWidget {
             }
           },
         ),
+        _MenuTile(
+          icon: Icons.delete_forever,
+          label: 'حذف الحساب',
+          isDestructive: true,
+          onTap: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('حذف الحساب'),
+                content: const Text(
+                  'سيتم حذف حسابك وجميع بياناتك نهائيًا ولا يمكن التراجع عن هذا الإجراء. هل أنت متأكد؟',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('حذف نهائي'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) return;
+
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) =>
+                  const Center(child: CircularProgressIndicator()),
+            );
+            final deleted = await session.deleteAccount();
+            if (!context.mounted) return;
+            Navigator.pop(context); // dismiss the loading dialog
+            if (!deleted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(session.error ?? 'تعذّر حذف الحساب'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+        ),
       ],
     );
   }

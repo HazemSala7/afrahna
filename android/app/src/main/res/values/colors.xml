@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent color used for the FCM notification icon tint. -->
+    <color name="colorPrimary">#D4AF37</color>
+</resources>

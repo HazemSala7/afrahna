@@ -2,6 +2,11 @@
     <!-- Voice assistant (speech-to-text) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Push notifications (Android 13+ runtime permission) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Sort vendors by distance to the user's location -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
@@ -38,6 +43,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Default channel used by FCM when a notification arrives in the
+             background/terminated state. Must match the channel created in Dart. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/colorPrimary" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

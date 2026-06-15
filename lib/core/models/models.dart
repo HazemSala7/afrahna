@@ -40,6 +40,7 @@ class UserModel {
     this.workField,
     this.cityId,
     this.commissionPerSubscription,
+    this.permissions = const {},
   });
 
   final int id;
@@ -53,6 +54,9 @@ class UserModel {
   final String? workField;
   final int? cityId;
   final double? commissionPerSubscription;
+
+  /// Granular delegate permission map, e.g. {'edit_vendor': true}.
+  final Map<String, dynamic> permissions;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -68,6 +72,9 @@ class UserModel {
         workField: _readT<String>(json, 'work_field'),
         cityId: _toInt(json['city_id']),
         commissionPerSubscription: _toDouble(json['commission_per_subscription']),
+        permissions: json['permissions'] is Map
+            ? Map<String, dynamic>.from(json['permissions'] as Map)
+            : const {},
       );
 
   Map<String, dynamic> toJson() => {
@@ -82,12 +89,20 @@ class UserModel {
         'work_field': workField,
         'city_id': cityId,
         'commission_per_subscription': commissionPerSubscription,
+        'permissions': permissions,
       };
 
   bool get isVendor   => role == 'vendor';
   bool get isAdmin    => role == 'admin';
   bool get isCustomer => role == 'customer';
   bool get isDelegate => role == 'delegate';
+
+  /// Admins implicitly have every permission; delegates check the map.
+  bool hasPermission(String key) {
+    if (isAdmin) return true;
+    final v = permissions[key];
+    return v == true || v == 1 || v == '1';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +195,8 @@ class VendorModel {
     this.snapchat,
     this.facebook,
     this.website,
+    this.latitude,
+    this.longitude,
     this.minPrice,
     this.maxPrice,
     this.isFeatured = false,
@@ -212,6 +229,8 @@ class VendorModel {
   final String? snapchat;
   final String? facebook;
   final String? website;
+  final double? latitude;
+  final double? longitude;
   final double? minPrice;
   final double? maxPrice;
   final bool isFeatured;
@@ -259,6 +278,8 @@ class VendorModel {
         snapchat: _readT<String>(json, 'snapchat'),
         facebook: _readT<String>(json, 'facebook'),
         website: _readT<String>(json, 'website'),
+        latitude: _toDouble(json['latitude']),
+        longitude: _toDouble(json['longitude']),
         minPrice: _toDouble(json['min_price']),
         maxPrice: _toDouble(json['max_price']),
         isFeatured: json['is_featured'] == true || json['is_featured'] == 1,

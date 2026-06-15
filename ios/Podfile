@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -43,6 +43,8 @@ post_install do |installer|
       # Ensure debug symbols are generated for all pods
       config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
       config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
+      # Ensure all pods target at least iOS 15.0 (required by firebase_core)
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
 end
