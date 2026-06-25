@@ -54,6 +54,9 @@ class _AssistantPageState extends State<AssistantPage>
   bool _listening = false;
   String _partial = '';
 
+  /// Best available Arabic locale id for speech recognition (resolved at init).
+  String? _arLocaleId;
+
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -63,10 +66,12 @@ class _AssistantPageState extends State<AssistantPage>
   void initState() {
     super.initState();
     _initSpeech();
+    _engine.preload();
     _messages.add(
       _ChatMessage.bot(
         'أهلاً بك 👋\nأنا مساعد أفراحنا الذكي. اسألني عن أفضل المعلنين، '
-        'الأسعار، أو الفئات — مثلاً: «بدي أفضل خدمة تصوير بميزانية 3000 شيكل».',
+        'الأسعار، أو الفئات.\nوإذا كنت مقبلاً على الزواج قل لي ميزانيتك '
+        'مثل: «ميزانيتي 50000 وبدي أتجوز» وسأقسّمها لك على كل بنود العرس 💍.',
       ),
     );
   }
@@ -85,6 +90,30 @@ class _AssistantPageState extends State<AssistantPage>
           }
         },
       );
+      if (ok) {
+        // Resolve the device's best Arabic locale; fall back to ar_SA.
+        try {
+          final locales = await _stt.locales();
+          final ar = locales.where(
+            (l) => l.localeId.toLowerCase().startsWith('ar'),
+          );
+          if (ar.isNotEmpty) {
+            // Prefer Palestinian/Levant variants when present.
+            stt.LocaleName pick = ar.first;
+            for (final pref in const ['ar_ps', 'ar_jo', 'ar_eg', 'ar_sa']) {
+              final m = ar.where((l) => l.localeId.toLowerCase() == pref);
+              if (m.isNotEmpty) {
+                pick = m.first;
+                break;
+              }
+            }
+            _arLocaleId = pick.localeId;
+          }
+        } catch (_) {
+          // locales() not supported → keep default below
+        }
+        _arLocaleId ??= 'ar_SA';
+      }
       if (mounted) setState(() => _sttReady = ok);
     } catch (_) {
       if (mounted) setState(() => _sttReady = false);
@@ -129,11 +158,13 @@ class _AssistantPageState extends State<AssistantPage>
       _partial = '';
     });
     await _stt.listen(
-      localeId: 'ar_SA',
       listenOptions: stt.SpeechListenOptions(
         listenMode: stt.ListenMode.dictation,
         partialResults: true,
         cancelOnError: true,
+        localeId: _arLocaleId ?? 'ar_SA',
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 4),
       ),
       onResult: (r) {
         if (!mounted) return;
@@ -144,6 +175,16 @@ class _AssistantPageState extends State<AssistantPage>
             offset: _controller.text.length,
           );
         });
+        // When the engine marks the phrase final, auto-send immediately.
+        if (r.finalResult) {
+          final text = r.recognizedWords.trim();
+          _partial = '';
+          if (mounted) setState(() => _listening = false);
+          if (text.isNotEmpty) {
+            _controller.text = text;
+            _send(text);
+          }
+        }
       },
     );
   }
@@ -404,12 +445,21 @@ class _Bubble extends StatelessWidget {
                 if (message.result != null &&
                     message.result!.vendors.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  for (final v in message.result!.vendors)
-                    _VendorResultCard(
-                      vendor: v,
-                      minPrice: message.result!.minPriceByVendor[v.id],
-                      onTap: () => onOpenVendor(v),
-                    ),
+                  if (message.result!.plan.isNotEmpty)
+                    for (final item in message.result!.plan)
+                      _PlanSlotCard(
+                        item: item,
+                        onTap: item.vendor == null
+                            ? null
+                            : () => onOpenVendor(item.vendor!),
+                      )
+                  else
+                    for (final v in message.result!.vendors)
+                      _VendorResultCard(
+                        vendor: v,
+                        minPrice: message.result!.minPriceByVendor[v.id],
+                        onTap: () => onOpenVendor(v),
+                      ),
                 ],
               ],
             ),
@@ -670,6 +720,186 @@ class _VendorResultCard extends StatelessWidget {
 }
 
 /// ===========================================================================
+/// WEDDING PLAN SLOT CARD — one budget line in a wedding breakdown.
+/// ===========================================================================
+class _PlanSlotCard extends StatelessWidget {
+  const _PlanSlotCard({required this.item, this.onTap});
+  final WeddingPlanItem item;
+  final VoidCallback? onTap;
+
+  String _money(double v) {
+    final s = v.toStringAsFixed(0);
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = item.vendor;
+    final pct = (item.percent * 100).round();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.22),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: emoji + label + allocated budget
+                Row(
+                  children: [
+                    Text(item.emoji, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        style: const TextStyle(
+                          color: AppColors.textDark,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    if (item.allocated > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFD4A373), AppColors.primary],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${_money(item.allocated)} ₪ · $pct٪',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (v == null)
+                  Row(
+                    children: [
+                      const Icon(Icons.search_off_rounded,
+                          size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'لا يوجد معلن مناسب لهذا البند حالياً',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 52,
+                          height: 52,
+                          child: AppNetworkImage(
+                            url: v.logo ?? v.cover,
+                            fallbackIcon: Icons.storefront_rounded,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              v.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textDark,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                if (v.rating != null) ...[
+                                  const Icon(Icons.star_rounded,
+                                      size: 14, color: Color(0xFFE6B450)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    v.rating!.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11.5,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                if (item.startingPrice != null)
+                                  Flexible(
+                                    child: Text(
+                                      'يبدأ من ${_money(item.startingPrice!)} ₪',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.primaryDark,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_left_rounded,
+                          color: AppColors.primary),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ===========================================================================
 /// LISTENING BAR (visible while STT is active)
 /// ===========================================================================
 class _ListeningBar extends StatelessWidget {
@@ -798,6 +1028,9 @@ class _InputBar extends StatelessWidget {
                     fontSize: 13.5,
                   ),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),

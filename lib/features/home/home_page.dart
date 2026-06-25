@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/event_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/services.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -94,6 +97,7 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<VendorModel>> _topVendorsFuture;
   late Future<List<VendorModel>> _featuredVendorsFuture;
   late Future<List<SliderModel>> _slidersFuture;
+  Future<EventModel?> _mainEventFuture = Future.value(null);
 
   Position? _userPos;
 
@@ -111,6 +115,17 @@ class _HomeTabState extends State<_HomeTab> {
     _featuredVendorsFuture =
         VendorService().list(featured: true, perPage: 12);
     _slidersFuture = SliderService().list();
+    _mainEventFuture = _loadMainEvent();
+  }
+
+  /// Only signed-in users have a personal event; guests get nothing.
+  Future<EventModel?> _loadMainEvent() async {
+    if (!context.read<SessionController>().isSignedIn) return null;
+    try {
+      return await EventService().main();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _loadLocation() async {
@@ -128,6 +143,7 @@ class _HomeTabState extends State<_HomeTab> {
       _topVendorsFuture,
       _featuredVendorsFuture,
       _slidersFuture,
+      _mainEventFuture,
     ]);
   }
 
@@ -182,14 +198,25 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture, userPos: _userPos),
               ),
-              const SizedBox(height: 22),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 460),
-                child: CountdownCard(
-                  title: 'موسم الأعراس يبدأ — لا تفوّت العروض',
-                  target: DateTime.now()
-                      .add(const Duration(days: 30)),
-                ),
+              FutureBuilder<EventModel?>(
+                future: _mainEventFuture,
+                builder: (context, snap) {
+                  final event = snap.data;
+                  if (event == null ||
+                      event.startsAt.isBefore(DateTime.now())) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 22),
+                    child: FadeSlideIn(
+                      delay: const Duration(milliseconds: 460),
+                      child: CountdownCard(
+                        title: event.title,
+                        target: event.startsAt,
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 22),
               FadeSlideIn(
@@ -1262,12 +1289,10 @@ class _FeaturedVendorCard extends StatelessWidget {
                         Container(
                           width: 46,
                           height: 46,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
-                            border: Border.all(
-                                color: Colors.white, width: 2),
-                            boxShadow: const [
+                            boxShadow: [
                               BoxShadow(
                                 color: Color(0x66000000),
                                 blurRadius: 8,
@@ -1276,13 +1301,10 @@ class _FeaturedVendorCard extends StatelessWidget {
                             ],
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: AppNetworkImage(
-                              url: vendor.logo,
-                              fit: BoxFit.contain,
-                              fallbackIcon: Icons.storefront,
-                            ),
+                          child: AppNetworkImage(
+                            url: vendor.logo,
+                            fit: BoxFit.cover,
+                            fallbackIcon: Icons.storefront,
                           ),
                         ),
                         const SizedBox(width: 10),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
@@ -55,6 +56,120 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ));
     }
+  }
+
+  /// رقم الدعم لاستعادة كلمة المرور.
+  static const String _supportPhone = '+972595679605';
+
+  Future<void> _openUri(Uri uri) async {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.primaryDark,
+          behavior: SnackBarBehavior.floating,
+          content: Text('تعذّر فتح التطبيق المطلوب'),
+        ),
+      );
+    }
+  }
+
+  void _forgotPassword() {
+    final phone = _phone.text.trim();
+    final digits = _supportPhone.replaceAll(RegExp(r'\D'), '');
+    final msg = Uri.encodeComponent(
+      'مرحباً، نسيت كلمة المرور الخاصة بحسابي في تطبيق أفراحنا'
+      '${phone.isNotEmpty ? '\nرقم الجوال المسجّل: $phone' : ''}'
+      '\nأرجو مساعدتي في إعادة تعيين كلمة المرور.',
+    );
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            20, 14, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const Icon(Icons.lock_reset_rounded,
+                color: AppColors.primary, size: 40),
+            const SizedBox(height: 10),
+            const Text(
+              'استعادة كلمة المرور',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'تواصل مع فريق الدعم لإعادة تعيين كلمة المرور الخاصة بك.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openUri(Uri.parse('https://wa.me/$digits?text=$msg'));
+              },
+              icon: const Icon(Icons.chat_rounded),
+              label: const Text('تواصل عبر واتساب',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                minimumSize: const Size.fromHeight(50),
+                side: const BorderSide(color: AppColors.primary, width: 1.4),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openUri(Uri(scheme: 'tel', path: _supportPhone));
+              },
+              icon: const Icon(Icons.call_rounded),
+              label: const Text('اتصال هاتفي',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -158,14 +273,7 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                       const Spacer(),
                                       TextButton(
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('سيتم تفعيل هذه الخاصية قريباً'),
-                                              backgroundColor: AppColors.primaryDark,
-                                            ),
-                                          );
-                                        },
+                                        onPressed: _forgotPassword,
                                         child: const Text(
                                           'نسيت كلمة المرور؟',
                                           style: TextStyle(

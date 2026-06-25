@@ -257,7 +257,7 @@ class VendorModel {
         descriptionAr: _readT<String>(json, 'description_ar'),
         descriptionEn: _readT<String>(json, 'description_en'),
         logo: _readT<String>(json, 'logo'),
-        cover: _readT<String>(json, 'cover'),
+        cover: _readT<String>(json, 'cover_image') ?? _readT<String>(json, 'cover'),
         cityId: _toInt(json['city_id']),
         categoryId: _toInt(json['category_id']),
         city: json['city'] is Map

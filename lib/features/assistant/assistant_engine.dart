@@ -16,6 +16,7 @@ class AssistantQuery {
     this.categoryHint,
     this.cityHint,
     this.currency,
+    this.weddingPlan = false,
   });
 
   final String raw;
@@ -25,6 +26,29 @@ class AssistantQuery {
   final String? categoryHint;
   final String? cityHint;
   final String? currency;
+
+  /// True when the user asks for a full wedding budget breakdown,
+  /// e.g. «ميزانيتي 50000 بدي أتجوز».
+  final bool weddingPlan;
+}
+
+/// A single line in a wedding budget breakdown.
+class WeddingPlanItem {
+  WeddingPlanItem({
+    required this.label,
+    required this.emoji,
+    required this.percent,
+    required this.allocated,
+    this.vendor,
+    this.startingPrice,
+  });
+
+  final String label;
+  final String emoji;
+  final double percent;
+  final double allocated;
+  final VendorModel? vendor;
+  final double? startingPrice;
 }
 
 /// Result returned by the engine for a single user turn.
@@ -36,6 +60,8 @@ class AssistantResult {
     this.matchedCategory,
     this.matchedCity,
     this.query,
+    this.plan = const [],
+    this.planBudget,
   });
 
   final String reply;
@@ -44,6 +70,10 @@ class AssistantResult {
   final CategoryModel? matchedCategory;
   final CityModel? matchedCity;
   final AssistantQuery? query;
+
+  /// Wedding budget breakdown (empty for normal queries).
+  final List<WeddingPlanItem> plan;
+  final double? planBudget;
 }
 
 /// ===========================================================================
@@ -66,6 +96,24 @@ class AssistantQueryParser {
     'فوق', 'اكثر من', 'أكثر من', 'ابتداء من', 'ابتدأ من', 'فأكثر',
     'على الاقل', 'على الأقل', 'min',
   ];
+  static const _weddingWords = [
+    'اتجوز', 'أتجوز', 'اتزوج', 'أتزوج', 'جواز', 'زواج', 'عرس', 'عرسي',
+    'زفاف', 'فرح', 'فرحي', 'حفل زفاف', 'حفلة زفاف', 'كل اشي للعرس',
+    'خطط للعرس', 'خطه للعرس', 'تجهيز عرس', 'تجهيزات العرس', 'wedding',
+  ];
+  // "Split / divide / distribute my budget" phrasing → also a wedding plan.
+  static const _splitWords = [
+    'قسم', 'قسملي', 'قسملي', 'قسمها', 'قسمهم', 'تقسيم', 'وزع', 'وزعلي',
+    'وزعها', 'توزيع', 'فرقها', 'فصلها', 'رتبلي', 'رتبهم', 'خطه', 'خطة',
+    'ميزانيتي', 'ميزانيه', 'ميزانية', 'split', 'divide', 'distribute',
+    'breakdown', 'break down', 'budget', 'plan',
+  ];
+  // "I have / what if I have X" possession phrasing.
+  static const _haveWords = [
+    'معي', 'عندي', 'بيدي', 'صار معي', 'لو معي', 'اذا معي', 'إذا معي',
+    'لو عندي', 'اذا عندي', 'ماذا لو', 'i have', 'if i have', 'what if i have',
+    'i got', 'got', 'have',
+  ];
 
   static String _normalize(String s) {
     var t = s.trim().toLowerCase();
@@ -82,6 +130,9 @@ class AssistantQueryParser {
     }
     return t;
   }
+
+  /// Public normalizer reused by the engine's wedding planner.
+  static String normalize(String s) => _normalize(s);
 
   static bool _contains(String text, List<String> needles) {
     for (final n in needles) {
@@ -105,8 +156,11 @@ class AssistantQueryParser {
     final t = _normalize(raw);
 
     AssistantIntent intent = AssistantIntent.list;
-    if (_contains(t, _cheapWords)) intent = AssistantIntent.cheapest;
-    else if (_contains(t, _bestWords)) intent = AssistantIntent.best;
+    if (_contains(t, _cheapWords)) {
+      intent = AssistantIntent.cheapest;
+    } else if (_contains(t, _bestWords)) {
+      intent = AssistantIntent.best;
+    }
 
     double? maxBudget;
     double? minBudget;
@@ -130,6 +184,10 @@ class AssistantQueryParser {
     final cityMatch = RegExp(r'في\s+([\u0600-\u06FFa-z\s]{2,30})').firstMatch(t);
     if (cityMatch != null) cityHint = cityMatch.group(1)!.trim();
 
+    final weddingPlan = _contains(t, _weddingWords) ||
+        (amount != null &&
+            (_contains(t, _splitWords) || _contains(t, _haveWords)));
+
     return AssistantQuery(
       raw: raw,
       intent: intent,
@@ -138,6 +196,7 @@ class AssistantQueryParser {
       categoryHint: categoryHint,
       cityHint: cityHint,
       currency: currency,
+      weddingPlan: weddingPlan,
     );
   }
 
@@ -188,43 +247,54 @@ class AssistantEngine {
   List<CategoryModel>? _cats;
   List<CityModel>? _cities;
   List<VendorModel>? _vendors;
-  List<ServiceModel>? _services;
 
   Future<void> _ensureLoaded() async {
-    final missing = _cats == null ||
-        _cities == null ||
-        _vendors == null ||
-        _services == null;
+    final missing = _cats == null || _cities == null || _vendors == null;
     if (!missing) return;
+    // Only three lightweight calls; vendor.minPrice/maxPrice already come from
+    // the API, so we avoid the heavy unpaginated /services endpoint entirely.
     final results = await Future.wait([
       CategoryService().list(),
       CityService().list(),
-      VendorService().list(),
-      ServiceService().list(),
+      VendorService().list(perPage: 100),
     ]);
     _cats = results[0] as List<CategoryModel>;
     _cities = results[1] as List<CityModel>;
     _vendors = results[2] as List<VendorModel>;
-    _services = results[3] as List<ServiceModel>;
+  }
+
+  /// Warms up the in-memory caches so the first question answers instantly.
+  /// Safe to call repeatedly and ignores network errors during warmup.
+  Future<void> preload() async {
+    try {
+      await _ensureLoaded();
+    } catch (_) {
+      // ignored — the next ask() will retry and surface any error
+    }
   }
 
   Future<AssistantResult> ask(String text) async {
     final q = AssistantQueryParser.parse(text);
     await _ensureLoaded();
-
     final cats = _cats ?? const <CategoryModel>[];
     final cities = _cities ?? const <CityModel>[];
     final allVendors = _vendors ?? const <VendorModel>[];
-    final allServices = _services ?? const <ServiceModel>[];
 
     final cat = AssistantQueryParser.matchCategory(q.categoryHint, cats);
     final city = AssistantQueryParser.matchCity(q.cityHint, cities);
 
-    // services grouped by vendor
-    final byVendor = <int, List<ServiceModel>>{};
-    for (final s in allServices) {
-      final id = s.vendorId;
-      if (id != null) byVendor.putIfAbsent(id, () => []).add(s);
+    // Cheapest known price for a vendor, straight from the API fields.
+    double minPriceOf(VendorModel v) => v.minPrice ?? double.infinity;
+
+    // ── Wedding budget breakdown (ChatGPT-style plan) ──────────────────
+    if (q.weddingPlan) {
+      return _buildWeddingPlan(
+        query: q,
+        cats: cats,
+        city: city,
+        vendors: allVendors,
+        minPriceOf: minPriceOf,
+      );
     }
 
     Iterable<VendorModel> filtered = allVendors;
@@ -236,18 +306,14 @@ class AssistantEngine {
     }
     if (q.maxBudget != null) {
       filtered = filtered.where((v) {
-        final svc = byVendor[v.id];
-        if (svc == null || svc.isEmpty) return true;
-        return svc.any((s) =>
-            s.price == null || s.price! <= q.maxBudget! + 0.0001);
+        final mp = v.minPrice;
+        return mp == null || mp <= q.maxBudget! + 0.0001;
       });
     }
     if (q.minBudget != null) {
       filtered = filtered.where((v) {
-        final svc = byVendor[v.id];
-        if (svc == null || svc.isEmpty) return true;
-        return svc.any((s) =>
-            s.price == null || s.price! >= q.minBudget! - 0.0001);
+        final mp = v.maxPrice ?? v.minPrice;
+        return mp == null || mp >= q.minBudget! - 0.0001;
       });
     }
 
@@ -261,15 +327,7 @@ class AssistantEngine {
       return (b.reviewsCount ?? 0).compareTo(a.reviewsCount ?? 0);
     }
 
-    double minPrice(VendorModel v) {
-      final svc = byVendor[v.id] ?? const <ServiceModel>[];
-      double m = double.infinity;
-      for (final s in svc) {
-        final p = s.price;
-        if (p != null && p < m) m = p;
-      }
-      return m;
-    }
+    double minPrice(VendorModel v) => v.minPrice ?? double.infinity;
 
     switch (q.intent) {
       case AssistantIntent.cheapest:
@@ -305,6 +363,172 @@ class AssistantEngine {
       matchedCity: city,
       query: q,
     );
+  }
+
+  /// Wedding plan slots: label, emoji, category keyword matchers and the
+  /// default share of the total budget. Shares sum to 1.0.
+  static const _planSlots = <({
+    String label,
+    String emoji,
+    List<String> keywords,
+    double share,
+  })>[
+    (label: 'قاعة الأفراح', emoji: '🏛️', share: 0.32, keywords: [
+      'قاعه', 'قاعات', 'صاله', 'صالات', 'منتجع', 'حديقه', 'مزرعه', 'فندق',
+    ]),
+    (label: 'التصوير والفيديو', emoji: '📸', share: 0.15, keywords: [
+      'تصوير', 'مصور', 'فوتو', 'فيديو', 'كاميرا', 'استوديو', 'فوتوغراف',
+    ]),
+    (label: 'التنسيق والكوش', emoji: '💐', share: 0.13, keywords: [
+      'تنسيق', 'كوش', 'كوشه', 'ديكور', 'ورد', 'زهور', 'اضاءه', 'فلاور',
+    ]),
+    (label: 'فستان الزفاف', emoji: '👰', share: 0.12, keywords: [
+      'فستان', 'فساتين', 'بدله', 'بدلات', 'عبايه', 'ازياء',
+    ]),
+    (label: 'المكياج والتجميل', emoji: '💄', share: 0.08, keywords: [
+      'مكياج', 'ميكب', 'تجميل', 'كوافير', 'صالون', 'شعر', 'بيوتي',
+    ]),
+    (label: 'الموسيقى والزفّة', emoji: '🎶', share: 0.08, keywords: [
+      'dj', 'دي جي', 'زفه', 'زفات', 'فرقه', 'طبل', 'موسيقى', 'اوركسترا',
+    ]),
+    (label: 'الضيافة والحلويات', emoji: '🍰', share: 0.09, keywords: [
+      'ضيافه', 'حلويات', 'كيك', 'كاترينج', 'بوفيه', 'مأكولات', 'طعام', 'حلى',
+    ]),
+    (label: 'الدعوات والكروت', emoji: '✉️', share: 0.03, keywords: [
+      'دعوات', 'كروت', 'بطاقات', 'invitation', 'دعوه',
+    ]),
+  ];
+
+  /// Builds a full wedding budget breakdown across the main categories,
+  /// recommending the best-rated vendor that fits each allocated slice.
+  AssistantResult _buildWeddingPlan({
+    required AssistantQuery query,
+    required List<CategoryModel> cats,
+    required CityModel? city,
+    required List<VendorModel> vendors,
+    required double Function(VendorModel) minPriceOf,
+  }) {
+    final total = query.maxBudget ?? query.minBudget;
+
+    // Pre-filter vendors by city when the user mentioned one.
+    final pool = city == null
+        ? vendors
+        : vendors.where((v) => v.cityId == city.id).toList();
+
+    final items = <WeddingPlanItem>[];
+    final picked = <VendorModel>[];
+    final minMap = <int, double?>{};
+    final usedVendorIds = <int>{};
+
+    for (final slot in _planSlots) {
+      // category ids whose name matches any of the slot keywords
+      final catIds = <int>{};
+      for (final c in cats) {
+        final name = AssistantQueryParser.normalize('${c.nameAr} ${c.nameEn}');
+        if (slot.keywords.any((k) =>
+            name.contains(AssistantQueryParser.normalize(k)))) {
+          catIds.add(c.id);
+        }
+      }
+
+      final allocated = total == null ? 0.0 : total * slot.share;
+
+      // candidate vendors for this slot
+      final candidates = pool
+          .where((v) =>
+              v.categoryId != null &&
+              catIds.contains(v.categoryId) &&
+              !usedVendorIds.contains(v.id))
+          .toList();
+
+      VendorModel? chosen;
+      double? startPrice;
+      if (candidates.isNotEmpty) {
+        int byRating(VendorModel a, VendorModel b) {
+          final cmp = (b.rating ?? 0).compareTo(a.rating ?? 0);
+          if (cmp != 0) return cmp;
+          return (b.reviewsCount ?? 0).compareTo(a.reviewsCount ?? 0);
+        }
+
+        // Prefer vendors whose cheapest service fits the slice, ranked by rating.
+        final affordable = candidates.where((v) {
+          final mp = minPriceOf(v);
+          return !mp.isFinite || total == null || mp <= allocated + 0.0001;
+        }).toList()
+          ..sort(byRating);
+
+        chosen = affordable.isNotEmpty
+            ? affordable.first
+            : (candidates
+              ..sort((a, b) => minPriceOf(a).compareTo(minPriceOf(b)))).first;
+
+        final mp = minPriceOf(chosen);
+        startPrice = mp.isFinite ? mp : null;
+        usedVendorIds.add(chosen.id);
+        picked.add(chosen);
+        minMap[chosen.id] = startPrice;
+      }
+
+      items.add(WeddingPlanItem(
+        label: slot.label,
+        emoji: slot.emoji,
+        percent: slot.share,
+        allocated: allocated,
+        vendor: chosen,
+        startingPrice: startPrice,
+      ));
+    }
+
+    final reply = _buildPlanReply(
+      city: city,
+      total: total,
+      items: items,
+    );
+
+    return AssistantResult(
+      reply: reply,
+      vendors: picked,
+      minPriceByVendor: minMap,
+      matchedCity: city,
+      query: query,
+      plan: items,
+      planBudget: total,
+    );
+  }
+
+  String _buildPlanReply({
+    required CityModel? city,
+    required double? total,
+    required List<WeddingPlanItem> items,
+  }) {
+    final where = city != null ? ' في ${city.nameAr}' : '';
+    final found = items.where((e) => e.vendor != null).length;
+    final sb = StringBuffer();
+    if (total != null) {
+      sb.write('تمام 🎉 إليك خطة عرسك$where بميزانية '
+          '${_fmtFull(total)} ₪، موزّعة على أهم البنود:');
+    } else {
+      sb.write('تمام 🎉 إليك خطة تجهيز عرسك$where بأهم البنود. '
+          'أخبرني بميزانيتك لأقسّمها لك بالأرقام:');
+    }
+    if (found == 0) {
+      sb.write('\n\nما لقيت معلنين مطابقين حالياً — جرّب توسيع المدينة '
+          'أو اسأل عن فئة محددة 🙂');
+    } else {
+      sb.write('\n\nاخترت لك أفضل خيار ضمن كل بند حسب التقييم والسعر. '
+          'اضغط على أي بطاقة لمزيد من التفاصيل 👇');
+    }
+    return sb.toString();
+  }
+
+  static String _fmtFull(double v) {
+    final s = v.toStringAsFixed(0);
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 
   String _buildReply({
@@ -365,6 +589,7 @@ class AssistantEngine {
 
   /// Suggested starter questions to show on the empty state.
   static const suggestions = <String>[
+    'ميزانيتي 50000 وبدي أتجوز، قسّملي المصاريف',
     'بدي أفضل خدمة تصوير',
     'أفضل قاعة أعراس بميزانية 5000 شيكل',
     'أرخص منسق ورد في رام الله',
