@@ -11,10 +11,16 @@ class LocationService {
   Position? get cached => _cached;
 
   /// Returns the device's current position, or null if location is disabled
-  /// or permission was denied. Never throws.
-  Future<Position?> current() async {
+  /// or permission was denied. Never throws and never hangs: [timeout] caps
+  /// how long we wait for a GPS fix before falling back to the last known
+  /// position (important on emulators / indoors where a fix can take forever).
+  Future<Position?> current({
+    Duration timeout = const Duration(seconds: 12),
+  }) async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return _cached;
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        return _cached ?? await _lastKnown();
+      }
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -26,14 +32,27 @@ class LocationService {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
+        locationSettings: LocationSettings(
           accuracy: LocationAccuracy.medium,
+          timeLimit: timeout,
         ),
       );
       _cached = pos;
       return pos;
     } catch (_) {
-      return _cached;
+      // Timed out or failed — return the best position we already have.
+      return _cached ?? await _lastKnown();
+    }
+  }
+
+  /// Best-effort cached fix from the OS; null if unavailable. Never throws.
+  Future<Position?> _lastKnown() async {
+    try {
+      final pos = await Geolocator.getLastKnownPosition();
+      if (pos != null) _cached = pos;
+      return pos;
+    } catch (_) {
+      return null;
     }
   }
 

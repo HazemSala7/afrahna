@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../core/services/location_service.dart';
 import '../core/theme.dart';
 
 /// Full-screen OpenStreetMap that lets the user pick a location by tapping the
@@ -22,6 +23,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
 
   late LatLng _picked;
   final _controller = MapController();
+  bool _locating = false;
 
   @override
   void initState() {
@@ -30,6 +32,26 @@ class _MapPickerPageState extends State<MapPickerPage> {
   }
 
   void _setPoint(LatLng p) => setState(() => _picked = p);
+
+  /// Fetches the device's current location, moves the marker there and
+  /// recenters the map. Shows a hint if location is off / permission denied.
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    final pos = await LocationService.instance.current();
+    if (!mounted) return;
+    setState(() => _locating = false);
+    if (pos == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذّر تحديد موقعك. فعّل خدمة الموقع وامنح الإذن.'),
+        ),
+      );
+      return;
+    }
+    final here = LatLng(pos.latitude, pos.longitude);
+    _setPoint(here);
+    _controller.move(here, 16);
+  }
 
   @override
   void dispose() {
@@ -73,6 +95,23 @@ class _MapPickerPageState extends State<MapPickerPage> {
                 ],
               ),
             ],
+          ),
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: FloatingActionButton.extended(
+              heroTag: 'mapMyLocation',
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primary,
+              icon: _locating
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary))
+                  : const Icon(Icons.my_location),
+              label: const Text('موقعي الحالي'),
+              onPressed: _locating ? null : _useCurrentLocation,
+            ),
           ),
           Positioned(
             top: 12,

@@ -4,8 +4,10 @@ import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/services/services.dart';
+import '../../core/theme.dart';
 import '../services/create_service_page.dart';
 import '../vendors/edit_vendor_page.dart';
+import '../vendors/manage_stories_page.dart';
 import 'create_post_page.dart';
 
 /// Vendor's content page — tabs: خدماتي / ريلز / دورات.
@@ -29,8 +31,29 @@ class _VendorPostsPageState extends State<VendorPostsPage>
 
   final _postService = PostService();
   final _serviceService = ServiceService();
+  final _vendorService = VendorService();
 
   int _reloadKey = 0;
+
+  /// The vendor whose content is shown — used for the header (name + image).
+  VendorModel? _vendor;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVendor();
+  }
+
+  Future<void> _loadVendor() async {
+    try {
+      final v = widget.vendorId == null
+          ? await _vendorService.mine()
+          : await _vendorService.show(widget.vendorId!);
+      if (mounted) setState(() => _vendor = v);
+    } on ApiException {
+      // Header is optional; ignore load failures and keep the page usable.
+    }
+  }
 
   Future<List<PostModel>> _loadPosts(PostType t) {
     return _postService.list(
@@ -41,7 +64,10 @@ class _VendorPostsPageState extends State<VendorPostsPage>
   }
 
   Future<List<ServiceModel>> _loadServices() {
-    return _serviceService.list(vendorId: widget.vendorId);
+    return _serviceService.list(
+      vendorId: widget.vendorId,
+      mine: widget.vendorId == null,
+    );
   }
 
   @override
@@ -89,8 +115,19 @@ class _VendorPostsPageState extends State<VendorPostsPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('المحتوى'),
+        title: Text(_vendor?.name ?? 'المحتوى'),
         actions: [
+          if (widget.canCreate && _vendor != null)
+            IconButton(
+              tooltip: 'إدارة الستوريز',
+              icon: const Icon(Icons.amp_stories_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ManageStoriesPage(vendorId: _vendor!.id),
+                ),
+              ),
+            ),
           if (widget.canCreate && widget.vendorId == null)
             IconButton(
               tooltip: 'تعديل بيانات المعلن',
@@ -98,13 +135,6 @@ class _VendorPostsPageState extends State<VendorPostsPage>
               onPressed: _editProfile,
             ),
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'خدماتي'),
-            Tab(text: 'ريلز'),
-          ],
-        ),
       ),
       floatingActionButton: widget.canCreate
           ? FloatingActionButton.extended(
@@ -113,20 +143,114 @@ class _VendorPostsPageState extends State<VendorPostsPage>
               onPressed: _createForCurrentTab,
             )
           : null,
-      body: TabBarView(
-        controller: _tabs,
+      body: Column(
         children: [
-          _ServicesList(
-            key: ValueKey('svc-$_reloadKey'),
-            loader: _loadServices,
-            vendorId: widget.vendorId,
-            canManage: widget.canCreate,
-            onChanged: () => setState(() => _reloadKey++),
+          if (_vendor != null) _VendorHeader(vendor: _vendor!),
+          TabBar(
+            controller: _tabs,
+            labelColor: AppColors.primary,
+            indicatorColor: AppColors.primary,
+            tabs: const [
+              Tab(text: 'خدماتي'),
+              Tab(text: 'ريلز'),
+            ],
           ),
-          _PostList(
-            key: ValueKey('reel-$_reloadKey'),
-            loader: () => _loadPosts(PostType.reel),
-            type: PostType.reel,
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _ServicesList(
+                  key: ValueKey('svc-$_reloadKey'),
+                  loader: _loadServices,
+                  vendorId: widget.vendorId,
+                  canManage: widget.canCreate,
+                  onChanged: () => setState(() => _reloadKey++),
+                ),
+                _PostList(
+                  key: ValueKey('reel-$_reloadKey'),
+                  loader: () => _loadPosts(PostType.reel),
+                  type: PostType.reel,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VENDOR HEADER (name + logo over the cover image)
+// ---------------------------------------------------------------------------
+
+class _VendorHeader extends StatelessWidget {
+  const _VendorHeader({required this.vendor});
+  final VendorModel vendor;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = vendor.cover;
+    final logo = vendor.logo;
+    return SizedBox(
+      height: 140,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Cover image (or a solid brand-colored fallback).
+          if (cover != null && cover.isNotEmpty)
+            Image.network(
+              cover,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: AppColors.primaryLight),
+            )
+          else
+            Container(color: AppColors.primaryLight),
+          // Dark gradient so the name stays readable over any image.
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black54],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 12,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.surface,
+                  backgroundImage: (logo != null && logo.isNotEmpty)
+                      ? NetworkImage(logo)
+                      : null,
+                  child: (logo == null || logo.isEmpty)
+                      ? const Icon(Icons.storefront_outlined,
+                          color: AppColors.primary)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    vendor.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

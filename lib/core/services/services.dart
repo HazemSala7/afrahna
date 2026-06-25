@@ -254,6 +254,49 @@ class VendorService {
       throw toApiException(e);
     }
   }
+
+  /// Admin: paginated + searchable vendor list that INCLUDES inactive shops
+  /// (active_only=0), for the in-app admin management screen.
+  Future<VendorsResult> adminList({
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/vendors', queryParameters: {
+        if (search != null && search.isNotEmpty) 'search': search,
+        'active_only': 0,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(VendorModel.fromJson).toList();
+      int current = page, last = page;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num) current = cp.toInt();
+        if (lp is num) last = lp.toInt();
+      }
+      return VendorsResult(items: items, currentPage: current, lastPage: last);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+/// One page of vendors plus paging info for infinite scroll (admin list).
+class VendorsResult {
+  VendorsResult({
+    required this.items,
+    required this.currentPage,
+    required this.lastPage,
+  });
+  final List<VendorModel> items;
+  final int currentPage;
+  final int lastPage;
+
+  bool get hasMore => currentPage < lastPage;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,11 +341,12 @@ class UploadService {
 class ServiceService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<ServiceModel>> list({int? vendorId, int? categoryId}) async {
+  Future<List<ServiceModel>> list({int? vendorId, int? categoryId, bool mine = false}) async {
     try {
       final res = await _dio.get('/services', queryParameters: {
         if (vendorId != null) 'vendor_id': vendorId,
         if (categoryId != null) 'category_id': categoryId,
+        if (mine) 'mine': 1,
       });
       return _unwrapList(res.data).map(ServiceModel.fromJson).toList();
     } catch (e) {
@@ -538,6 +582,35 @@ class StoryService {
         'per_page': 30,
       });
       return _unwrapList(res.data).map(StoryModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Create a story for [vendorId]. The owner of the vendor (or an admin)
+  /// is authorized server-side. [image] is a public URL from UploadService.
+  Future<StoryModel> create({
+    required int vendorId,
+    required String image,
+    String? captionAr,
+    String? captionEn,
+  }) async {
+    try {
+      final res = await _dio.post('/stories', data: {
+        'vendor_id': vendorId,
+        'image': image,
+        if (captionAr != null && captionAr.isNotEmpty) 'caption_ar': captionAr,
+        if (captionEn != null && captionEn.isNotEmpty) 'caption_en': captionEn,
+      });
+      return StoryModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/stories/$id');
     } catch (e) {
       throw toApiException(e);
     }
