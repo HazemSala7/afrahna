@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
 import '../bookings/bookings_page.dart';
 import '../delegate/delegate_dashboard_page.dart';
@@ -154,6 +155,15 @@ class _SignedInView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        if (user.isAdmin)
+          _MenuTile(
+            icon: Icons.admin_panel_settings,
+            label: 'لوحة الإدارة',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
+            ),
+          ),
         if (user.isDelegate)
           _MenuTile(
             icon: Icons.badge,

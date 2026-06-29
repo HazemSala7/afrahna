@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 
 class MyCommissionsPage extends StatefulWidget {
@@ -63,9 +64,20 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
                 ],
               ),
               const SizedBox(height: 12),
+              Text('صافي ربحك (إجمالي العمولات): ${t.totalCommission.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+              const SizedBox(height: 4),
               Text('عدد الاشتراكات: ${t.count}',
                   style: const TextStyle(fontWeight: FontWeight.bold)),
+
+              // المشتركون لكل شهر (subscribers per month + collection + profit)
+              ..._monthlySection(data.subscriptions),
+
               const Divider(height: 24),
+              const Text('المعلنون والاشتراكات',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
               ...data.subscriptions.map((s) => Card(
                     child: ListTile(
                       title: Text(s.clientName),
@@ -73,8 +85,10 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
                         'باقة: ${s.planName} • '
                         'مدفوع: ${s.amountPaid} • '
                         'عمولة: ${s.commissionAmount} '
-                        '${s.commissionPaid ? "(مدفوعة)" : "(معلّقة)"}',
+                        '${s.commissionPaid ? "(مدفوعة)" : "(معلّقة)"}\n'
+                        'الاشتراك: ${_fmt(s.startDate)} ← ${_fmt(s.endDate)}',
                       ),
+                      isThreeLine: true,
                       trailing: _statusChip(s.status),
                     ),
                   )),
@@ -83,6 +97,49 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
         },
       ),
     );
+  }
+
+  String _fmt(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Groups subscriptions by their start month and renders one row per month
+  /// with: subscriber count, total collection, and net profit (commission).
+  List<Widget> _monthlySection(List<SubscriptionModel> subs) {
+    if (subs.isEmpty) return const [];
+
+    final byMonth = <String, List<SubscriptionModel>>{};
+    for (final s in subs) {
+      final key =
+          '${s.startDate.year}-${s.startDate.month.toString().padLeft(2, '0')}';
+      byMonth.putIfAbsent(key, () => []).add(s);
+    }
+    final months = byMonth.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return [
+      const SizedBox(height: 16),
+      const Text('المشتركون لكل شهر',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      const SizedBox(height: 8),
+      ...months.map((m) {
+        final rows = byMonth[m]!;
+        final collected =
+            rows.fold<double>(0, (sum, s) => sum + s.amountPaid);
+        final profit =
+            rows.fold<double>(0, (sum, s) => sum + s.commissionAmount);
+        return Card(
+          color: Colors.indigo.withOpacity(0.06),
+          child: ListTile(
+            dense: true,
+            title: Text(m, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              'مشتركون: ${rows.length} • '
+              'تحصيل: ${collected.toStringAsFixed(0)} • '
+              'صافي الربح: ${profit.toStringAsFixed(0)}',
+            ),
+          ),
+        );
+      }),
+    ];
   }
 
   Widget _statusChip(String s) {

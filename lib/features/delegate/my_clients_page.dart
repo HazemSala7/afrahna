@@ -124,10 +124,22 @@ class _MyClientsPageState extends State<MyClientsPage> {
                   separatorBuilder: (_, __) => const Divider(height: 0),
                   itemBuilder: (_, i) {
                     final c = clients[i];
+                    final hasShop = c.vendorName != null && c.vendorName!.isNotEmpty;
+                    // Title shows the company (shop) name; the owner's username
+                    // and phone go underneath so the delegate can match shop ↔ owner.
+                    final title = hasShop ? c.vendorName! : c.name;
                     return ListTile(
-                      leading: CircleAvatar(child: Text(c.name.isNotEmpty ? c.name[0] : '?')),
-                      title: Text(c.name),
+                      leading: CircleAvatar(
+                        backgroundImage: (c.vendorLogo != null && c.vendorLogo!.isNotEmpty)
+                            ? NetworkImage(c.vendorLogo!)
+                            : null,
+                        child: (c.vendorLogo == null || c.vendorLogo!.isEmpty)
+                            ? Text(title.isNotEmpty ? title[0] : '?')
+                            : null,
+                      ),
+                      title: Text(title),
                       subtitle: Text([
+                        if (hasShop) 'المستخدم: ${c.name}',
                         c.phone,
                         if (c.workField != null && c.workField!.isNotEmpty) c.workField!,
                       ].join(' • ')),

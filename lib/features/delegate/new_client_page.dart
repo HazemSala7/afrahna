@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -37,9 +39,6 @@ class _NewClientPageState extends State<NewClientPage> {
   // Shop selection: 'new' (type a name) or 'existing' (pick an unowned shop).
   String _shopMode = 'new';
   AvailableShop? _selectedShop;
-  List<AvailableShop> _shops = const [];
-  bool _loadingShops = false;
-  String? _shopsError;
 
   DateTime _start = DateTime.now();
   DateTime _end = DateTime.now().add(const Duration(days: 365));
@@ -58,26 +57,13 @@ class _NewClientPageState extends State<NewClientPage> {
     super.dispose();
   }
 
-  Future<void> _loadShops() async {
-    setState(() {
-      _loadingShops = true;
-      _shopsError = null;
-    });
-    try {
-      final shops = await _service.availableShops();
-      if (!mounted) return;
-      setState(() {
-        _shops = shops;
-        if (_selectedShop != null &&
-            !shops.any((s) => s.id == _selectedShop!.id)) {
-          _selectedShop = null;
-        }
-      });
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _shopsError = e.message);
-    } finally {
-      if (mounted) setState(() => _loadingShops = false);
-    }
+  Future<void> _openShopPicker() async {
+    final picked = await showModalBottomSheet<AvailableShop>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ShopPickerSheet(service: _service),
+    );
+    if (picked != null) setState(() => _selectedShop = picked);
   }
 
   Future<void> _pickStart() async {
@@ -292,57 +278,30 @@ class _NewClientPageState extends State<NewClientPage> {
         ],
         selected: {_shopMode},
         onSelectionChanged: (sel) {
-          final mode = sel.first;
-          setState(() => _shopMode = mode);
-          if (mode == 'existing' && _shops.isEmpty && !_loadingShops) {
-            _loadShops();
-          }
+          setState(() => _shopMode = sel.first);
         },
       );
 
   Widget _existingShopPicker() {
-    if (_loadingShops) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_shopsError != null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Expanded(child: Text(_shopsError!, style: const TextStyle(color: Colors.red))),
-            TextButton(onPressed: _loadShops, child: const Text('إعادة المحاولة')),
-          ],
-        ),
-      );
-    }
-    if (_shops.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            const Expanded(child: Text('لا توجد محلات متاحة بدون حساب.')),
-            TextButton(onPressed: _loadShops, child: const Text('تحديث')),
-          ],
-        ),
-      );
-    }
+    final hasSelection = _selectedShop != null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: DropdownButtonFormField<AvailableShop>(
-        initialValue: _selectedShop,
-        isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'اختر المحل',
-          border: OutlineInputBorder(),
+      child: InkWell(
+        onTap: _openShopPicker,
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'اختر المحل',
+            border: OutlineInputBorder(),
+            suffixIcon: Icon(Icons.search),
+          ),
+          child: Text(
+            hasSelection ? _selectedShop!.name : 'اضغط للبحث واختيار محل',
+            style: hasSelection
+                ? null
+                : TextStyle(color: Theme.of(context).hintColor),
+          ),
         ),
-        items: [
-          for (final s in _shops)
-            DropdownMenuItem(value: s, child: Text(s.name)),
-        ],
-        onChanged: (v) => setState(() => _selectedShop = v),
       ),
     );
   }
@@ -369,6 +328,178 @@ class _NewClientPageState extends State<NewClientPage> {
           return (v == null || v.trim().isEmpty) ? 'حقل مطلوب' : null;
         },
       ),
+    );
+  }
+}
+
+/// Searchable, lazily-paginated picker for unowned shops. Opens as a bottom
+/// sheet: type to search (debounced) and scroll to load the next page.
+class _ShopPickerSheet extends StatefulWidget {
+  const _ShopPickerSheet({required this.service});
+  final DelegateService service;
+
+  @override
+  State<_ShopPickerSheet> createState() => _ShopPickerSheetState();
+}
+
+class _ShopPickerSheetState extends State<_ShopPickerSheet> {
+  final _scroll = ScrollController();
+  final _searchCtl = TextEditingController();
+  final List<AvailableShop> _items = [];
+
+  String _search = '';
+  int _page = 0; // last successfully loaded page (0 = none yet)
+  int _lastPage = 1;
+  bool _loading = false;
+  bool _initialLoaded = false;
+  String? _error;
+  Timer? _debounce;
+
+  bool get _hasMore => _page < _lastPage;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    _loadNext();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _scroll.dispose();
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 200) {
+      _loadNext();
+    }
+  }
+
+  Future<void> _loadNext() async {
+    if (_loading || (_initialLoaded && !_hasMore)) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await widget.service.availableShops(
+        search: _search,
+        page: _page + 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _items.addAll(res.items);
+        _page = res.currentPage;
+        _lastPage = res.lastPage;
+        _initialLoaded = true;
+      });
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _onSearchChanged(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      setState(() {
+        _search = v.trim();
+        _items.clear();
+        _page = 0;
+        _lastPage = 1;
+        _initialLoaded = false;
+      });
+      _loadNext();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: h * 0.85,
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: TextField(
+                controller: _searchCtl,
+                onChanged: _onSearchChanged,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'ابحث عن محل بالاسم',
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _searchCtl.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchCtl.clear();
+                            _onSearchChanged('');
+                          },
+                        ),
+                ),
+              ),
+            ),
+            Expanded(child: _buildList()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    if (_error != null && _items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+            TextButton(onPressed: _loadNext, child: const Text('إعادة المحاولة')),
+          ],
+        ),
+      );
+    }
+    if (!_initialLoaded && _loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_items.isEmpty) {
+      return const Center(child: Text('لا توجد محلات متاحة'));
+    }
+    return ListView.separated(
+      controller: _scroll,
+      itemCount: _items.length + (_hasMore ? 1 : 0),
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        if (i >= _items.length) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final s = _items[i];
+        return ListTile(
+          leading: const Icon(Icons.store),
+          title: Text(s.name),
+          onTap: () => Navigator.pop(context, s),
+        );
+      },
     );
   }
 }

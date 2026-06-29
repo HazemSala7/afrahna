@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../widgets/image_upload_field.dart';
 
 class CreateServicePage extends StatefulWidget {
   const CreateServicePage({super.key, this.vendorId, this.existing});
@@ -24,11 +25,17 @@ class _CreateServicePageState extends State<CreateServicePage> {
   final _price = TextEditingController();
   final _discount = TextEditingController();
   final _duration = TextEditingController();
-  final _image = TextEditingController();
-  final _vendorIdCtrl = TextEditingController();
+
+  /// Public URL of the chosen service image (uploaded via [ImageUploadField]).
+  String? _imageUrl;
 
   bool _isActive = true;
   bool _submitting = false;
+
+  /// The vendor this service belongs to. Resolved automatically for the
+  /// logged-in vendor owner so they never type a numeric id by hand.
+  int? _resolvedVendorId;
+  bool _loadingVendor = false;
 
   final _service = ServiceService();
 
@@ -44,12 +51,26 @@ class _CreateServicePageState extends State<CreateServicePage> {
       _descAr.text = e.descriptionAr ?? '';
       _descEn.text = e.descriptionEn ?? '';
       _price.text = e.price?.toString() ?? '';
-      _image.text = e.image ?? '';
+      _imageUrl = e.image;
     }
-    if (widget.vendorId != null) {
-      _vendorIdCtrl.text = '${widget.vendorId}';
-    } else if (e?.vendorId != null) {
-      _vendorIdCtrl.text = '${e!.vendorId}';
+    _resolvedVendorId = widget.vendorId ?? e?.vendorId;
+    // Logged-in owner creating a service for their own shop: fetch their
+    // vendor id from the API instead of asking them to type it.
+    if (_resolvedVendorId == null && !_editing) {
+      _loadMyVendor();
+    }
+  }
+
+  Future<void> _loadMyVendor() async {
+    setState(() => _loadingVendor = true);
+    try {
+      final v = await VendorService().mine();
+      if (!mounted) return;
+      setState(() => _resolvedVendorId = v.id);
+    } on ApiException {
+      // Leave it null; _submit will surface a clear message if needed.
+    } finally {
+      if (mounted) setState(() => _loadingVendor = false);
     }
   }
 
@@ -57,7 +78,7 @@ class _CreateServicePageState extends State<CreateServicePage> {
   void dispose() {
     for (final c in [
       _nameAr, _nameEn, _descAr, _descEn,
-      _price, _discount, _duration, _image, _vendorIdCtrl,
+      _price, _discount, _duration,
     ]) {
       c.dispose();
     }
@@ -66,12 +87,10 @@ class _CreateServicePageState extends State<CreateServicePage> {
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    final vid = widget.vendorId ??
-        widget.existing?.vendorId ??
-        int.tryParse(_vendorIdCtrl.text.trim());
+    final vid = _resolvedVendorId;
     if (vid == null && !_editing) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('معرّف المعلِن مطلوب')),
+        const SnackBar(content: Text('تعذّر تحديد المتجر. تأكد من تسجيل الدخول كصاحب متجر.')),
       );
       return;
     }
@@ -89,7 +108,7 @@ class _CreateServicePageState extends State<CreateServicePage> {
           discountPrice:
               _discount.text.trim().isEmpty ? null : double.tryParse(_discount.text.trim()),
           duration: _duration.text.trim().isEmpty ? null : _duration.text.trim(),
-          image: _image.text.trim().isEmpty ? null : _image.text.trim(),
+          image: (_imageUrl != null && _imageUrl!.isNotEmpty) ? _imageUrl : null,
           isActive: _isActive,
         );
       } else {
@@ -103,7 +122,7 @@ class _CreateServicePageState extends State<CreateServicePage> {
           discountPrice:
               _discount.text.trim().isEmpty ? null : double.tryParse(_discount.text.trim()),
           duration: _duration.text.trim().isEmpty ? null : _duration.text.trim(),
-          image: _image.text.trim().isEmpty ? null : _image.text.trim(),
+          image: (_imageUrl != null && _imageUrl!.isNotEmpty) ? _imageUrl : null,
           isActive: _isActive,
         );
       }
@@ -124,16 +143,16 @@ class _CreateServicePageState extends State<CreateServicePage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (widget.vendorId == null && !_editing) ...[
-              TextFormField(
-                controller: _vendorIdCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'معرّف المعلِن (vendor_id)',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) =>
-                    (v == null || int.tryParse(v.trim()) == null) ? 'مطلوب' : null,
+            if (_loadingVendor) ...[
+              const Row(
+                children: [
+                  SizedBox(
+                    height: 18, width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text('جارٍ تحميل بيانات متجرك...'),
+                ],
               ),
               const SizedBox(height: 12),
             ],
@@ -201,12 +220,12 @@ class _CreateServicePageState extends State<CreateServicePage> {
               ),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _image,
-              decoration: const InputDecoration(
-                labelText: 'رابط الصورة',
-                border: OutlineInputBorder(),
-              ),
+            ImageUploadField(
+              label: 'صورة الخدمة',
+              url: _imageUrl,
+              folder: 'services',
+              fallbackIcon: Icons.design_services_outlined,
+              onChanged: (url) => setState(() => _imageUrl = url),
             ),
             const SizedBox(height: 8),
             SwitchListTile(

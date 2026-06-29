@@ -41,6 +41,8 @@ class UserModel {
     this.cityId,
     this.commissionPerSubscription,
     this.permissions = const {},
+    this.vendorName,
+    this.vendorLogo,
   });
 
   final int id;
@@ -57,6 +59,13 @@ class UserModel {
 
   /// Granular delegate permission map, e.g. {'edit_vendor': true}.
   final Map<String, dynamic> permissions;
+
+  /// Name of the shop (vendor) this user owns, when the API eager-loads it
+  /// (e.g. the delegate's clients list). Null if the user has no shop.
+  final String? vendorName;
+
+  /// Logo URL of the user's shop, when available.
+  final String? vendorLogo;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -75,6 +84,16 @@ class UserModel {
         permissions: json['permissions'] is Map
             ? Map<String, dynamic>.from(json['permissions'] as Map)
             : const {},
+        vendorName: json['vendor'] is Map
+            ? (_readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
+                _readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
+            : null,
+        vendorLogo: json['vendor'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -205,6 +224,8 @@ class VendorModel {
     this.activePlans = const <String>[],
     this.inSlider = false,
     this.isPremium = false,
+    this.isActive = true,
+    this.delegateName,
   });
 
   final int id;
@@ -245,6 +266,13 @@ class VendorModel {
 
   /// Vendor has the featured/premium badge (manual flag or active featured plan).
   final bool isPremium;
+
+  /// Whether the shop is active/visible. Admins can toggle this.
+  final bool isActive;
+
+  /// Name of the delegate responsible for this shop's owner account.
+  /// Only populated for admin requests (`/vendors` eager-loads it).
+  final String? delegateName;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
@@ -291,6 +319,16 @@ class VendorModel {
             : const <String>[],
         inSlider: json['in_slider'] == true || json['in_slider'] == 1,
         isPremium: json['is_premium'] == true || json['is_premium'] == 1,
+        isActive: json['is_active'] == null
+            ? true
+            : (json['is_active'] == true || json['is_active'] == 1),
+        delegateName: json['user'] is Map &&
+                (json['user'] as Map)['delegate'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(
+                    (json['user'] as Map)['delegate'] as Map),
+                'name')
+            : null,
       );
 }
 
@@ -554,6 +592,7 @@ class SliderModel {
     this.badgeAr,
     this.badgeEn,
     this.link,
+    this.vendorId,
     this.sortOrder = 0,
   });
 
@@ -568,6 +607,9 @@ class SliderModel {
   final String? badgeAr;
   final String? badgeEn;
   final String? link;
+
+  /// Optional advertiser this slide opens when tapped.
+  final int? vendorId;
   final int sortOrder;
 
   String get title =>
@@ -591,6 +633,7 @@ class SliderModel {
         badgeAr: _readT<String>(json, 'badge_ar'),
         badgeEn: _readT<String>(json, 'badge_en'),
         link: _readT<String>(json, 'link'),
+        vendorId: _toInt(json['vendor_id']),
         sortOrder: _toInt(json['sort_order']) ?? 0,
       );
 }

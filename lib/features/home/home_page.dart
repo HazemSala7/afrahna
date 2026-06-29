@@ -556,7 +556,11 @@ class _HeroSlideView extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const OffersPage()),
+        MaterialPageRoute(
+          builder: (_) => slide.vendorId != null
+              ? VendorDetailsPage(vendorId: slide.vendorId!)
+              : const OffersPage(),
+        ),
       ),
       child: Stack(
         fit: StackFit.expand,

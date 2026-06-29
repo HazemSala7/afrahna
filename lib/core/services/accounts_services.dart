@@ -39,6 +39,20 @@ Map<String, dynamic> _unwrapObject(dynamic body) {
 // SUBSCRIPTION
 // ---------------------------------------------------------------------------
 
+/// One page of subscriptions plus paging info for infinite scroll.
+class SubscriptionsPage {
+  SubscriptionsPage({
+    required this.items,
+    required this.currentPage,
+    required this.lastPage,
+  });
+  final List<SubscriptionModel> items;
+  final int currentPage;
+  final int lastPage;
+
+  bool get hasMore => currentPage < lastPage;
+}
+
 class SubscriptionService {
   final _dio = ApiClient.instance.dio;
 
@@ -61,10 +75,143 @@ class SubscriptionService {
     }
   }
 
+  /// Paginated list for infinite scroll (admin subscriptions screen).
+  Future<SubscriptionsPage> listPaged({
+    String? status,
+    int? delegateId,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/subscriptions', queryParameters: {
+        if (status != null) 'status': status,
+        if (delegateId != null) 'delegate_id': delegateId,
+        if (search != null && search.isNotEmpty) 'search': search,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(SubscriptionModel.fromJson).toList();
+      int current = page, last = page;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num) current = cp.toInt();
+        if (lp is num) last = lp.toInt();
+      }
+      return SubscriptionsPage(items: items, currentPage: current, lastPage: last);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<SubscriptionModel> show(int id) async {
     try {
       final res = await _dio.get('/subscriptions/$id');
       return SubscriptionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Admin: update any subscription (edit plan / amounts / dates / status).
+  Future<SubscriptionModel> update(int id, Map<String, dynamic> data) async {
+    try {
+      final res = await _dio.put('/subscriptions/$id', data: data);
+      return SubscriptionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Admin: flag the delegate commission on a subscription as paid.
+  Future<SubscriptionModel> markCommissionPaid(int id) async {
+    try {
+      final res = await _dio.post('/subscriptions/$id/mark-commission-paid');
+      return SubscriptionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN — user management (vendors / delegates / customers / admins)
+// ---------------------------------------------------------------------------
+
+/// One page of users plus paging info for infinite scroll.
+class UsersPage {
+  UsersPage({
+    required this.items,
+    required this.currentPage,
+    required this.lastPage,
+  });
+  final List<UserModel> items;
+  final int currentPage;
+  final int lastPage;
+
+  bool get hasMore => currentPage < lastPage;
+}
+
+class AdminUserService {
+  final _dio = ApiClient.instance.dio;
+
+  /// Paginated, searchable user list. [role] filters to a single account type
+  /// (customer / vendor / delegate / admin); omit for all roles.
+  Future<UsersPage> list({
+    String? role,
+    String? search,
+    bool? isActive,
+    int? delegateId,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/users', queryParameters: {
+        if (role != null) 'role': role,
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (isActive != null) 'is_active': isActive ? 1 : 0,
+        if (delegateId != null) 'delegate_id': delegateId,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(UserModel.fromJson).toList();
+      int current = page, last = page;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num) current = cp.toInt();
+        if (lp is num) last = lp.toInt();
+      }
+      return UsersPage(items: items, currentPage: current, lastPage: last);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<UserModel> update(int id, Map<String, dynamic> data) async {
+    try {
+      final res = await _dio.put('/users/$id', data: data);
+      return UserModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<UserModel> toggleActive(int id) async {
+    try {
+      final res = await _dio.post('/users/$id/toggle-active');
+      return UserModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/users/$id');
     } catch (e) {
       throw toApiException(e);
     }
@@ -107,6 +254,20 @@ class AvailableShop {
       name: ar.isNotEmpty ? ar : en,
     );
   }
+}
+
+/// One page of available shops plus enough paging info for infinite scroll.
+class AvailableShopsPage {
+  AvailableShopsPage({
+    required this.items,
+    required this.currentPage,
+    required this.lastPage,
+  });
+  final List<AvailableShop> items;
+  final int currentPage;
+  final int lastPage;
+
+  bool get hasMore => currentPage < lastPage;
 }
 
 class DelegateService {
@@ -155,12 +316,27 @@ class DelegateService {
 
   /// Shops (vendors) that have no owner account yet — selectable when linking
   /// a new advertiser to an existing shop.
-  Future<List<AvailableShop>> availableShops({String? search}) async {
+  Future<AvailableShopsPage> availableShops({
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
     try {
       final res = await _dio.get('/delegate/available-shops', queryParameters: {
         if (search != null && search.isNotEmpty) 'search': search,
+        'page': page,
+        'per_page': perPage,
       });
-      return _unwrapList(res.data).map(AvailableShop.fromJson).toList();
+      final body = res.data;
+      final items = _unwrapList(body).map(AvailableShop.fromJson).toList();
+      int current = page, last = page;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num) current = cp.toInt();
+        if (lp is num) last = lp.toInt();
+      }
+      return AvailableShopsPage(items: items, currentPage: current, lastPage: last);
     } catch (e) {
       throw toApiException(e);
     }
