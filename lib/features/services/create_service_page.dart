@@ -51,6 +51,7 @@ class _CreateServicePageState extends State<CreateServicePage> {
       _descAr.text = e.descriptionAr ?? '';
       _descEn.text = e.descriptionEn ?? '';
       _price.text = e.price?.toString() ?? '';
+      _discount.text = e.discountPrice?.toString() ?? '';
       _imageUrl = e.image;
     }
     _resolvedVendorId = widget.vendorId ?? e?.vendorId;

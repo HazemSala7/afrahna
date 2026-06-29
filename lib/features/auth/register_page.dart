@@ -57,8 +57,16 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
+      // Clear the auth stack AND swap in HomePage instantly. A normal
+      // MaterialPageRoute here would slide in over an empty (removed) stack,
+      // briefly exposing a black gap behind the transition — so use a
+      // zero-duration route that paints the page from the first frame.
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        PageRouteBuilder(
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (_, __, ___) => const HomePage(),
+        ),
         (_) => false,
       );
     } else {

@@ -131,6 +131,16 @@ class _StoryTile extends StatelessWidget {
   final StoryModel story;
   final VoidCallback onDelete;
 
+  /// Human label for how long a story has left before it auto-expires.
+  static String _remainingLabel(DateTime? expiresAt) {
+    if (expiresAt == null) return 'دائم';
+    final left = expiresAt.difference(DateTime.now());
+    if (left.isNegative) return 'منتهية';
+    if (left.inHours >= 24) return 'تبقّى ${left.inDays} يوم';
+    if (left.inHours >= 1) return 'تبقّى ${left.inHours} ساعة';
+    return 'تبقّى ${left.inMinutes} دقيقة';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -179,6 +189,33 @@ class _StoryTile extends StatelessWidget {
               ),
             ),
           ),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.timer_outlined,
+                      color: Colors.white, size: 12),
+                  const SizedBox(width: 3),
+                  Text(
+                    _remainingLabel(story.expiresAt),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -197,11 +234,23 @@ class _AddStoryPage extends StatefulWidget {
   State<_AddStoryPage> createState() => _AddStoryPageState();
 }
 
+/// Selectable lifespans for a story. `null` duration = never expires.
+const _storyDurations = <({String label, Duration? duration})>[
+  (label: '12 ساعة', duration: Duration(hours: 12)),
+  (label: '24 ساعة', duration: Duration(hours: 24)),
+  (label: '48 ساعة', duration: Duration(hours: 48)),
+  (label: '3 أيام', duration: Duration(days: 3)),
+  (label: 'أسبوع', duration: Duration(days: 7)),
+  (label: 'بدون انتهاء (دائم)', duration: null),
+];
+
 class _AddStoryPageState extends State<_AddStoryPage> {
   final _service = StoryService();
   final _captionAr = TextEditingController();
   final _captionEn = TextEditingController();
   String? _imageUrl;
+  // Default to the classic 24-hour story lifespan.
+  Duration? _duration = const Duration(hours: 24);
   bool _saving = false;
 
   @override
@@ -225,6 +274,8 @@ class _AddStoryPageState extends State<_AddStoryPage> {
         image: _imageUrl!,
         captionAr: _captionAr.text.trim(),
         captionEn: _captionEn.text.trim(),
+        expiresAt:
+            _duration == null ? null : DateTime.now().add(_duration!),
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -268,6 +319,29 @@ class _AddStoryPageState extends State<_AddStoryPage> {
               labelText: 'تعليق بالإنجليزية (اختياري)',
               border: OutlineInputBorder(),
             ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<Duration?>(
+            value: _duration,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'مدة عرض الستوري',
+              prefixIcon: Icon(Icons.timer_outlined),
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final o in _storyDurations)
+                DropdownMenuItem<Duration?>(
+                  value: o.duration,
+                  child: Text(o.label),
+                ),
+            ],
+            onChanged: (v) => setState(() => _duration = v),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'بعد انتهاء المدة تختفي الستوري تلقائيًا من التطبيق.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
           ),
           const SizedBox(height: 16),
           FilledButton(

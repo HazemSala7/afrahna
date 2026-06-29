@@ -7,10 +7,15 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/follow_button.dart';
 import '../bookings/booking_create_page.dart';
 import '../home/home_page.dart';
 import '../services/service_details_page.dart';
+import 'package:latlong2/latlong.dart';
+
+import 'highlight_viewer_page.dart';
 import 'story_viewer_page.dart';
+import 'vendor_map_page.dart';
 
 class VendorDetailsPage extends StatefulWidget {
   const VendorDetailsPage({super.key, required this.vendorId});
@@ -29,6 +34,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   late Future<List<ServiceModel>> _servicesFuture;
   late Future<List<ReviewModel>> _reviewsFuture;
   late Future<List<StoryModel>> _storiesFuture;
+  late Future<List<HighlightModel>> _highlightsFuture;
   final ScrollController _scrollController = ScrollController();
   bool _favLoading = false;
   bool? _favLocal;
@@ -40,6 +46,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
     _servicesFuture = ServiceService().list(vendorId: widget.vendorId);
     _reviewsFuture = ReviewService().listForVendor(widget.vendorId);
     _storiesFuture = StoryService().listForVendor(widget.vendorId);
+    _highlightsFuture = HighlightService().listForVendor(widget.vendorId);
   }
 
   @override
@@ -165,6 +172,10 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                               servicesFuture: _servicesFuture,
                             ),
                             const SizedBox(height: 18),
+                            _HighlightsSection(
+                              vendor: vendor,
+                              future: _highlightsFuture,
+                            ),
                             _StoriesSection(
                               vendor: vendor,
                               future: _storiesFuture,
@@ -178,10 +189,24 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             _launch(Uri.parse('tel:$p'));
                           },
                           onMap: () {
-                            final q = Uri.encodeComponent(
-                                vendor.address ?? vendor.name);
-                            _launch(Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=$q'));
+                            // Always show the map inside the app. Use the shop's
+                            // coordinates when set; otherwise geocode its address.
+                            final hasCoords = vendor.latitude != null &&
+                                vendor.longitude != null;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => VendorMapPage(
+                                  title: vendor.name,
+                                  address: vendor.address,
+                                  query: vendor.address ?? vendor.name,
+                                  initialLocation: hasCoords
+                                      ? LatLng(vendor.latitude!,
+                                          vendor.longitude!)
+                                      : null,
+                                ),
+                              ),
+                            );
                           },
                           onOpenSocial: _launch,
                         ),
@@ -387,6 +412,13 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                       onTap: () => Navigator.pop(context),
                     ),
                     const Spacer(),
+                    FollowButton(
+                      vendorId: vendor.id,
+                      initiallyFollowing: vendor.isFollowing,
+                      followersCount: vendor.followersCount,
+                      compact: true,
+                    ),
+                    const SizedBox(width: 8),
                     _GlassIconButton(
                       icon: isFav
                           ? Icons.favorite
@@ -1050,6 +1082,35 @@ class _RatingSheetState extends State<_RatingSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// HIGHLIGHTS SECTION (دائمة، مثل انستجرام)
+// ============================================================
+class _HighlightsSection extends StatelessWidget {
+  const _HighlightsSection({required this.vendor, required this.future});
+  final VendorModel vendor;
+  final Future<List<HighlightModel>> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<HighlightModel>>(
+      future: future,
+      builder: (_, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+        final highlights =
+            snap.data!.where((h) => h.items.isNotEmpty).toList();
+        if (highlights.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HighlightsRail(vendor: vendor, highlights: highlights),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
     );
   }
 }
@@ -1861,39 +1922,73 @@ class _ServiceTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (service.price != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryDark],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (service.hasDiscount) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'خصم ${service.discountPercent}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
                       Text(
-                        service.price!.toStringAsFixed(0),
+                        '${service.price!.toStringAsFixed(0)} ₪',
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
+                          color: AppColors.textMuted,
+                          decoration: TextDecoration.lineThrough,
+                          fontSize: 11.5,
                         ),
                       ),
-                      const SizedBox(width: 3),
-                      const Text(
-                        '₪',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
+                      const SizedBox(height: 2),
                     ],
-                  ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.primaryDark],
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            service.effectivePrice!.toStringAsFixed(0),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Text(
+                            '₪',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
             ],
           ),

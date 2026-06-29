@@ -255,6 +255,42 @@ class VendorService {
     }
   }
 
+  /// Vendor owner (or admin): list users who follow this shop + total count.
+  Future<({List<UserModel> users, int total})> followers(
+    int vendorId, {
+    int page = 1,
+    int perPage = 30,
+  }) async {
+    try {
+      final res = await _dio.get('/vendors/$vendorId/followers',
+          queryParameters: {'page': page, 'per_page': perPage});
+      final body = res.data;
+      final total = (body is Map && body['total'] is num)
+          ? (body['total'] as num).toInt()
+          : 0;
+      final users = _unwrapList(body).map(UserModel.fromJson).toList();
+      return (users: users, total: total);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Vendor owner sends a notification to all of their followers.
+  /// Returns how many followers were notified.
+  Future<int> notifyFollowers(int vendorId,
+      {required String title, String? body}) async {
+    try {
+      final res = await _dio.post('/vendors/$vendorId/notify-followers', data: {
+        'title': title,
+        if (body != null && body.isNotEmpty) 'body': body,
+      });
+      final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : {};
+      return (m['sent'] is num) ? (m['sent'] as num).toInt() : 0;
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Admin: paginated + searchable vendor list that INCLUDES inactive shops
   /// (active_only=0), for the in-app admin management screen.
   Future<VendorsResult> adminList({
@@ -308,13 +344,28 @@ class UploadService {
 
   /// Uploads a local file to the server and returns its public URL.
   /// [folder] groups files server-side, e.g. "vendors/logos".
-  Future<String> uploadFile(String filePath, {String folder = 'general'}) async {
+  /// [onProgress] reports upload progress in the range 0.0–1.0 (useful for
+  /// large reel videos); it may be called with values > total unknown, so it is
+  /// clamped before being emitted.
+  Future<String> uploadFile(
+    String filePath, {
+    String folder = 'general',
+    void Function(double progress)? onProgress,
+  }) async {
     try {
       final form = FormData.fromMap({
         'folder': folder,
         'file': await MultipartFile.fromFile(filePath),
       });
-      final res = await _dio.post('/uploads', data: form);
+      final res = await _dio.post(
+        '/uploads',
+        data: form,
+        onSendProgress: onProgress == null
+            ? null
+            : (sent, total) {
+                if (total > 0) onProgress((sent / total).clamp(0.0, 1.0));
+              },
+      );
       final status = res.statusCode ?? 0;
       if (status < 200 || status >= 300) {
         throw toApiException(DioException(
@@ -531,6 +582,112 @@ class PromotionService {
       throw toApiException(e);
     }
   }
+
+  /// All promotions for one vendor (incl. inactive/expired) — for the vendor's
+  /// own management screen.
+  Future<List<PromotionModel>> listForVendor(int vendorId) async {
+    try {
+      final res = await _dio.get('/promotions', queryParameters: {
+        'vendor_id': vendorId,
+        'active_only': 0,
+        'per_page': 50,
+      });
+      return _unwrapList(res.data).map(PromotionModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Create a promotion for [vendorId] (vendor owner / admin authorized server-side).
+  Future<PromotionModel> create({
+    required int vendorId,
+    required String titleAr,
+    required String titleEn,
+    String? descriptionAr,
+    String? descriptionEn,
+    String? image,
+    String discountType = 'percent',
+    double? discountValue,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool isActive = true,
+  }) async {
+    try {
+      final res = await _dio.post('/promotions', data: {
+        'vendor_id': vendorId,
+        'title_ar': titleAr,
+        'title_en': titleEn.isEmpty ? titleAr : titleEn,
+        if (descriptionAr != null && descriptionAr.isNotEmpty)
+          'description_ar': descriptionAr,
+        if (descriptionEn != null && descriptionEn.isNotEmpty)
+          'description_en': descriptionEn,
+        if (image != null && image.isNotEmpty) 'image': image,
+        'discount_type': discountType,
+        if (discountValue != null) 'discount_value': discountValue,
+        if (startDate != null) 'start_date': _ymd(startDate),
+        if (endDate != null) 'end_date': _ymd(endDate),
+        'is_active': isActive,
+      });
+      return PromotionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/promotions/$id');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  String _ymd(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+// ---------------------------------------------------------------------------
+// HOME STATS
+// ---------------------------------------------------------------------------
+
+class HomeStats {
+  const HomeStats({
+    this.vendors = 0,
+    this.users = 0,
+    this.appUsers = 0,
+    this.services = 0,
+    this.cities = 0,
+  });
+
+  final int vendors;
+  final int users;
+  final int appUsers;
+  final int services;
+  final int cities;
+
+  factory HomeStats.fromJson(Map<String, dynamic> json) => HomeStats(
+        vendors: (json['vendors'] as num?)?.toInt() ?? 0,
+        users: (json['users'] as num?)?.toInt() ?? 0,
+        appUsers: (json['app_users'] as num?)?.toInt() ?? 0,
+        services: (json['services'] as num?)?.toInt() ?? 0,
+        cities: (json['cities'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class StatsService {
+  final _dio = ApiClient.instance.dio;
+
+  Future<HomeStats> get() async {
+    try {
+      final res = await _dio.get('/stats');
+      final m = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
+      return HomeStats.fromJson(m);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -594,6 +751,7 @@ class StoryService {
     required String image,
     String? captionAr,
     String? captionEn,
+    DateTime? expiresAt,
   }) async {
     try {
       final res = await _dio.post('/stories', data: {
@@ -601,6 +759,7 @@ class StoryService {
         'image': image,
         if (captionAr != null && captionAr.isNotEmpty) 'caption_ar': captionAr,
         if (captionEn != null && captionEn.isNotEmpty) 'caption_en': captionEn,
+        if (expiresAt != null) 'expires_at': expiresAt.toUtc().toIso8601String(),
       });
       return StoryModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
@@ -628,6 +787,104 @@ class StoryService {
           .map((m) => VendorStoriesGroup.fromJson(
               Map<String, dynamic>.from(m)))
           .toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HIGHLIGHTS (دائمة)
+// ---------------------------------------------------------------------------
+
+class HighlightService {
+  final _dio = ApiClient.instance.dio;
+
+  /// Active highlights (with their items) for a vendor profile.
+  Future<List<HighlightModel>> listForVendor(int vendorId) async {
+    try {
+      final res = await _dio.get('/highlights', queryParameters: {
+        'vendor_id': vendorId,
+        'per_page': 50,
+      });
+      return _unwrapList(res.data).map(HighlightModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<HighlightModel> create({
+    required int vendorId,
+    required String title,
+    String? coverImage,
+    int? sortOrder,
+  }) async {
+    try {
+      final res = await _dio.post('/highlights', data: {
+        'vendor_id': vendorId,
+        'title': title,
+        if (coverImage != null && coverImage.isNotEmpty) 'cover_image': coverImage,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      });
+      return HighlightModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<HighlightModel> update(
+    int id, {
+    String? title,
+    String? coverImage,
+    int? sortOrder,
+    bool? isActive,
+  }) async {
+    try {
+      final res = await _dio.put('/highlights/$id', data: {
+        if (title != null) 'title': title,
+        if (coverImage != null) 'cover_image': coverImage,
+        if (sortOrder != null) 'sort_order': sortOrder,
+        if (isActive != null) 'is_active': isActive,
+      });
+      return HighlightModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/highlights/$id');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Add one media item (image/video URL from UploadService) to a highlight.
+  Future<HighlightItemModel> addItem({
+    required int highlightId,
+    required String mediaUrl,
+    String type = 'image',
+    String? caption,
+    int? sortOrder,
+  }) async {
+    try {
+      final res = await _dio.post('/highlight-items', data: {
+        'highlight_id': highlightId,
+        'type': type,
+        'media_url': mediaUrl,
+        if (caption != null && caption.isNotEmpty) 'caption': caption,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      });
+      return HighlightItemModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> deleteItem(int itemId) async {
+    try {
+      await _dio.delete('/highlight-items/$itemId');
     } catch (e) {
       throw toApiException(e);
     }

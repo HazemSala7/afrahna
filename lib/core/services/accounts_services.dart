@@ -391,6 +391,78 @@ class DelegateService {
     }
   }
 
+  /// Subscriptions of one of the delegate's clients (for renew / change plan).
+  Future<List<SubscriptionModel>> clientSubscriptions(int userId) async {
+    try {
+      final res = await _dio.get('/delegate/clients/$userId/subscriptions');
+      return _unwrapList(res.data).map(SubscriptionModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Add a new subscription (renewal / extra plan) for an existing client.
+  Future<SubscriptionModel> addSubscription({
+    required int userId,
+    required String planName,
+    required double amountPaid,
+    double? commissionAmount,
+    String? paymentMethod,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? notes,
+  }) async {
+    try {
+      final res = await _dio.post('/delegate/subscriptions', data: {
+        'user_id': userId,
+        'plan_name': planName,
+        'amount_paid': amountPaid,
+        if (commissionAmount != null) 'commission_amount': commissionAmount,
+        if (paymentMethod != null && paymentMethod.isNotEmpty)
+          'payment_method': paymentMethod,
+        'start_date': _date(startDate),
+        'end_date': _date(endDate),
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      });
+      _throwIfError(res);
+      return SubscriptionModel.fromJson(
+          Map<String, dynamic>.from(res.data as Map));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Change an existing subscription's plan type, duration (dates) or status.
+  Future<SubscriptionModel> updateSubscription(
+    int id, {
+    String? planName,
+    double? amountPaid,
+    double? commissionAmount,
+    String? paymentMethod,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? status,
+    String? notes,
+  }) async {
+    try {
+      final res = await _dio.put('/delegate/subscriptions/$id', data: {
+        if (planName != null) 'plan_name': planName,
+        if (amountPaid != null) 'amount_paid': amountPaid,
+        if (commissionAmount != null) 'commission_amount': commissionAmount,
+        if (paymentMethod != null) 'payment_method': paymentMethod,
+        if (startDate != null) 'start_date': _date(startDate),
+        if (endDate != null) 'end_date': _date(endDate),
+        if (status != null) 'status': status,
+        if (notes != null) 'notes': notes,
+      });
+      _throwIfError(res);
+      return SubscriptionModel.fromJson(
+          Map<String, dynamic>.from(res.data as Map));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Dio accepts any status < 500 without throwing, so 4xx responses (e.g.
   /// validation 422) arrive here as a normal response with an error body.
   /// Surface the real server message instead of crashing while parsing.

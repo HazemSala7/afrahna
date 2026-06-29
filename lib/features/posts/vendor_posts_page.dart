@@ -7,8 +7,11 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../services/create_service_page.dart';
 import '../vendors/edit_vendor_page.dart';
+import '../vendors/manage_highlights_page.dart';
+import '../vendors/manage_promotions_page.dart';
 import '../vendors/manage_stories_page.dart';
-import 'create_post_page.dart';
+import '../vendors/vendor_followers_page.dart';
+import 'reel_studio_page.dart';
 
 /// Vendor's content page — tabs: خدماتي / ريلز / دورات.
 /// Pass [vendorId] to view a specific vendor (read-only); omit for current vendor.
@@ -90,10 +93,34 @@ class _VendorPostsPageState extends State<VendorPostsPage>
       final ok = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => CreatePostPage(vendorId: widget.vendorId),
+          builder: (_) => ReelStudioPage(vendorId: widget.vendorId),
         ),
       );
       if (ok == true && mounted) setState(() => _reloadKey++);
+    }
+  }
+
+  Future<void> _notifyFollowers(VendorModel vendor) async {
+    final titleCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController();
+    final sent = await showDialog<int>(
+      context: context,
+      builder: (ctx) => _NotifyFollowersDialog(
+        vendor: vendor,
+        titleCtrl: titleCtrl,
+        bodyCtrl: bodyCtrl,
+      ),
+    );
+    titleCtrl.dispose();
+    bodyCtrl.dispose();
+    if (sent != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(sent > 0
+              ? 'تم إرسال الإشعار إلى $sent متابع'
+              : 'لا يوجد متابعون بعد'),
+        ),
+      );
     }
   }
 
@@ -118,28 +145,88 @@ class _VendorPostsPageState extends State<VendorPostsPage>
         title: Text(_vendor?.name ?? 'المحتوى'),
         actions: [
           if (widget.canCreate && _vendor != null)
-            IconButton(
-              tooltip: 'إدارة الستوريز',
-              icon: const Icon(Icons.amp_stories_outlined),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ManageStoriesPage(vendorId: _vendor!.id),
+            PopupMenuButton<String>(
+              tooltip: 'إدارة',
+              icon: const Icon(Icons.tune),
+              onSelected: (value) {
+                final vid = _vendor!.id;
+                switch (value) {
+                  case 'promotions':
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ManagePromotionsPage(vendorId: vid)));
+                    break;
+                  case 'highlights':
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ManageHighlightsPage(vendorId: vid)));
+                    break;
+                  case 'stories':
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ManageStoriesPage(vendorId: vid)));
+                    break;
+                  case 'followers':
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => VendorFollowersPage(vendorId: vid)));
+                    break;
+                  case 'notify':
+                    _notifyFollowers(_vendor!);
+                    break;
+                  case 'edit':
+                    _editProfile();
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'promotions',
+                  child: ListTile(
+                      leading: Icon(Icons.local_offer_outlined),
+                      title: Text('عروضي'),
+                      contentPadding: EdgeInsets.zero),
                 ),
-              ),
-            ),
-          if (widget.canCreate && widget.vendorId == null)
-            IconButton(
-              tooltip: 'تعديل بيانات المعلن',
-              icon: const Icon(Icons.edit_note),
-              onPressed: _editProfile,
+                const PopupMenuItem(
+                  value: 'highlights',
+                  child: ListTile(
+                      leading: Icon(Icons.auto_awesome_outlined),
+                      title: Text('إدارة الهايلايت'),
+                      contentPadding: EdgeInsets.zero),
+                ),
+                const PopupMenuItem(
+                  value: 'stories',
+                  child: ListTile(
+                      leading: Icon(Icons.amp_stories_outlined),
+                      title: Text('إدارة الستوريز'),
+                      contentPadding: EdgeInsets.zero),
+                ),
+                const PopupMenuItem(
+                  value: 'followers',
+                  child: ListTile(
+                      leading: Icon(Icons.group_outlined),
+                      title: Text('المتابعون'),
+                      contentPadding: EdgeInsets.zero),
+                ),
+                const PopupMenuItem(
+                  value: 'notify',
+                  child: ListTile(
+                      leading: Icon(Icons.campaign_outlined),
+                      title: Text('إشعار للمتابعين'),
+                      contentPadding: EdgeInsets.zero),
+                ),
+                if (widget.vendorId == null)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(
+                        leading: Icon(Icons.edit_note),
+                        title: Text('تعديل بيانات المعلن'),
+                        contentPadding: EdgeInsets.zero),
+                  ),
+              ],
             ),
         ],
       ),
       floatingActionButton: widget.canCreate
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.add),
-              label: Text(_tabs.index == 0 ? 'إضافة خدمة' : 'إنشاء جديد'),
+              label: Text(_tabs.index == 0 ? 'إضافة خدمة' : 'إضافة ريلز'),
               onPressed: _createForCurrentTab,
             )
           : null,
@@ -420,8 +507,7 @@ class _ServiceCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    if (service.price != null)
-                      Chip(label: Text('السعر: ${service.price}')),
+                    if (service.price != null) _ServicePriceTag(service: service),
                     const Spacer(),
                     if (canManage) ...[
                       IconButton(
@@ -443,6 +529,69 @@ class _ServiceCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Price tag that clearly shows a discount when the service has one:
+/// the old price struck through, the new price, and a "-NN%" badge.
+class _ServicePriceTag extends StatelessWidget {
+  const _ServicePriceTag({required this.service});
+  final ServiceModel service;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!service.hasDiscount) {
+      return Chip(
+        label: Text('السعر: ${_fmt(service.price)} ₪'),
+        backgroundColor: AppColors.primaryLight,
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Discount percentage badge.
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.red.shade600,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'خصم ${service.discountPercent}%',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 11.5,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Old price (struck through).
+        Text(
+          '${_fmt(service.price)} ₪',
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            decoration: TextDecoration.lineThrough,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(width: 6),
+        // New (discounted) price.
+        Text(
+          '${_fmt(service.discountPrice)} ₪',
+          style: const TextStyle(
+            color: AppColors.primaryDark,
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _fmt(double? v) {
+    if (v == null) return '0';
+    return v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
   }
 }
 
@@ -562,6 +711,109 @@ class _PostCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// NOTIFY FOLLOWERS DIALOG
+// ---------------------------------------------------------------------------
+
+class _NotifyFollowersDialog extends StatefulWidget {
+  const _NotifyFollowersDialog({
+    required this.vendor,
+    required this.titleCtrl,
+    required this.bodyCtrl,
+  });
+  final VendorModel vendor;
+  final TextEditingController titleCtrl;
+  final TextEditingController bodyCtrl;
+
+  @override
+  State<_NotifyFollowersDialog> createState() => _NotifyFollowersDialogState();
+}
+
+class _NotifyFollowersDialogState extends State<_NotifyFollowersDialog> {
+  bool _sending = false;
+
+  Future<void> _send() async {
+    if (widget.titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اكتب عنوان الإشعار')),
+      );
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      final sent = await VendorService().notifyFollowers(
+        widget.vendor.id,
+        title: widget.titleCtrl.text.trim(),
+        body: widget.bodyCtrl.text.trim(),
+      );
+      if (mounted) Navigator.pop(context, sent);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('إشعار للمتابعين'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              'سيصل هذا الإشعار لكل من يتابع "${widget.vendor.name}"',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: widget.titleCtrl,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'العنوان',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: widget.bodyCtrl,
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'النص (اختياري)',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sending ? null : () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _sending ? null : _send,
+          icon: _sending
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.send),
+          label: const Text('إرسال'),
+        ),
+      ],
     );
   }
 }

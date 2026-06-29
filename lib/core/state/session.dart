@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../api/api_client.dart';
 import '../api/auth_storage.dart';
 import '../models/models.dart';
 import '../services/push_notifications.dart';
@@ -11,9 +12,15 @@ import '../services/services.dart';
 enum AuthStatus { unknown, signedIn, signedOut }
 
 class SessionController extends ChangeNotifier {
-  SessionController({AuthService? auth}) : _auth = auth ?? AuthService();
+  SessionController({AuthService? auth}) : _auth = auth ?? AuthService() {
+    // When any authenticated request returns 401 (token revoked because the
+    // account was stopped), drop the session immediately so the app returns to
+    // the login screen and the user can't keep using a dead session.
+    ApiClient.instance.onUnauthorized = _onUnauthorized;
+  }
 
   final AuthService _auth;
+  bool _forcingLogout = false;
 
   AuthStatus _status = AuthStatus.unknown;
   UserModel? _user;
@@ -98,6 +105,24 @@ class SessionController extends ChangeNotifier {
     _user = null;
     _status = AuthStatus.signedOut;
     notifyListeners();
+  }
+
+  /// Called by the API client when a 401 hits an authenticated request — the
+  /// token was revoked server-side (e.g. the admin stopped this account).
+  /// Clears the local session without calling the server (the token is dead).
+  void _onUnauthorized() {
+    if (_status != AuthStatus.signedIn || _forcingLogout) return;
+    _forcingLogout = true;
+    () async {
+      try {
+        await AuthStorage.instance.clear();
+      } finally {
+        _user = null;
+        _status = AuthStatus.signedOut;
+        _forcingLogout = false;
+        notifyListeners();
+      }
+    }();
   }
 
   /// Permanently deletes the user's account, then signs out locally.
