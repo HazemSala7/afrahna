@@ -97,6 +97,7 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<VendorModel>> _topVendorsFuture;
   late Future<List<VendorModel>> _featuredVendorsFuture;
   late Future<List<SliderModel>> _slidersFuture;
+  late Future<HomeStats> _statsFuture;
   Future<EventModel?> _mainEventFuture = Future.value(null);
 
   Position? _userPos;
@@ -114,7 +115,9 @@ class _HomeTabState extends State<_HomeTab> {
     _topVendorsFuture = VendorService().list();
     _featuredVendorsFuture =
         VendorService().list(featured: true, perPage: 12);
-    _slidersFuture = SliderService().list();
+    // Shuffle so the banner shows slides in a fresh random order each load.
+    _slidersFuture = SliderService().list().then((l) => l..shuffle());
+    _statsFuture = StatsService().get();
     _mainEventFuture = _loadMainEvent();
   }
 
@@ -174,6 +177,11 @@ class _HomeTabState extends State<_HomeTab> {
               FadeSlideIn(
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
+              ),
+              const SizedBox(height: 15),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 340),
+                child: _StatsBand(future: _statsFuture),
               ),
               const SizedBox(height: 15),
               FadeSlideIn(
@@ -386,8 +394,34 @@ class _CircleIconButton extends StatelessWidget {
 // SEARCH BAR
 // ===========================================================================
 
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends StatefulWidget {
   const _SearchBar();
+
+  @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _controller.text.trim();
+    // Always drop focus so the keyboard closes after a search action.
+    FocusScope.of(context).unfocus();
+    if (v.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VendorsPage(title: 'نتائج: $v'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -397,16 +431,9 @@ class _SearchBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
       ),
       child: TextField(
+        controller: _controller,
         textInputAction: TextInputAction.search,
-        onSubmitted: (v) {
-          if (v.trim().isEmpty) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VendorsPage(title: 'نتائج: $v'),
-            ),
-          );
-        },
+        onSubmitted: (_) => _submit(),
         decoration: InputDecoration(
           hintText: 'ابحث عن خدمات، محلات، عروض والمزيد...',
           hintStyle: const TextStyle(
@@ -419,20 +446,211 @@ class _SearchBar extends StatelessWidget {
           focusedBorder: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          suffixIcon: Container(
-            margin: const EdgeInsetsDirectional.only(end: 6),
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+          suffixIcon: GestureDetector(
+            onTap: _submit,
+            child: Container(
+              margin: const EdgeInsetsDirectional.only(end: 6),
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.search, color: Colors.white, size: 20),
             ),
-            child: const Icon(Icons.search, color: Colors.white, size: 20),
           ),
         ),
       ),
     );
   }
+}
+
+// ===========================================================================
+// STATS BAND (homepage counts — real, admin-overridable)
+// ===========================================================================
+
+class _StatsBand extends StatelessWidget {
+  const _StatsBand({required this.future});
+  final Future<HomeStats> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<HomeStats>(
+      future: future,
+      builder: (_, snap) {
+        final s = snap.data;
+        if (s == null) return const SizedBox.shrink();
+        final items = <({IconData icon, int value, String label, Color color})>[
+          (icon: Icons.storefront_rounded, value: s.vendors, label: 'شركة',
+              color: Color(0xFFF3C969)),
+          (icon: Icons.favorite_rounded, value: s.users, label: 'مستفيد',
+              color: Color(0xFFFF8FA3)),
+          (icon: Icons.phone_iphone_rounded, value: s.appUsers, label: 'مستخدم',
+              color: Color(0xFFB9A7FF)),
+          (icon: Icons.design_services_rounded, value: s.services, label: 'خدمة',
+              color: Color(0xFF8FE3C2)),
+          (icon: Icons.location_city_rounded, value: s.cities, label: 'مدينة',
+              color: Color(0xFF9FC2FF)),
+        ];
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryDark.withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                Expanded(
+                  child: _StatCell(
+                    icon: items[i].icon,
+                    value: items[i].value,
+                    label: items[i].label,
+                    accent: items[i].color,
+                    delay: i * 160,
+                  ),
+                ),
+                if (i != items.length - 1)
+                  Container(
+                    width: 1,
+                    height: 48,
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.accent,
+    this.delay = 0,
+  });
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color accent;
+  final int delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+            border: Border.all(color: accent.withValues(alpha: 0.95), width: 1.6),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: accent, size: 21),
+        ),
+        const SizedBox(height: 8),
+        _CountUp(value: value, delay: delay),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Animated count-up number (animates 0 → value once on first appearance,
+/// with an optional stagger [delay] so cells fire one after another).
+class _CountUp extends StatefulWidget {
+  const _CountUp({required this.value, this.delay = 0});
+  final int value;
+  final int delay;
+
+  @override
+  State<_CountUp> createState() => _CountUpState();
+}
+
+class _CountUpState extends State<_CountUp>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  );
+  late final Animation<double> _a =
+      CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _a,
+      builder: (_, __) {
+        final v = (widget.value * _a.value).round();
+        return Text(
+          _formatCompact(v),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 19,
+            height: 1.0,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Compact number formatting for the stats band: 1234 → "1.2K", 1e6 → "1M".
+String _formatCompact(int n) {
+  if (n < 1000) return '$n';
+  if (n < 1000000) {
+    final v = n / 1000;
+    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}K';
+  }
+  final v = n / 1000000;
+  return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}M';
 }
 
 // ===========================================================================
@@ -1126,7 +1344,9 @@ class _FeaturedVendorsCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 270,
+      // Compact circular row — deliberately smaller / less prominent than the
+      // hero slider above it.
+      height: 116,
       child: FutureBuilder<List<VendorModel>>(
         future: future,
         builder: (context, snap) {
@@ -1140,18 +1360,21 @@ class _FeaturedVendorsCarousel extends StatelessWidget {
               ),
             );
           }
-          final items = (snap.data ?? const <VendorModel>[])
-              .where((v) => v.isFeatured)
-              .toList();
+          if (snap.hasError) {
+            return _EmptyMini(text: 'تعذّر تحميل الشركات المميّزة');
+          }
+          // Trust the server's `featured=1` filter (avoid double-filtering,
+          // which hid vendors when the boolean wasn't parsed as expected).
+          final items = List<VendorModel>.from(snap.data ?? const <VendorModel>[]);
           _sortByProximity(items, userPos);
           if (items.isEmpty) {
             return _EmptyMini(text: 'لا توجد شركات مميّزة حالياً');
           }
           return ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _FeaturedVendorCard(vendor: items[i]),
           );
         },
@@ -1203,22 +1426,11 @@ class _CardCover extends StatelessWidget {
   }
 }
 
+/// Compact circular featured-vendor avatar — intentionally smaller and less
+/// prominent than the hero slider above the section.
 class _FeaturedVendorCard extends StatelessWidget {
   const _FeaturedVendorCard({required this.vendor});
   final VendorModel vendor;
-
-  String? get _priceLabel {
-    final min = vendor.minPrice;
-    final max = vendor.maxPrice;
-    if (min == null && max == null) return null;
-    String fmt(double v) => v % 1 == 0
-        ? v.toStringAsFixed(0)
-        : v.toStringAsFixed(0);
-    if (min != null && max != null && max > min) {
-      return 'يبدأ من ${fmt(min)} ₪';
-    }
-    return 'يبدأ من ${fmt(min ?? max!)} ₪';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1229,352 +1441,87 @@ class _FeaturedVendorCard extends StatelessWidget {
           builder: (_) => VendorDetailsPage(vendorId: vendor.id),
         ),
       ),
-      child: Container(
-        width: 280,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.zero,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x338B5A3C),
-              blurRadius: 22,
-              offset: Offset(0, 10),
-            ),
-          ],
-          border: Border.all(
-            color: AppColors.primaryLight.withValues(alpha: 0.6),
-            width: 1,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: 80,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // ---------- COVER + OVERLAY ----------
-            Expanded(
-              flex: 6,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _CardCover(vendor: vendor),
-                  // gradient overlay for legibility
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0x00000000),
-                          Color(0x99000000),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                  // Featured badge (top start)
-                  PositionedDirectional(
-                    top: 10,
-                    start: 10,
-                    child: _FeaturedBadge(),
-                  ),
-                  // Verified mark (top end)
-                  if (vendor.isVerified)
-                    const PositionedDirectional(
-                      top: 10,
-                      end: 10,
-                      child: _VerifiedBadge(),
-                    ),
-                  // Logo + name pinned to bottom
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    bottom: 10,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 8,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: AppNetworkImage(
-                            url: vendor.logo,
-                            fit: BoxFit.cover,
-                            fallbackIcon: Icons.storefront,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                vendor.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  shadows: [
-                                    Shadow(
-                                      color: Color(0x99000000),
-                                      blurRadius: 6,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (vendor.city != null)
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on_rounded,
-                                      size: 12,
-                                      color: Colors.white70,
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Expanded(
-                                      child: Text(
-                                        vendor.city!.nameAr,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Thin gold ring around the logo.
+                Container(
+                  width: 66,
+                  height: 66,
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: SweepGradient(
+                      colors: [
+                        Color(0xFFE6B450),
+                        AppColors.primary,
+                        Color(0xFFF3D9B1),
+                        AppColors.primaryDark,
+                        Color(0xFFE6B450),
                       ],
                     ),
                   ),
-                ],
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: ClipOval(
+                      child: AppNetworkImage(
+                        url: vendor.logo ?? vendor.cover,
+                        fit: BoxFit.cover,
+                        fallbackIcon: Icons.storefront,
+                      ),
+                    ),
+                  ),
+                ),
+                if (vendor.isVerified)
+                  const PositionedDirectional(
+                    bottom: -2,
+                    end: -2,
+                    child: Icon(Icons.verified_rounded,
+                        color: Color(0xFF1DA1F2), size: 18),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              vendor.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark,
               ),
             ),
-            // ---------- INFO ROW ----------
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (vendor.rating != null)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      // Rating pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF6E0),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: const Color(0xFFFFD66B), width: 1),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                size: 14, color: Color(0xFFE6A800)),
-                            const SizedBox(width: 3),
-                            Text(
-                              (vendor.rating ?? 0).toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 12,
-                                color: AppColors.textDark,
-                              ),
-                            ),
-                            if ((vendor.reviewsCount ?? 0) > 0) ...[
-                              const SizedBox(width: 3),
-                              Text(
-                                '(${vendor.reviewsCount})',
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      // Category chip
-                      if (vendor.category != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight
-                                .withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            vendor.category!.nameAr,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                              color: AppColors.primaryDark,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (_priceLabel != null) ...[
-                        const Icon(Icons.local_offer_rounded,
-                            size: 14, color: AppColors.primary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _priceLabel!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.primaryDark,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ] else
-                        const Expanded(
-                          child: Text(
-                            'تواصل لمعرفة الأسعار',
-                            style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFFD4A373),
-                              Color(0xFFB8835A),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'عرض',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 11,
-                              ),
-                            ),
-                            SizedBox(width: 3),
-                            Icon(Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white, size: 11),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const Icon(Icons.star_rounded,
+                      size: 11, color: Color(0xFFE6A800)),
+                  const SizedBox(width: 2),
+                  Text(
+                    vendor.rating!.toStringAsFixed(1),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ],
               ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FeaturedBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE6B450), Color(0xFFB8835A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.55),
-          width: 1,
-        ),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.workspace_premium_rounded,
-              color: Colors.white, size: 14),
-          SizedBox(width: 4),
-          Text(
-            'مميَّز',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 11,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VerifiedBadge extends StatelessWidget {
-  const _VerifiedBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.95),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x55000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.verified_rounded,
-        color: Color(0xFF1DA1F2),
-        size: 20,
       ),
     );
   }
@@ -1883,6 +1830,8 @@ class _SearchTabState extends State<_SearchTab> {
   }
 
   void _search(String q) {
+    // Close the keyboard once a search is triggered.
+    FocusScope.of(context).unfocus();
     if (q.trim().isEmpty) {
       setState(() => _future = null);
       return;

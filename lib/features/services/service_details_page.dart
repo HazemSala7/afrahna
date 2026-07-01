@@ -87,13 +87,41 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
                                 color: AppColors.primary),
                             const SizedBox(width: 6),
                             Text(
-                              '${s.price!.toStringAsFixed(0)} ₪',
+                              '${s.effectivePrice!.toStringAsFixed(0)} ₪',
                               style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primary,
                               ),
                             ),
+                            if (s.hasDiscount) ...[
+                              const SizedBox(width: 10),
+                              Text(
+                                '${s.price!.toStringAsFixed(0)} ₪',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textMuted,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade600,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'خصم ${s.discountPercent}%',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       const SizedBox(height: 14),

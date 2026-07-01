@@ -30,6 +30,17 @@ class ApiClient {
           }
           handler.next(options);
         },
+        // A 401 on an authenticated request means the token was revoked
+        // (e.g. the admin stopped this account) — force a global logout.
+        // Note: 401 arrives here (not onError) because validateStatus allows
+        // any status < 500 through as a normal response.
+        onResponse: (response, handler) {
+          if (response.statusCode == 401 &&
+              response.requestOptions.headers.containsKey('Authorization')) {
+            onUnauthorized?.call();
+          }
+          handler.next(response);
+        },
       ),
     );
   }
@@ -37,6 +48,10 @@ class ApiClient {
   static final ApiClient instance = ApiClient._();
   late final Dio _dio;
   Dio get dio => _dio;
+
+  /// Invoked when an authenticated request is rejected with 401 (token revoked
+  /// / account stopped). The session controller registers a forced-logout here.
+  void Function()? onUnauthorized;
 
   /// Picks the correct backend URL for the runtime platform.
   /// - Android emulator: host machine is 10.0.2.2

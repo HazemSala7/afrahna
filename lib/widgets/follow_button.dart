@@ -3,21 +3,29 @@ import 'package:provider/provider.dart';
 
 import '../../core/services/accounts_services.dart';
 import '../../core/state/session.dart';
+import '../../core/theme.dart';
 
 /// Drop-in follow/unfollow button for a vendor profile.
 /// Customer accounts can follow an advertiser to receive notifications
 /// and a personalized post feed.
+///
+/// Set [compact] for a small Facebook/Twitter-style pill that fits inside a
+/// top action bar (doesn't take a full row).
 class FollowButton extends StatefulWidget {
   const FollowButton({
     super.key,
     required this.vendorId,
     this.initiallyFollowing = false,
+    this.followersCount = 0,
     this.onChanged,
+    this.compact = false,
   });
 
   final int vendorId;
   final bool initiallyFollowing;
+  final int followersCount;
   final ValueChanged<bool>? onChanged;
+  final bool compact;
 
   @override
   State<FollowButton> createState() => _FollowButtonState();
@@ -25,6 +33,7 @@ class FollowButton extends StatefulWidget {
 
 class _FollowButtonState extends State<FollowButton> {
   late bool _following = widget.initiallyFollowing;
+  late int _followers = widget.followersCount;
   bool _busy = false;
   final _service = FollowService();
 
@@ -39,7 +48,10 @@ class _FollowButtonState extends State<FollowButton> {
     setState(() => _busy = true);
     try {
       final res = await _service.toggle(widget.vendorId);
-      setState(() => _following = res.following);
+      setState(() {
+        _following = res.following;
+        _followers = res.followers;
+      });
       widget.onChanged?.call(res.following);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,6 +64,7 @@ class _FollowButtonState extends State<FollowButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.compact) return _buildCompact();
     return FilledButton.icon(
       style: FilledButton.styleFrom(
         backgroundColor: _following ? Colors.grey[200] : null,
@@ -59,7 +72,63 @@ class _FollowButtonState extends State<FollowButton> {
       ),
       onPressed: _busy ? null : _toggle,
       icon: Icon(_following ? Icons.notifications_active : Icons.notifications_none),
-      label: Text(_following ? 'تتم المتابعة' : 'متابعة'),
+      label: Text(
+        _followers > 0
+            ? (_following ? 'تتم المتابعة · $_followers' : 'متابعة · $_followers')
+            : (_following ? 'تتم المتابعة' : 'متابعة'),
+      ),
+    );
+  }
+
+  /// Compact Facebook/Twitter-style pill: filled when not following,
+  /// outlined/subtle when already following. Sits inline in a top bar.
+  Widget _buildCompact() {
+    final following = _following;
+    final bg = following ? Colors.white.withValues(alpha: 0.9) : AppColors.primary;
+    final fg = following ? AppColors.primaryDark : Colors.white;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: _busy ? null : _toggle,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: following
+                ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_busy)
+                SizedBox(
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+                )
+              else
+                Icon(
+                  following ? Icons.check_rounded : Icons.add_rounded,
+                  size: 17,
+                  color: fg,
+                ),
+              const SizedBox(width: 4),
+              Text(
+                following ? 'متابَع' : 'متابعة',
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

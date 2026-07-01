@@ -220,6 +220,8 @@ class VendorModel {
     this.maxPrice,
     this.isFeatured = false,
     this.isVerified = false,
+    this.isFollowing = false,
+    this.followersCount = 0,
     this.isFavorite = false,
     this.activePlans = const <String>[],
     this.inSlider = false,
@@ -257,6 +259,12 @@ class VendorModel {
   final bool isFeatured;
   final bool isVerified;
   final bool isFavorite;
+
+  /// Whether the current authenticated user follows this vendor.
+  final bool isFollowing;
+
+  /// Total number of users following this vendor.
+  final int followersCount;
 
   /// Active subscription tier names returned by the API, e.g. `["slider","featured"]`.
   final List<String> activePlans;
@@ -313,6 +321,8 @@ class VendorModel {
         isFeatured: json['is_featured'] == true || json['is_featured'] == 1,
         isVerified: json['is_verified'] == true || json['is_verified'] == 1,
         isFavorite: json['is_favorite'] == true,
+        isFollowing: json['is_following'] == true || json['is_following'] == 1,
+        followersCount: _toInt(json['followers_count']) ?? 0,
         activePlans: (json['active_plans'] is List)
             ? List<String>.from(
                 (json['active_plans'] as List).map((e) => e.toString()))
@@ -344,6 +354,7 @@ class ServiceModel {
     this.descriptionAr,
     this.descriptionEn,
     this.price,
+    this.discountPrice,
     this.image,
     this.vendorId,
     this.vendor,
@@ -355,6 +366,7 @@ class ServiceModel {
   final String? descriptionAr;
   final String? descriptionEn;
   final double? price;
+  final double? discountPrice;
   final String? image;
   final int? vendorId;
   final VendorModel? vendor;
@@ -362,6 +374,20 @@ class ServiceModel {
   String get title => titleAr.isNotEmpty ? titleAr : titleEn;
   String get description =>
       (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+
+  /// True when a valid discount (less than the base price) is set.
+  bool get hasDiscount =>
+      discountPrice != null &&
+      price != null &&
+      discountPrice! > 0 &&
+      discountPrice! < price!;
+
+  /// The price the customer actually pays (discounted when applicable).
+  double? get effectivePrice => hasDiscount ? discountPrice : price;
+
+  /// Discount percentage off the base price, e.g. 25 for 25% off.
+  int get discountPercent =>
+      hasDiscount ? (((price! - discountPrice!) / price!) * 100).round() : 0;
 
   factory ServiceModel.fromJson(Map<String, dynamic> json) => ServiceModel(
         id: _toInt(json['id']) ?? 0,
@@ -371,6 +397,7 @@ class ServiceModel {
         descriptionAr: _readT<String>(json, 'description_ar'),
         descriptionEn: _readT<String>(json, 'description_en'),
         price: _toDouble(json['price']),
+        discountPrice: _toDouble(json['discount_price']),
         image: _readT<String>(json, 'image'),
         vendorId: _toInt(json['vendor_id']),
         vendor: json['vendor'] is Map
@@ -474,8 +501,13 @@ class PromotionModel {
     this.descriptionEn,
     this.image,
     this.discountPercent,
+    this.discountType,
+    this.discountValue,
     this.startsAt,
     this.endsAt,
+    this.startDate,
+    this.endDate,
+    this.isActive = true,
     this.vendorId,
     this.vendor,
   });
@@ -487,14 +519,28 @@ class PromotionModel {
   final String? descriptionEn;
   final String? image;
   final double? discountPercent;
+  // Server-aligned discount fields: type = 'percent' | 'fixed'.
+  final String? discountType;
+  final double? discountValue;
   final DateTime? startsAt;
   final DateTime? endsAt;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final bool isActive;
   final int? vendorId;
   final VendorModel? vendor;
 
   String get title => titleAr.isNotEmpty ? titleAr : titleEn;
   String get description =>
       (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+
+  /// Human label for the discount, e.g. "25%" or "50 ₪".
+  String get discountLabel {
+    final v = discountValue ?? discountPercent;
+    if (v == null || v <= 0) return '';
+    final n = v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    return discountType == 'fixed' ? '$n ₪' : '$n%';
+  }
 
   factory PromotionModel.fromJson(Map<String, dynamic> json) => PromotionModel(
         id: _toInt(json['id']) ?? 0,
@@ -504,8 +550,15 @@ class PromotionModel {
         descriptionEn: _readT<String>(json, 'description_en'),
         image: _readT<String>(json, 'image'),
         discountPercent: _toDouble(json['discount_percent']),
+        discountType: _readT<String>(json, 'discount_type'),
+        discountValue: _toDouble(json['discount_value']),
         startsAt: _toDate(json['starts_at']),
         endsAt: _toDate(json['ends_at']),
+        startDate: _toDate(json['start_date']),
+        endDate: _toDate(json['end_date']),
+        isActive: json['is_active'] == null
+            ? true
+            : (json['is_active'] == true || json['is_active'] == 1),
         vendorId: _toInt(json['vendor_id']),
         vendor: json['vendor'] is Map
             ? VendorModel.fromJson(
@@ -573,6 +626,79 @@ class VendorStoriesGroup {
       stories: list,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// HIGHLIGHTS (دائمة، مثل انستجرام)
+// ---------------------------------------------------------------------------
+
+class HighlightItemModel {
+  HighlightItemModel({
+    required this.id,
+    required this.highlightId,
+    required this.type,
+    required this.mediaUrl,
+    this.caption,
+    this.sortOrder = 0,
+  });
+
+  final int id;
+  final int highlightId;
+  final String type; // 'image' | 'video'
+  final String mediaUrl;
+  final String? caption;
+  final int sortOrder;
+
+  bool get isVideo => type == 'video';
+
+  factory HighlightItemModel.fromJson(Map<String, dynamic> json) =>
+      HighlightItemModel(
+        id: _toInt(json['id']) ?? 0,
+        highlightId: _toInt(json['highlight_id']) ?? 0,
+        type: (json['type'] ?? 'image').toString(),
+        mediaUrl: (json['media_url'] ?? '').toString(),
+        caption: _readT<String>(json, 'caption'),
+        sortOrder: _toInt(json['sort_order']) ?? 0,
+      );
+}
+
+class HighlightModel {
+  HighlightModel({
+    required this.id,
+    required this.title,
+    this.coverImage,
+    this.vendorId,
+    this.sortOrder = 0,
+    this.isActive = true,
+    this.items = const [],
+  });
+
+  final int id;
+  final String title;
+  final String? coverImage;
+  final int? vendorId;
+  final int sortOrder;
+  final bool isActive;
+  final List<HighlightItemModel> items;
+
+  /// Cover falls back to the first item's media so a highlight always has a face.
+  String? get cover => (coverImage?.isNotEmpty ?? false)
+      ? coverImage
+      : (items.isNotEmpty ? items.first.mediaUrl : null);
+
+  factory HighlightModel.fromJson(Map<String, dynamic> json) => HighlightModel(
+        id: _toInt(json['id']) ?? 0,
+        title: (json['title'] ?? '').toString(),
+        coverImage: _readT<String>(json, 'cover_image'),
+        vendorId: _toInt(json['vendor_id']),
+        sortOrder: _toInt(json['sort_order']) ?? 0,
+        isActive: json['is_active'] == true || json['is_active'] == 1,
+        items: (json['items'] as List? ?? const [])
+            .whereType<Map>()
+            .map((m) =>
+                HighlightItemModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList(),
+      );
 }
 
 // ---------------------------------------------------------------------------

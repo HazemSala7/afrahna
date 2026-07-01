@@ -6,7 +6,9 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
+import '../../core/theme.dart';
 import '../vendors/edit_vendor_page.dart';
+import 'manage_client_subscription_page.dart';
 
 class MyClientsPage extends StatefulWidget {
   const MyClientsPage({super.key});
@@ -79,6 +81,7 @@ class _MyClientsPageState extends State<MyClientsPage> {
   Widget build(BuildContext context) {
     final me = context.watch<SessionController>().user;
     final canEdit = me != null && me.hasPermission('edit_vendor');
+    final canSubscribe = me != null && me.hasPermission('create_subscription');
     return Scaffold(
       appBar: AppBar(
         title: const Text('عملائي'),
@@ -150,8 +153,23 @@ class _MyClientsPageState extends State<MyClientsPage> {
                             c.isActive ? Icons.check_circle : Icons.block,
                             color: c.isActive ? Colors.green : Colors.red,
                           ),
+                          if (canSubscribe) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              tooltip: 'إدارة الاشتراك',
+                              icon: const Icon(Icons.card_membership,
+                                  color: AppColors.primary),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ManageClientSubscriptionPage(client: c),
+                                ),
+                              ),
+                            ),
+                          ],
                           if (canEdit) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 4),
                             const Icon(Icons.edit, color: Colors.grey),
                           ],
                         ],
