@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
@@ -206,9 +207,21 @@ class _SignedInView extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const NotificationsPage()),
           ),
         ),
-        const _MenuTile(icon: Icons.language, label: 'اللغة'),
-        const _MenuTile(icon: Icons.help_outline, label: 'المساعدة والدعم'),
-        const _MenuTile(icon: Icons.info_outline, label: 'حول التطبيق'),
+        _MenuTile(
+          icon: Icons.language,
+          label: 'اللغة',
+          onTap: () => _showLanguageDialog(context),
+        ),
+        _MenuTile(
+          icon: Icons.help_outline,
+          label: 'المساعدة والدعم',
+          onTap: () => _showSupportSheet(context),
+        ),
+        _MenuTile(
+          icon: Icons.info_outline,
+          label: 'حول التطبيق',
+          onTap: () => _showAboutSheet(context),
+        ),
         const SizedBox(height: 16),
         _MenuTile(
           icon: Icons.logout,
@@ -289,6 +302,101 @@ class _SignedInView extends StatelessWidget {
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Settings actions (Language / Support / About)
+// ---------------------------------------------------------------------------
+
+const String _kSupportPhone = '+972595679605';
+
+Future<void> _openUri(Uri uri) async {
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+void _showLanguageDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('اللغة'),
+      content: const Text(
+          'التطبيق متوفّر باللغة العربية حاليًا، وسيتم دعم الإنجليزية قريبًا.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('حسناً'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showSupportSheet(BuildContext context) {
+  final digits = _kSupportPhone.replaceAll(RegExp(r'\D'), '');
+  final msg = Uri.encodeComponent('مرحباً، أحتاج للمساعدة في تطبيق أفراحنا');
+  showModalBottomSheet<void>(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('المساعدة والدعم',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
+            title: const Text('تواصل عبر واتساب'),
+            onTap: () {
+              Navigator.pop(context);
+              _openUri(Uri.parse('https://wa.me/$digits?text=$msg'));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.call, color: AppColors.primary),
+            title: const Text('اتصال هاتفي'),
+            subtitle: const Text(_kSupportPhone,
+                textDirection: TextDirection.ltr),
+            onTap: () {
+              Navigator.pop(context);
+              _openUri(Uri(scheme: 'tel', path: _kSupportPhone));
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showAboutSheet(BuildContext context) {
+  showAboutDialog(
+    context: context,
+    applicationName: 'أفراحنا',
+    applicationVersion: 'الإصدار 1.8.0',
+    applicationIcon: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.asset('assets/images/logo.png',
+          width: 52, height: 52, errorBuilder: (_, _, _) => const Icon(
+              Icons.celebration, size: 44, color: AppColors.primary)),
+    ),
+    children: const [
+      SizedBox(height: 8),
+      Text(
+        'أفراحنا — دليلك الشامل لتجهيز المناسبات والأعراس: قاعات، خدمات، '
+        'عروض خاصة، ريلز وأكثر. كل ما تحتاجه ليومك المميّز في مكان واحد.',
+      ),
+    ],
+  );
 }
 
 class _MenuTile extends StatelessWidget {

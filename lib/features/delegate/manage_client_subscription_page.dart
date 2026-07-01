@@ -4,12 +4,13 @@ import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/theme.dart';
+import '../subscriptions/subscription_plans.dart';
 
 /// Subscription plans (value sent to API, label shown to the delegate).
 const _planOptions = <({String value, String label})>[
   (value: 'normal', label: 'عادي'),
-  (value: 'slider', label: 'سلايد'),
-  (value: 'featured', label: 'شركة مميزة'),
+  (value: 'featured', label: 'مميز'),
+  (value: 'vip', label: 'VIP'),
 ];
 
 String planLabel(String value) => _planOptions
@@ -63,6 +64,58 @@ class _ManageClientSubscriptionPageState
     }
   }
 
+  Future<void> _delete(SubscriptionModel sub) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف الاشتراك'),
+        content: Text('هل تريد حذف اشتراك (${planLabel(sub.planName)})؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.deleteSubscription(sub.id);
+      if (!mounted) return;
+      setState(_reload);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('تم حذف الاشتراك')));
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _addPayment(SubscriptionModel sub) async {
+    final result = await showDialog<({double amount, String notes})>(
+      context: context,
+      builder: (_) => _AddPaymentDialog(remaining: sub.remaining),
+    );
+    if (result == null || result.amount <= 0) return;
+    try {
+      await _service.addPayment(sub.id,
+          amount: result.amount, notes: result.notes);
+      if (!mounted) return;
+      setState(_reload);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('تمت إضافة الدفعة')));
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,6 +162,8 @@ class _ManageClientSubscriptionPageState
               itemBuilder: (_, i) => _SubscriptionCard(
                 sub: subs[i],
                 onEdit: () => _addOrEdit(existing: subs[i]),
+                onDelete: () => _delete(subs[i]),
+                onAddPayment: () => _addPayment(subs[i]),
               ),
             );
           },
@@ -119,9 +174,16 @@ class _ManageClientSubscriptionPageState
 }
 
 class _SubscriptionCard extends StatelessWidget {
-  const _SubscriptionCard({required this.sub, required this.onEdit});
+  const _SubscriptionCard({
+    required this.sub,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onAddPayment,
+  });
   final SubscriptionModel sub;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onAddPayment;
 
   static String _fmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -194,14 +256,97 @@ class _SubscriptionCard extends StatelessWidget {
                 icon: const Icon(Icons.edit, color: AppColors.primary),
                 onPressed: onEdit,
               ),
+              IconButton(
+                tooltip: 'حذف',
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: onDelete,
+              ),
             ],
           ),
           const SizedBox(height: 8),
           _row(Icons.event, 'من ${_fmt(sub.startDate)} إلى ${_fmt(sub.endDate)}'),
           if (_active && daysLeft >= 0)
             _row(Icons.timelapse, 'متبقّي $daysLeft يوم'),
-          _row(Icons.payments_outlined,
-              'المدفوع: ${sub.amountPaid.toStringAsFixed(0)} • عمولتك: ${sub.commissionAmount.toStringAsFixed(0)}'),
+          _row(Icons.sell_outlined,
+              'السعر: ${sub.totalAmount.toStringAsFixed(0)} • المدفوع: ${sub.amountPaid.toStringAsFixed(0)} • عمولتك: ${sub.commissionAmount.toStringAsFixed(0)}'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: sub.remaining > 0
+                      ? Colors.red.withValues(alpha: 0.12)
+                      : Colors.green.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  sub.remaining > 0
+                      ? 'متبقّي: ${sub.remaining.toStringAsFixed(0)} شيكل'
+                      : 'مدفوع بالكامل ✓',
+                  style: TextStyle(
+                    color: sub.remaining > 0
+                        ? Colors.red
+                        : Colors.green.shade700,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (sub.remaining > 0)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: onAddPayment,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('إضافة دفعة'),
+                ),
+            ],
+          ),
+          if (sub.payments.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 6),
+            const Text('الدفعات:',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: AppColors.textMuted)),
+            for (final p in sub.payments)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        size: 13, color: Colors.green),
+                    const SizedBox(width: 5),
+                    Text('${p.amount.toStringAsFixed(0)} شيكل',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 12)),
+                    if (p.paidAt != null) ...[
+                      const SizedBox(width: 6),
+                      Text(_fmt(p.paidAt!),
+                          style: const TextStyle(
+                              color: AppColors.textMuted, fontSize: 11)),
+                    ],
+                    if ((p.notes ?? '').isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text('• ${p.notes}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 11)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -245,6 +390,7 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
   late String _plan;
   late DateTime _start;
   late DateTime _end;
+  late final TextEditingController _total;
   late final TextEditingController _amount;
   late final TextEditingController _commission;
   bool _saving = false;
@@ -266,13 +412,22 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
     _plan = e?.planName ?? 'normal';
     _start = e?.startDate ?? DateTime.now();
     _end = e?.endDate ?? _addMonths(DateTime.now(), 12);
-    _amount = TextEditingController(text: e?.amountPaid.toStringAsFixed(0) ?? '0');
+    // New subscription: full price defaults to the selected plan's yearly
+    // price, and "paid now" starts empty so the delegate enters the actual
+    // first payment (the remaining balance is shown live).
+    _total = TextEditingController(
+        text: e != null
+            ? e.totalAmount.toStringAsFixed(0)
+            : '${planByKey(_plan).yearly}');
+    _amount = TextEditingController(
+        text: e != null ? e.amountPaid.toStringAsFixed(0) : '');
     _commission = TextEditingController(
         text: e != null ? e.commissionAmount.toStringAsFixed(0) : '');
   }
 
   @override
   void dispose() {
+    _total.dispose();
     _amount.dispose();
     _commission.dispose();
     super.dispose();
@@ -315,6 +470,9 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
 
   Future<void> _save() async {
     final amount = double.tryParse(_amount.text.trim()) ?? 0;
+    final total = _total.text.trim().isEmpty
+        ? amount
+        : (double.tryParse(_total.text.trim()) ?? amount);
     final commission =
         _commission.text.trim().isEmpty ? null : double.tryParse(_commission.text.trim());
     setState(() => _saving = true);
@@ -324,6 +482,7 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
           widget.existing!.id,
           planName: _plan,
           amountPaid: amount,
+          totalAmount: total,
           commissionAmount: commission,
           startDate: _start,
           endDate: _end,
@@ -333,6 +492,7 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
           userId: widget.clientId,
           planName: _plan,
           amountPaid: amount,
+          totalAmount: total,
           commissionAmount: commission,
           startDate: _start,
           endDate: _end,
@@ -384,16 +544,17 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
               const Text('نوع الاشتراك',
                   style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final p in _planOptions)
-                    ChoiceChip(
-                      label: Text(p.label),
-                      selected: _plan == p.value,
-                      onSelected: (_) => setState(() => _plan = p.value),
-                    ),
-                ],
+              SubscriptionPlansView(
+                compact: true,
+                selected: _plan,
+                onSelected: (k) => setState(() {
+                  _plan = k;
+                  // Full price = the plan's yearly price (e.g. VIP = 600).
+                  // Clear "paid now" so the delegate enters the actual first
+                  // payment; the remaining balance is shown live below.
+                  _total.text = '${planByKey(k).yearly}';
+                  _amount.clear();
+                }),
               ),
               const SizedBox(height: 16),
 
@@ -432,15 +593,52 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
               ),
               const SizedBox(height: 14),
 
-              TextField(
-                controller: _amount,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'المبلغ المدفوع',
-                  border: OutlineInputBorder(),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _total,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'السعر الكامل',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _amount,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'المدفوع الآن',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 6),
+              Builder(builder: (_) {
+                final t = double.tryParse(_total.text.trim()) ?? 0;
+                final p = double.tryParse(_amount.text.trim()) ?? 0;
+                final rem = (t - p) > 0 ? (t - p) : 0;
+                return Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    'المتبقّي: ${rem.toStringAsFixed(0)} شيكل',
+                    style: TextStyle(
+                      color: rem > 0 ? Colors.red : Colors.green.shade700,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(height: 12),
+
               TextField(
                 controller: _commission,
                 keyboardType: TextInputType.number,
@@ -468,6 +666,94 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Dialog to add a payment to a subscription. Kept as its own StatefulWidget so
+/// its controllers/focus live in the dialog's lifecycle (avoids focus-during-
+/// build assertions that `autofocus` triggers inside a freshly-shown dialog).
+class _AddPaymentDialog extends StatefulWidget {
+  const _AddPaymentDialog({required this.remaining});
+  final double remaining;
+
+  @override
+  State<_AddPaymentDialog> createState() => _AddPaymentDialogState();
+}
+
+class _AddPaymentDialogState extends State<_AddPaymentDialog> {
+  late final TextEditingController _amount;
+  final _notes = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _amount = TextEditingController(
+        text: widget.remaining > 0 ? widget.remaining.toStringAsFixed(0) : '');
+    // Focus after the dialog is fully inserted into the tree — not during build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _notes.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('إضافة دفعة'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+                'المتبقّي حاليًا: ${widget.remaining.toStringAsFixed(0)} شيكل',
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _amount,
+            focusNode: _focus,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'مبلغ الدفعة',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _notes,
+            decoration: const InputDecoration(
+              labelText: 'ملاحظة (اختياري)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء')),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            (
+              amount: double.tryParse(_amount.text.trim()) ?? 0,
+              notes: _notes.text.trim(),
+            ),
+          ),
+          child: const Text('إضافة'),
+        ),
+      ],
     );
   }
 }

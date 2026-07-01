@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../vendors/vendor_details_page.dart';
 import 'reel_comments_sheet.dart';
@@ -115,6 +117,7 @@ class _ReelItemState extends State<_ReelItem> {
   void initState() {
     super.initState();
     _likes = widget.reel.likesCount;
+    _liked = widget.reel.isLiked;
     _maybeInitVideo();
   }
 
@@ -181,11 +184,35 @@ class _ReelItemState extends State<_ReelItem> {
     });
   }
 
-  void _toggleLike() {
+  Future<void> _toggleLike() async {
+    if (!context.read<SessionController>().isSignedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('سجّل الدخول للإعجاب بالريلز')),
+      );
+      return;
+    }
+    // Optimistic update, then reconcile with the server's real count.
+    final prevLiked = _liked;
+    final prevLikes = _likes;
     setState(() {
       _liked = !_liked;
       _likes += _liked ? 1 : -1;
     });
+    try {
+      final res = await PostService().toggleLike(widget.reel.id);
+      if (!mounted) return;
+      setState(() {
+        _liked = res.liked;
+        _likes = res.likes;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // Revert on failure.
+      setState(() {
+        _liked = prevLiked;
+        _likes = prevLikes;
+      });
+    }
   }
 
   void _openComments(BuildContext context) {

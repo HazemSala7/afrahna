@@ -11,6 +11,7 @@ import '../vendors/manage_highlights_page.dart';
 import '../vendors/manage_promotions_page.dart';
 import '../vendors/manage_stories_page.dart';
 import '../vendors/vendor_followers_page.dart';
+import '../subscriptions/subscription_plans.dart';
 import 'reel_studio_page.dart';
 
 /// Vendor's content page — tabs: خدماتي / ريلز / دورات.
@@ -170,12 +171,24 @@ class _VendorPostsPageState extends State<VendorPostsPage>
                   case 'notify':
                     _notifyFollowers(_vendor!);
                     break;
+                  case 'plans':
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => SubscriptionPlansPage(
+                            currentPlan: _vendor!.activePlan)));
+                    break;
                   case 'edit':
                     _editProfile();
                     break;
                 }
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'plans',
+                  child: ListTile(
+                      leading: Icon(Icons.workspace_premium_outlined),
+                      title: Text('باقات الاشتراك'),
+                      contentPadding: EdgeInsets.zero),
+                ),
                 const PopupMenuItem(
                   value: 'promotions',
                   child: ListTile(
@@ -302,6 +315,37 @@ class _VendorHeader extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [Colors.transparent, Colors.black54],
+              ),
+            ),
+          ),
+          // Current subscription badge (top-end).
+          PositionedDirectional(
+            top: 12,
+            end: 12,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: AppColors.primaryLight.withValues(alpha: 0.7)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.workspace_premium,
+                      color: Color(0xFFF3C969), size: 16),
+                  const SizedBox(width: 5),
+                  Text(
+                    'اشتراكك: ${vendor.subscriptionLabel}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

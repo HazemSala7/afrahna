@@ -6,12 +6,13 @@ import 'package:flutter/services.dart';
 import '../../core/api/api_client.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/theme.dart';
+import '../subscriptions/subscription_plans.dart';
 
 /// Subscription plans (نوع الاشتراك) — value sent to the API, label shown in UI.
 const _planOptions = <({String value, String label})>[
   (value: 'normal', label: 'عادي'),
-  (value: 'slider', label: 'سلايد'),
-  (value: 'featured', label: 'شركة مميزة'),
+  (value: 'featured', label: 'مميز'),
+  (value: 'vip', label: 'VIP'),
 ];
 
 class NewClientPage extends StatefulWidget {
@@ -28,7 +29,8 @@ class _NewClientPageState extends State<NewClientPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _workField = TextEditingController();
-  final _amountPaid = TextEditingController(text: '0');
+  final _total = TextEditingController(text: '${planByKey('normal').yearly}');
+  final _amountPaid = TextEditingController();
   final _commission = TextEditingController();
   final _paymentMethod = TextEditingController(text: 'cash');
   final _notes = TextEditingController();
@@ -50,7 +52,7 @@ class _NewClientPageState extends State<NewClientPage> {
   void dispose() {
     for (final c in [
       _name, _phone, _email, _password, _workField,
-      _amountPaid, _commission, _paymentMethod, _notes, _shopName,
+      _total, _amountPaid, _commission, _paymentMethod, _notes, _shopName,
     ]) {
       c.dispose();
     }
@@ -104,6 +106,7 @@ class _NewClientPageState extends State<NewClientPage> {
         workField: _workField.text.trim().isEmpty ? null : _workField.text.trim(),
         planName: _plan,
         amountPaid: double.tryParse(_amountPaid.text.trim()) ?? 0,
+        totalAmount: double.tryParse(_total.text.trim()),
         commissionAmount: _commission.text.trim().isEmpty
             ? null
             : double.tryParse(_commission.text.trim()),
@@ -146,7 +149,12 @@ class _NewClientPageState extends State<NewClientPage> {
                 ),
                 const Divider(),
                 Text('نوع الاشتراك: ${_planLabel(res.subscription.planName)}'),
-                Text('المبلغ المدفوع: ${res.subscription.amountPaid}'),
+                Text('السعر الكامل: ${res.subscription.totalAmount.toStringAsFixed(0)} شيكل'),
+                Text('المدفوع: ${res.subscription.amountPaid.toStringAsFixed(0)} شيكل'),
+                if (res.subscription.remaining > 0)
+                  Text('المتبقّي: ${res.subscription.remaining.toStringAsFixed(0)} شيكل',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: Colors.red.shade700)),
                 Text('عمولتك: ${res.subscription.commissionAmount}'),
               ],
             ),
@@ -202,9 +210,53 @@ class _NewClientPageState extends State<NewClientPage> {
               _existingShopPicker(),
             const SizedBox(height: 16),
 
+            _section('اختر الباقة'),
+            SubscriptionPlansView(
+              compact: true,
+              selected: _plan,
+              onSelected: (k) {
+                setState(() {
+                  _plan = k;
+                  // Full price = the plan's yearly price (e.g. VIP = 600).
+                  // Clear "paid now" so the delegate enters the actual first
+                  // payment; the remaining balance is shown live below.
+                  _total.text = '${planByKey(k).yearly}';
+                  _amountPaid.clear();
+                });
+              },
+            ),
+            const SizedBox(height: 14),
             _section('بيانات الاشتراك'),
-            _planSelector(),
-            _field(_amountPaid, 'المبلغ المدفوع', required: true, keyboard: TextInputType.number),
+            Row(
+              children: [
+                Expanded(
+                  child: _field(_total, 'السعر الكامل', required: true,
+                      keyboard: TextInputType.number, onChanged: (_) => setState(() {})),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _field(_amountPaid, 'المدفوع الآن', required: true,
+                      keyboard: TextInputType.number, onChanged: (_) => setState(() {})),
+                ),
+              ],
+            ),
+            Builder(builder: (_) {
+              final total = double.tryParse(_total.text.trim()) ?? 0;
+              final paid = double.tryParse(_amountPaid.text.trim()) ?? 0;
+              final rem = (total - paid) > 0 ? (total - paid) : 0;
+              return Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                child: Text(
+                  rem > 0
+                      ? 'المتبقّي: ${rem.toStringAsFixed(0)} شيكل'
+                      : 'مدفوع بالكامل ✓',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: rem > 0 ? Colors.red.shade700 : Colors.green.shade700,
+                  ),
+                ),
+              );
+            }),
             _field(_commission, 'عمولة المندوب (افتراضي = إعدادات حسابك)', keyboard: TextInputType.number),
             _field(_paymentMethod, 'طريقة الدفع (cash/transfer/...)'),
             Row(
@@ -253,24 +305,6 @@ class _NewClientPageState extends State<NewClientPage> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       );
 
-  Widget _planSelector() => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: DropdownButtonFormField<String>(
-          initialValue: _plan,
-          decoration: const InputDecoration(
-            labelText: 'نوع الاشتراك',
-            border: OutlineInputBorder(),
-          ),
-          items: [
-            for (final p in _planOptions)
-              DropdownMenuItem(value: p.value, child: Text(p.label)),
-          ],
-          onChanged: (v) {
-            if (v != null) setState(() => _plan = v);
-          },
-        ),
-      );
-
   Widget _shopModeSelector() => SegmentedButton<String>(
         segments: const [
           ButtonSegment(value: 'new', label: Text('محل جديد'), icon: Icon(Icons.add_business)),
@@ -312,6 +346,7 @@ class _NewClientPageState extends State<NewClientPage> {
     bool required = false,
     int maxLines = 1,
     TextInputType? keyboard,
+    ValueChanged<String>? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -319,6 +354,7 @@ class _NewClientPageState extends State<NewClientPage> {
         controller: c,
         keyboardType: keyboard,
         maxLines: maxLines,
+        onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),

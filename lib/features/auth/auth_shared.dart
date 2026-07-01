@@ -223,6 +223,16 @@ class AuthField extends StatelessWidget {
   final TextInputAction textInputAction;
   final void Function(String)? onFieldSubmitted;
 
+  /// Optional gradient fill behind the field (used for the login inputs).
+  final Gradient? gradient;
+
+  /// Warm right-to-left gradient used to tint the login inputs.
+  static const rtlFill = LinearGradient(
+    begin: Alignment.centerRight,
+    end: Alignment.centerLeft,
+    colors: [Color(0xFFF1DFC6), Color(0xFFFBF4EB)],
+  );
+
   const AuthField({
     super.key,
     required this.controller,
@@ -235,11 +245,12 @@ class AuthField extends StatelessWidget {
     this.validator,
     this.textInputAction = TextInputAction.next,
     this.onFieldSubmitted,
+    this.gradient,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
+    final field = TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       textDirection: textDirection,
@@ -277,7 +288,9 @@ class AuthField extends StatelessWidget {
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         suffixIcon: suffix,
-        filled: true,
+        // When a gradient is provided, keep the field transparent so the
+        // gradient behind it shows through.
+        filled: gradient == null,
         fillColor: const Color(0xFFFBF4EB),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -287,6 +300,15 @@ class AuthField extends StatelessWidget {
         errorBorder: _border(AppColors.discount),
         focusedErrorBorder: _border(AppColors.discount, width: 1.6),
       ),
+    );
+
+    if (gradient == null) return field;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: field,
     );
   }
 
