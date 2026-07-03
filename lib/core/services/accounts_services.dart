@@ -351,6 +351,7 @@ class DelegateService {
     String? workField,
     required String planName,
     required double amountPaid,
+    double? totalAmount,
     double? commissionAmount,
     String? paymentMethod,
     required DateTime startDate,
@@ -370,6 +371,7 @@ class DelegateService {
         if (workField != null && workField.isNotEmpty) 'work_field': workField,
         'plan_name': planName,
         'amount_paid': amountPaid,
+        if (totalAmount != null) 'total_amount': totalAmount,
         if (commissionAmount != null) 'commission_amount': commissionAmount,
         if (paymentMethod != null && paymentMethod.isNotEmpty) 'payment_method': paymentMethod,
         'start_date': _date(startDate),
@@ -406,6 +408,7 @@ class DelegateService {
     required int userId,
     required String planName,
     required double amountPaid,
+    double? totalAmount,
     double? commissionAmount,
     String? paymentMethod,
     required DateTime startDate,
@@ -417,6 +420,7 @@ class DelegateService {
         'user_id': userId,
         'plan_name': planName,
         'amount_paid': amountPaid,
+        if (totalAmount != null) 'total_amount': totalAmount,
         if (commissionAmount != null) 'commission_amount': commissionAmount,
         if (paymentMethod != null && paymentMethod.isNotEmpty)
           'payment_method': paymentMethod,
@@ -437,6 +441,7 @@ class DelegateService {
     int id, {
     String? planName,
     double? amountPaid,
+    double? totalAmount,
     double? commissionAmount,
     String? paymentMethod,
     DateTime? startDate,
@@ -448,12 +453,45 @@ class DelegateService {
       final res = await _dio.put('/delegate/subscriptions/$id', data: {
         if (planName != null) 'plan_name': planName,
         if (amountPaid != null) 'amount_paid': amountPaid,
+        if (totalAmount != null) 'total_amount': totalAmount,
         if (commissionAmount != null) 'commission_amount': commissionAmount,
         if (paymentMethod != null) 'payment_method': paymentMethod,
         if (startDate != null) 'start_date': _date(startDate),
         if (endDate != null) 'end_date': _date(endDate),
         if (status != null) 'status': status,
         if (notes != null) 'notes': notes,
+      });
+      _throwIfError(res);
+      return SubscriptionModel.fromJson(
+          Map<String, dynamic>.from(res.data as Map));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Delete a client's subscription.
+  Future<void> deleteSubscription(int id) async {
+    try {
+      final res = await _dio.delete('/delegate/subscriptions/$id');
+      _throwIfError(res);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Record an additional payment (installment) on a subscription.
+  Future<SubscriptionModel> addPayment(
+    int subscriptionId, {
+    required double amount,
+    String? method,
+    String? notes,
+  }) async {
+    try {
+      final res = await _dio
+          .post('/delegate/subscriptions/$subscriptionId/payments', data: {
+        'amount': amount,
+        if (method != null && method.isNotEmpty) 'method': method,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
       });
       _throwIfError(res);
       return SubscriptionModel.fromJson(
@@ -572,6 +610,21 @@ class PostService {
       await _dio.post('/posts/$id/view');
     } catch (_) {
       // Silent — never block the UI on view tracking.
+    }
+  }
+
+  /// Toggle the current user's like on a post (reel). Persisted server-side.
+  /// Returns the new liked state + the live like count.
+  Future<({bool liked, int likes})> toggleLike(int id) async {
+    try {
+      final res = await _dio.post('/posts/$id/like');
+      final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : {};
+      return (
+        liked: m['liked'] == true,
+        likes: (m['likes_count'] is num) ? (m['likes_count'] as num).toInt() : 0,
+      );
+    } catch (e) {
+      throw toApiException(e);
     }
   }
 }

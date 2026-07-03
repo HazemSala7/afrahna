@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api/auth_storage.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../home/home_page.dart';
@@ -17,11 +18,27 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _phone = TextEditingController(text: '0599000000');
-  final _password = TextEditingController(text: 'password');
+  final _phone = TextEditingController();
+  final _password = TextEditingController();
   bool _loading = false;
   bool _obscure = true;
   bool _remember = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastLogin();
+  }
+
+  Future<void> _loadLastLogin() async {
+    final last = await AuthStorage.instance.readLastLogin();
+    if (last != null && mounted) {
+      setState(() {
+        _phone.text = last.phone;
+        _password.text = last.password;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -36,6 +53,15 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _loading = true);
     final session = context.read<SessionController>();
     final ok = await session.login(_phone.text.trim(), _password.text);
+    if (ok) {
+      // Remember (or forget) the last credentials for next launch.
+      if (_remember) {
+        await AuthStorage.instance
+            .writeLastLogin(_phone.text.trim(), _password.text);
+      } else {
+        await AuthStorage.instance.clearLastLogin();
+      }
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
@@ -223,6 +249,7 @@ class _LoginPageState extends State<LoginPage> {
                                     icon: Icons.phone_iphone_rounded,
                                     keyboardType: TextInputType.phone,
                                     textDirection: TextDirection.ltr,
+                                    gradient: AuthField.rtlFill,
                                     validator: (v) {
                                       final s = (v ?? '').replaceAll(RegExp(r'\D'), '');
                                       if (s.length < 7) return 'رقم الجوال غير صحيح';
@@ -234,6 +261,7 @@ class _LoginPageState extends State<LoginPage> {
                                     controller: _password,
                                     label: 'كلمة المرور',
                                     icon: Icons.lock_outline_rounded,
+                                    gradient: AuthField.rtlFill,
                                     obscure: _obscure,
                                     textInputAction: TextInputAction.done,
                                     onFieldSubmitted: (_) => _submit(),

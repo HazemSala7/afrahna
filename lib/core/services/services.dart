@@ -203,6 +203,7 @@ class VendorService {
     String? query,
     bool? featured,
     bool? verified,
+    bool? vip,
     int? userId,
     int? delegateId,
     bool? activeOnly,
@@ -216,6 +217,7 @@ class VendorService {
         if (query != null && query.isNotEmpty) 'q': query,
         if (featured == true) 'featured': 1,
         if (verified == true) 'verified': 1,
+        if (vip == true) 'vip': 1,
         if (userId != null) 'user_id': userId,
         if (delegateId != null) 'delegate_id': delegateId,
         if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
@@ -654,22 +656,22 @@ class HomeStats {
   const HomeStats({
     this.vendors = 0,
     this.users = 0,
-    this.appUsers = 0,
-    this.services = 0,
+    this.likes = 0,
+    this.offers = 0,
     this.cities = 0,
   });
 
   final int vendors;
   final int users;
-  final int appUsers;
-  final int services;
+  final int likes;
+  final int offers;
   final int cities;
 
   factory HomeStats.fromJson(Map<String, dynamic> json) => HomeStats(
         vendors: (json['vendors'] as num?)?.toInt() ?? 0,
         users: (json['users'] as num?)?.toInt() ?? 0,
-        appUsers: (json['app_users'] as num?)?.toInt() ?? 0,
-        services: (json['services'] as num?)?.toInt() ?? 0,
+        likes: (json['likes'] as num?)?.toInt() ?? 0,
+        offers: (json['offers'] as num?)?.toInt() ?? 0,
         cities: (json['cities'] as num?)?.toInt() ?? 0,
       );
 }

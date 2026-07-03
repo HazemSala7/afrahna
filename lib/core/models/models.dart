@@ -43,6 +43,7 @@ class UserModel {
     this.permissions = const {},
     this.vendorName,
     this.vendorLogo,
+    this.activePlan,
   });
 
   final int id;
@@ -66,6 +67,10 @@ class UserModel {
 
   /// Logo URL of the user's shop, when available.
   final String? vendorLogo;
+
+  /// Current active subscription plan key (normal|featured|vip), or null when
+  /// the client has no active subscription. Provided by the delegate clients list.
+  final String? activePlan;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -94,6 +99,7 @@ class UserModel {
             ? _readT<String>(
                 Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
             : null,
+        activePlan: _readT<String>(json, 'active_plan'),
       );
 
   Map<String, dynamic> toJson() => {
@@ -220,6 +226,7 @@ class VendorModel {
     this.maxPrice,
     this.isFeatured = false,
     this.isVerified = false,
+    this.isVip = false,
     this.isFollowing = false,
     this.followersCount = 0,
     this.isFavorite = false,
@@ -260,6 +267,9 @@ class VendorModel {
   final bool isVerified;
   final bool isFavorite;
 
+  /// Active VIP subscription (drives slider visibility + verified badge).
+  final bool isVip;
+
   /// Whether the current authenticated user follows this vendor.
   final bool isFollowing;
 
@@ -285,6 +295,28 @@ class VendorModel {
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
       (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+
+  /// Highest active subscription tier (vip > featured > normal), or null.
+  String? get activePlan {
+    if (isVip || activePlans.contains('vip')) return 'vip';
+    if (activePlans.contains('featured')) return 'featured';
+    if (activePlans.contains('normal')) return 'normal';
+    return null;
+  }
+
+  /// Arabic label of the current subscription for display to the vendor.
+  String get subscriptionLabel {
+    switch (activePlan) {
+      case 'vip':
+        return 'VIP';
+      case 'featured':
+        return 'مميز';
+      case 'normal':
+        return 'عادي';
+      default:
+        return 'لا يوجد اشتراك فعّال';
+    }
+  }
 
   factory VendorModel.fromJson(Map<String, dynamic> json) => VendorModel(
         id: _toInt(json['id']) ?? 0,
@@ -319,7 +351,12 @@ class VendorModel {
         minPrice: _toDouble(json['min_price']),
         maxPrice: _toDouble(json['max_price']),
         isFeatured: json['is_featured'] == true || json['is_featured'] == 1,
-        isVerified: json['is_verified'] == true || json['is_verified'] == 1,
+        isVip: json['is_vip'] == true || json['is_vip'] == 1,
+        // VIP subscription also grants the verified badge.
+        isVerified: json['is_verified'] == true ||
+            json['is_verified'] == 1 ||
+            json['is_vip'] == true ||
+            json['is_vip'] == 1,
         isFavorite: json['is_favorite'] == true,
         isFollowing: json['is_following'] == true || json['is_following'] == 1,
         followersCount: _toInt(json['followers_count']) ?? 0,
@@ -859,6 +896,7 @@ class SubscriptionModel {
     this.workField,
     required this.planName,
     required this.amountPaid,
+    this.totalAmount = 0,
     required this.commissionAmount,
     this.commissionPaid = false,
     this.paymentMethod,
@@ -868,6 +906,7 @@ class SubscriptionModel {
     this.notes,
     this.client,
     this.delegate,
+    this.payments = const [],
   });
 
   final int id;
@@ -879,6 +918,7 @@ class SubscriptionModel {
   final String? workField;
   final String planName;
   final double amountPaid;
+  final double totalAmount;
   final double commissionAmount;
   final bool commissionPaid;
   final String? paymentMethod;
@@ -888,6 +928,15 @@ class SubscriptionModel {
   final String? notes;
   final UserModel? client;
   final UserModel? delegate;
+  final List<SubscriptionPaymentModel> payments;
+
+  /// Outstanding balance the client still owes.
+  double get remaining {
+    final r = totalAmount - amountPaid;
+    return r > 0 ? r : 0;
+  }
+
+  bool get isFullyPaid => remaining <= 0;
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) => SubscriptionModel(
         id: _toInt(json['id']) ?? 0,
@@ -899,6 +948,7 @@ class SubscriptionModel {
         workField: _readT<String>(json, 'work_field'),
         planName: (json['plan_name'] ?? 'standard').toString(),
         amountPaid: _toDouble(json['amount_paid']) ?? 0,
+        totalAmount: _toDouble(json['total_amount']) ?? (_toDouble(json['amount_paid']) ?? 0),
         commissionAmount: _toDouble(json['commission_amount']) ?? 0,
         commissionPaid: json['commission_paid'] == true || json['commission_paid'] == 1,
         paymentMethod: _readT<String>(json, 'payment_method'),
@@ -912,9 +962,39 @@ class SubscriptionModel {
         delegate: json['delegate'] is Map
             ? UserModel.fromJson(Map<String, dynamic>.from(json['delegate'] as Map))
             : null,
+        payments: (json['payments'] as List? ?? const [])
+            .whereType<Map>()
+            .map((m) =>
+                SubscriptionPaymentModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList(),
       );
 
   bool get isActive => status == 'active';
+}
+
+class SubscriptionPaymentModel {
+  SubscriptionPaymentModel({
+    required this.id,
+    required this.amount,
+    this.method,
+    this.notes,
+    this.paidAt,
+  });
+
+  final int id;
+  final double amount;
+  final String? method;
+  final String? notes;
+  final DateTime? paidAt;
+
+  factory SubscriptionPaymentModel.fromJson(Map<String, dynamic> json) =>
+      SubscriptionPaymentModel(
+        id: _toInt(json['id']) ?? 0,
+        amount: _toDouble(json['amount']) ?? 0,
+        method: _readT<String>(json, 'method'),
+        notes: _readT<String>(json, 'notes'),
+        paidAt: _toDate(json['paid_at']) ?? _toDate(json['created_at']),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -955,6 +1035,7 @@ class PostModel {
     this.viewsCount = 0,
     this.commentsCount = 0,
     this.isPublished = true,
+    this.isLiked = false,
     this.vendor,
     this.createdAt,
   });
@@ -973,6 +1054,7 @@ class PostModel {
   final int viewsCount;
   final int commentsCount;
   final bool isPublished;
+  final bool isLiked;
   final VendorModel? vendor;
   final DateTime? createdAt;
 
@@ -991,6 +1073,7 @@ class PostModel {
         viewsCount: _toInt(json['views_count']) ?? 0,
         commentsCount: _toInt(json['comments_count']) ?? 0,
         isPublished: json['is_published'] == true || json['is_published'] == 1,
+        isLiked: json['is_liked'] == true || json['is_liked'] == 1,
         vendor: json['vendor'] is Map
             ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
             : null,

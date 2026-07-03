@@ -141,11 +141,19 @@ class _MyClientsPageState extends State<MyClientsPage> {
                             : null,
                       ),
                       title: Text(title),
-                      subtitle: Text([
-                        if (hasShop) 'المستخدم: ${c.name}',
-                        c.phone,
-                        if (c.workField != null && c.workField!.isNotEmpty) c.workField!,
-                      ].join(' • ')),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text([
+                            if (hasShop) 'المستخدم: ${c.name}',
+                            c.phone,
+                            if (c.workField != null && c.workField!.isNotEmpty)
+                              c.workField!,
+                          ].join(' • ')),
+                          const SizedBox(height: 4),
+                          _PlanChip(plan: c.activePlan),
+                        ],
+                      ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -180,6 +188,46 @@ class _MyClientsPageState extends State<MyClientsPage> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small badge showing a client's active subscription plan (or "بدون اشتراك").
+class _PlanChip extends StatelessWidget {
+  const _PlanChip({required this.plan});
+  final String? plan;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = {'normal': 'عادي', 'featured': 'مميز', 'vip': 'VIP'};
+    final has = plan != null && labels.containsKey(plan);
+    final color = !has
+        ? Colors.grey
+        : plan == 'vip'
+            ? const Color(0xFFD8455C)
+            : plan == 'featured'
+                ? const Color(0xFFD89B30)
+                : const Color(0xFF3E9C86);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(has ? Icons.card_membership : Icons.block,
+              size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            has ? 'اشتراك: ${labels[plan]}' : 'بدون اشتراك',
+            style: TextStyle(
+                color: color, fontWeight: FontWeight.w800, fontSize: 11.5),
           ),
         ],
       ),

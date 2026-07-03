@@ -113,12 +113,41 @@ class _HomeTabState extends State<_HomeTab> {
     _categoriesFuture = CategoryService().list(tree: true);
     _promosFuture = PromotionService().list();
     _topVendorsFuture = VendorService().list();
-    _featuredVendorsFuture =
-        VendorService().list(featured: true, perPage: 12);
-    // Shuffle so the banner shows slides in a fresh random order each load.
-    _slidersFuture = SliderService().list().then((l) => l..shuffle());
+    // Featured: fresh random order on each load.
+    _featuredVendorsFuture = VendorService()
+        .list(featured: true, perPage: 12)
+        .then((l) => l..shuffle());
+    // Hero slider = admin slides + VIP vendors, shuffled fresh each load.
+    _slidersFuture = _loadSliders();
     _statsFuture = StatsService().get();
     _mainEventFuture = _loadMainEvent();
+  }
+
+  /// Hero slider content = admin-created slides + VIP vendors (as slides),
+  /// shuffled so the order is fresh on every load. VIP vendors literally
+  /// appearing here is part of the VIP subscription tier.
+  Future<List<SliderModel>> _loadSliders() async {
+    List<SliderModel> sliders = const [];
+    List<VendorModel> vips = const [];
+    try {
+      sliders = await SliderService().list();
+    } catch (_) {}
+    try {
+      vips = await VendorService().list(vip: true, perPage: 10);
+    } catch (_) {}
+    final vipSlides = vips
+        .where((v) => (v.cover ?? v.logo ?? '').isNotEmpty)
+        .map((v) => SliderModel(
+              id: -v.id, // negative id to avoid clashing with real slides
+              image: v.cover ?? v.logo ?? '',
+              titleAr: v.name,
+              subtitleAr: v.category?.name,
+              badgeAr: 'VIP ⭐',
+              vendorId: v.id,
+            ))
+        .toList();
+    final all = [...vipSlides, ...sliders]..shuffle();
+    return all;
   }
 
   /// Only signed-in users have a personal event; guests get nothing.
@@ -160,31 +189,33 @@ class _HomeTabState extends State<_HomeTab> {
           color: AppColors.primary,
           onRefresh: _refresh,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 130),
             children: [
-              const _TopBar(),
+              _hpad(const _TopBar()),
               const SizedBox(height: 16),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 60),
                 child: const _SearchBar(),
-              ),
+              )),
               const SizedBox(height: 18),
+              // Full-width auto-scrolling categories (no side gaps).
               FadeSlideIn(
                 delay: const Duration(milliseconds: 200),
                 child: _CategoriesGrid(future: _categoriesFuture),
               ),
               const SizedBox(height: 22),
+              // Full-width hero slider.
               FadeSlideIn(
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               ),
               const SizedBox(height: 15),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 340),
                 child: _StatsBand(future: _statsFuture),
-              ),
+              )),
               const SizedBox(height: 15),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 380),
                 child: _SectionHeader(
                   title: 'الشركات المميّزة',
@@ -199,8 +230,9 @@ class _HomeTabState extends State<_HomeTab> {
                     ),
                   ),
                 ),
-              ),
+              )),
               const SizedBox(height: 12),
+              // Full-width auto-scrolling featured row.
               FadeSlideIn(
                 delay: const Duration(milliseconds: 440),
                 child: _FeaturedVendorsCarousel(
@@ -214,7 +246,7 @@ class _HomeTabState extends State<_HomeTab> {
                       event.startsAt.isBefore(DateTime.now())) {
                     return const SizedBox.shrink();
                   }
-                  return Padding(
+                  return _hpad(Padding(
                     padding: const EdgeInsets.only(top: 22),
                     child: FadeSlideIn(
                       delay: const Duration(milliseconds: 460),
@@ -223,11 +255,11 @@ class _HomeTabState extends State<_HomeTab> {
                         target: event.startsAt,
                       ),
                     ),
-                  );
+                  ));
                 },
               ),
               const SizedBox(height: 22),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 480),
                 child: _SectionHeader(
                   title: 'عروض اليوم',
@@ -237,14 +269,14 @@ class _HomeTabState extends State<_HomeTab> {
                     MaterialPageRoute(builder: (_) => const OffersPage()),
                   ),
                 ),
-              ),
+              )),
               const SizedBox(height: 12),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 540),
                 child: _OffersRow(future: _promosFuture),
-              ),
+              )),
               const SizedBox(height: 22),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 520),
                 child: _SectionHeader(
                   title: 'الأكثر تقييماً',
@@ -254,17 +286,17 @@ class _HomeTabState extends State<_HomeTab> {
                     MaterialPageRoute(builder: (_) => const VendorsPage()),
                   ),
                 ),
-              ),
+              )),
               const SizedBox(height: 12),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 580),
                 child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
-              ),
+              )),
               const SizedBox(height: 22),
-              FadeSlideIn(
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 660),
                 child: const _QuickActionsRow(),
-              ),
+              )),
             ],
           ),
         ),
@@ -480,17 +512,23 @@ class _StatsBand extends StatelessWidget {
       builder: (_, snap) {
         final s = snap.data;
         if (s == null) return const SizedBox.shrink();
-        final items = <({IconData icon, int value, String label, Color color})>[
-          (icon: Icons.storefront_rounded, value: s.vendors, label: 'شركة',
-              color: Color(0xFFF3C969)),
-          (icon: Icons.favorite_rounded, value: s.users, label: 'مستفيد',
-              color: Color(0xFFFF8FA3)),
-          (icon: Icons.phone_iphone_rounded, value: s.appUsers, label: 'مستخدم',
-              color: Color(0xFFB9A7FF)),
-          (icon: Icons.design_services_rounded, value: s.services, label: 'خدمة',
-              color: Color(0xFF8FE3C2)),
-          (icon: Icons.location_city_rounded, value: s.cities, label: 'مدينة',
-              color: Color(0xFF9FC2FF)),
+        // Coordinated warm pastel palette that harmonizes with the gold band.
+        final items =
+            <({IconData icon, int value, String label, Color color, VoidCallback? onTap, bool pulse})>[
+          (icon: Icons.store_mall_directory_rounded, value: s.vendors, label: 'شركة',
+              color: Color(0xFFF6B25C), onTap: null, pulse: false),
+          (icon: Icons.volunteer_activism_rounded, value: s.likes, label: 'إعجاب',
+              color: Color(0xFFF48CA0), onTap: null, pulse: false),
+          (icon: Icons.groups_rounded, value: s.users, label: 'مستخدم',
+              color: Color(0xFF7FC6C0), onTap: null, pulse: false),
+          // "عرض خاص" is highlighted + animated + tappable → opens all offers.
+          (icon: Icons.local_fire_department_rounded, value: s.offers, label: 'عرض خاص',
+              color: Color(0xFFF6A93B),
+              onTap: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const OffersPage())),
+              pulse: true),
+          (icon: Icons.holiday_village_rounded, value: s.cities, label: 'مدينة',
+              color: Color(0xFFC7A9E0), onTap: null, pulse: false),
         ];
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 6),
@@ -519,6 +557,8 @@ class _StatsBand extends StatelessWidget {
                     label: items[i].label,
                     accent: items[i].color,
                     delay: i * 160,
+                    onTap: items[i].onTap,
+                    pulse: items[i].pulse,
                   ),
                 ),
                 if (i != items.length - 1)
@@ -543,49 +583,130 @@ class _StatCell extends StatelessWidget {
     required this.label,
     required this.accent,
     this.delay = 0,
+    this.onTap,
+    this.pulse = false,
   });
   final IconData icon;
   final int value;
   final String label;
   final Color accent;
   final int delay;
+  final VoidCallback? onTap;
+  final bool pulse;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    Widget circle = Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        // Glossy two-tone accent badge.
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(accent, Colors.white, 0.28)!,
+            accent,
+            Color.lerp(accent, Colors.black, 0.12)!,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.55),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Soft glossy highlight near the top.
+          Positioned(
+            top: 6,
+            child: Container(
+              width: 22,
+              height: 9,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.38),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
+          Icon(icon, color: Colors.white, size: 23),
+        ],
+      ),
+    );
+    if (pulse) circle = _Pulse(child: circle);
+
+    final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.14),
-            shape: BoxShape.circle,
-            border: Border.all(color: accent.withValues(alpha: 0.95), width: 1.6),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: accent, size: 21),
-        ),
+        circle,
         const SizedBox(height: 8),
         _CountUp(value: value, delay: delay),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (onTap != null)
+              const Padding(
+                padding: EdgeInsets.only(right: 2),
+                child: Icon(Icons.chevron_left,
+                    color: Colors.white70, size: 14),
+              ),
+          ],
         ),
       ],
     );
+
+    if (onTap == null) return column;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: column,
+    );
   }
+}
+
+/// Gentle repeating pulse to draw attention (used on the tappable offers stat).
+class _Pulse extends StatefulWidget {
+  const _Pulse({required this.child});
+  final Widget child;
+
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  )..repeat(reverse: true);
+  late final Animation<double> _a =
+      Tween(begin: 1.0, end: 1.14).animate(
+          CurvedAnimation(parent: _c, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      ScaleTransition(scale: _a, child: widget.child);
 }
 
 /// Animated count-up number (animates 0 → value once on first appearance,
@@ -633,12 +754,73 @@ class _CountUpState extends State<_CountUp>
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
-            fontSize: 19,
+            fontSize: 20,
             height: 1.0,
+            letterSpacing: 0.2,
+            shadows: [
+              Shadow(color: Color(0x55000000), blurRadius: 6, offset: Offset(0, 2)),
+            ],
           ),
         );
       },
     );
+  }
+}
+
+/// Wraps a widget with the standard horizontal page padding (16). Used so the
+/// home list can be edge-to-edge for full-width sections (slider, categories,
+/// featured) while normal sections keep their side margins.
+Widget _hpad(Widget child) =>
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: child);
+
+/// Drives a horizontal [ScrollController] in a slow, continuous ping-pong
+/// motion (marquee-like). Pauses when the user drags, then resumes shortly
+/// after. Used by the categories and featured rows.
+class _AutoScroller {
+  _AutoScroller({this.speed = 0.4});
+  final double speed; // pixels per tick (~33 ticks/sec)
+
+  ScrollController? _c;
+  Timer? _timer;
+  Timer? _resume;
+  double _dir = 1;
+
+  void attach(ScrollController c) {
+    _c = c;
+    _start();
+  }
+
+  void _start() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
+      final c = _c;
+      if (c == null || !c.hasClients) return;
+      final max = c.position.maxScrollExtent;
+      if (max <= 0) return;
+      var next = c.offset + _dir * speed;
+      if (next >= max) {
+        next = max;
+        _dir = -1;
+      } else if (next <= 0) {
+        next = 0;
+        _dir = 1;
+      }
+      c.jumpTo(next);
+    });
+  }
+
+  /// Pause auto-scroll (e.g. while the user is dragging) and resume after 3s.
+  void pause() {
+    _timer?.cancel();
+    _timer = null;
+    _resume?.cancel();
+    _resume = Timer(const Duration(seconds: 3), _start);
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    _resume?.cancel();
+    _c = null;
   }
 }
 
@@ -715,10 +897,12 @@ class _HeroBannerState extends State<_HeroBanner> {
           if (_index >= _slides.length) _index = 0;
           WidgetsBinding.instance.addPostFrameCallback((_) => _startTimer());
         }
-        return ClipRRect(
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: SizedBox(
-            height: 200,
+            height: 235,
             child: Stack(
               children: [
                 PageView.builder(
@@ -759,6 +943,7 @@ class _HeroBannerState extends State<_HeroBanner> {
               ],
             ),
           ),
+        ),
         );
       },
     );
@@ -949,36 +1134,17 @@ class _CategoriesGrid extends StatefulWidget {
 
 class _CategoriesGridState extends State<_CategoriesGrid> {
   final ScrollController _controller = ScrollController();
-  Timer? _hintTimer;
-  bool _userInteracted = false;
+  final _auto = _AutoScroller(speed: 0.35);
 
   @override
   void initState() {
     super.initState();
-    // Subtle periodic "nudge" so users notice the list is scrollable.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startHintLoop());
-  }
-
-  void _startHintLoop() {
-    _hintTimer?.cancel();
-    _hintTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (!mounted || _userInteracted) return;
-      if (!_controller.hasClients) return;
-      final max = _controller.position.maxScrollExtent;
-      if (max <= 0) return;
-      final current = _controller.offset;
-      final target = current < 1 ? 28.0 : 0.0;
-      await _controller.animateTo(
-        target,
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeInOut,
-      );
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _auto.attach(_controller));
   }
 
   @override
   void dispose() {
-    _hintTimer?.cancel();
+    _auto.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -1041,19 +1207,16 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
           height: tileSize,
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
-              if (n is UserScrollNotification) {
-                _userInteracted = true;
-                _hintTimer?.cancel();
-              }
+              if (n is UserScrollNotification) _auto.pause();
               return false;
             },
             child: ListView.separated(
               controller: _controller,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
               itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: spacing),
+              separatorBuilder: (_, _) => const SizedBox(width: spacing),
               itemBuilder: (_, i) => SizedBox(
                 width: tileSize,
                 height: tileSize,
@@ -1336,13 +1499,37 @@ class _OfferCard extends StatelessWidget {
 // FEATURED VENDORS CAROUSEL (controlled from admin panel via is_featured)
 // ===========================================================================
 
-class _FeaturedVendorsCarousel extends StatelessWidget {
+class _FeaturedVendorsCarousel extends StatefulWidget {
   const _FeaturedVendorsCarousel({required this.future, this.userPos});
   final Future<List<VendorModel>> future;
   final Position? userPos;
 
   @override
+  State<_FeaturedVendorsCarousel> createState() =>
+      _FeaturedVendorsCarouselState();
+}
+
+class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
+  final ScrollController _controller = ScrollController();
+  final _auto = _AutoScroller(speed: 0.45);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _auto.attach(_controller));
+  }
+
+  @override
+  void dispose() {
+    _auto.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final future = widget.future;
+    final userPos = widget.userPos;
     return SizedBox(
       // Compact circular row — deliberately smaller / less prominent than the
       // hero slider above it.
@@ -1370,12 +1557,20 @@ class _FeaturedVendorsCarousel extends StatelessWidget {
           if (items.isEmpty) {
             return _EmptyMini(text: 'لا توجد شركات مميّزة حالياً');
           }
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => _FeaturedVendorCard(vendor: items[i]),
+          return NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is UserScrollNotification) _auto.pause();
+              return false;
+            },
+            child: ListView.separated(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsetsDirectional.only(
+                  start: 16, end: 16, top: 4, bottom: 4),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (_, i) => _FeaturedVendorCard(vendor: items[i]),
+            ),
           );
         },
       ),
@@ -1573,11 +1768,15 @@ class _TopRatedRow extends StatelessWidget {
               ),
             );
           }
-          final items = [...(snap.data ?? const <VendorModel>[])];
+          // "الأكثر تقييماً" — show only vendors with a full 5/5 rating.
+          final items = [
+            ...(snap.data ?? const <VendorModel>[])
+                .where((v) => (v.rating ?? 0) >= 5.0),
+          ];
           _sortByProximity(items, userPos);
           final top = items.take(8).toList();
           if (top.isEmpty) {
-            return _EmptyMini(text: 'لا يوجد مزوّدون بعد');
+            return _EmptyMini(text: 'لا يوجد مزوّدون بتقييم 5/5 بعد');
           }
           return ListView.separated(
             scrollDirection: Axis.horizontal,
