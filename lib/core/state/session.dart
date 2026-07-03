@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../api/api_client.dart';
 import '../api/auth_storage.dart';
@@ -11,16 +11,24 @@ import '../services/services.dart';
 
 enum AuthStatus { unknown, signedIn, signedOut }
 
-class SessionController extends ChangeNotifier {
+class SessionController extends ChangeNotifier with WidgetsBindingObserver {
   SessionController({AuthService? auth}) : _auth = auth ?? AuthService() {
     // When any authenticated request returns 401 (token revoked because the
     // account was stopped), drop the session immediately so the app returns to
     // the login screen and the user can't keep using a dead session.
     ApiClient.instance.onUnauthorized = _onUnauthorized;
+    // Observe app lifecycle so we can re-verify the session when the app is
+    // brought back to the foreground.
+    WidgetsBinding.instance.addObserver(this);
   }
 
   final AuthService _auth;
   bool _forcingLogout = false;
+
+  /// Proactively re-checks the session on a timer so a stopped account is
+  /// forced out promptly even while the app sits idle (no other requests).
+  Timer? _heartbeat;
+  static const _heartbeatInterval = Duration(seconds: 45);
 
   AuthStatus _status = AuthStatus.unknown;
   UserModel? _user;
@@ -48,6 +56,7 @@ class SessionController extends ChangeNotifier {
     try {
       _user = await _auth.me();
       _status = AuthStatus.signedIn;
+      _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
     } catch (_) {
       await AuthStorage.instance.clear();
@@ -63,6 +72,7 @@ class SessionController extends ChangeNotifier {
       final result = await _auth.login(phone: phone, password: password);
       _user = result.user;
       _status = AuthStatus.signedIn;
+      _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
       notifyListeners();
       return true;
@@ -89,6 +99,7 @@ class SessionController extends ChangeNotifier {
       );
       _user = result.user;
       _status = AuthStatus.signedIn;
+      _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
       notifyListeners();
       return true;
@@ -100,6 +111,7 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _stopHeartbeat();
     await PushNotificationService.instance.unregisterToken();
     await _auth.logout();
     _user = null;
@@ -113,6 +125,7 @@ class SessionController extends ChangeNotifier {
   void _onUnauthorized() {
     if (_status != AuthStatus.signedIn || _forcingLogout) return;
     _forcingLogout = true;
+    _stopHeartbeat();
     () async {
       try {
         await AuthStorage.instance.clear();
@@ -125,9 +138,57 @@ class SessionController extends ChangeNotifier {
     }();
   }
 
+  // --- Proactive session verification -------------------------------------
+
+  void _startHeartbeat() {
+    _heartbeat?.cancel();
+    _heartbeat = Timer.periodic(_heartbeatInterval, (_) => _verifySession());
+  }
+
+  void _stopHeartbeat() {
+    _heartbeat?.cancel();
+    _heartbeat = null;
+  }
+
+  /// Re-fetches the current user. If the account was stopped (token revoked →
+  /// 401, or the account comes back `is_active = false`), forces a logout.
+  Future<void> _verifySession() async {
+    if (_status != AuthStatus.signedIn || _forcingLogout) return;
+    try {
+      final u = await _auth.me();
+      if (!u.isActive) {
+        _onUnauthorized();
+        return;
+      }
+      _user = u;
+      notifyListeners();
+    } on ApiException catch (e) {
+      // 401 → the interceptor already triggered _onUnauthorized; other codes
+      // (offline / server hiccup) are transient and must not sign the user out.
+      if (e.statusCode == 401) _onUnauthorized();
+    } catch (_) {
+      // Network error — ignore; we only force logout on an explicit 401 / stop.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_verifySession());
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopHeartbeat();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   /// Permanently deletes the user's account, then signs out locally.
   Future<bool> deleteAccount() async {
     try {
+      _stopHeartbeat();
       await PushNotificationService.instance.unregisterToken();
       await _auth.deleteAccount();
       _user = null;

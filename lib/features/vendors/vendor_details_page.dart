@@ -2027,7 +2027,7 @@ class _ReviewCard extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  (review.user?.name ?? '؟').characters.first,
+                  review.displayName.characters.first,
                   style: const TextStyle(
                     color: AppColors.primaryDark,
                     fontWeight: FontWeight.w900,
@@ -2037,7 +2037,7 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  review.user?.name ?? 'مستخدم',
+                  review.displayName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.textDark,
