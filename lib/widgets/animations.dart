@@ -210,7 +210,7 @@ class _SparkleOverlayState extends State<SparkleOverlay>
     return IgnorePointer(
       child: AnimatedBuilder(
         animation: _c,
-        builder: (_, __) => CustomPaint(
+        builder: (_, _) => CustomPaint(
           painter: _SparklePainter(
               sparkles: _sparkles, t: _c.value, color: widget.color),
           size: Size.infinite,
@@ -569,7 +569,7 @@ class _ShimmerState extends State<Shimmer>
       borderRadius: BorderRadius.circular(widget.borderRadius),
       child: AnimatedBuilder(
         animation: _c,
-        builder: (_, __) {
+        builder: (_, _) {
           return Container(
             width: widget.width,
             height: widget.height,

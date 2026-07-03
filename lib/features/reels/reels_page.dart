@@ -364,8 +364,8 @@ class _ReelItemState extends State<_ReelItem> {
             CachedNetworkImage(
               imageUrl: thumb,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: Colors.black),
-              errorWidget: (_, __, ___) => Container(color: Colors.black),
+              placeholder: (_, _) => Container(color: Colors.black),
+              errorWidget: (_, _, _) => Container(color: Colors.black),
             ),
             if (!_initFailed)
               const Center(
@@ -381,8 +381,8 @@ class _ReelItemState extends State<_ReelItem> {
       return CachedNetworkImage(
         imageUrl: thumb,
         fit: BoxFit.cover,
-        placeholder: (_, __) => Container(color: Colors.black),
-        errorWidget: (_, __, ___) => Container(
+        placeholder: (_, _) => Container(color: Colors.black),
+        errorWidget: (_, _, _) => Container(
           color: Colors.black,
           child: const Icon(Icons.broken_image_outlined,
               color: Colors.white24, size: 80),

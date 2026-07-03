@@ -169,6 +169,7 @@ class _NewClientPageState extends State<NewClientPage> {
       );
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );

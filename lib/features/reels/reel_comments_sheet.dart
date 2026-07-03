@@ -157,7 +157,7 @@ class _ReelCommentsSheetState extends State<ReelCommentsSheet> {
                         controller: scrollCtl,
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         itemCount: items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        separatorBuilder: (_, _) => const SizedBox(height: 6),
                         itemBuilder: (_, i) => _CommentTile(comment: items[i]),
                       );
                     },

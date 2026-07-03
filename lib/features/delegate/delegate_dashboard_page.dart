@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/services/accounts_services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import 'new_client_page.dart';
@@ -84,7 +83,7 @@ class _ActionTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.15),
+          backgroundColor: color.withValues(alpha: 0.15),
           child: Icon(icon, color: color),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),

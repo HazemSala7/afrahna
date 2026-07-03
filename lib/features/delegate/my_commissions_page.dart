@@ -127,7 +127,7 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
         final profit =
             rows.fold<double>(0, (sum, s) => sum + s.commissionAmount);
         return Card(
-          color: Colors.indigo.withOpacity(0.06),
+          color: Colors.indigo.withValues(alpha: 0.06),
           child: ListTile(
             dense: true,
             title: Text(m, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -151,7 +151,7 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
       case 'cancelled': c = Colors.red;     label = 'ملغى';    break;
       default:          c = Colors.orange;  label = 'قيد الانتظار';
     }
-    return Chip(label: Text(label), backgroundColor: c.withOpacity(0.15));
+    return Chip(label: Text(label), backgroundColor: c.withValues(alpha: 0.15));
   }
 }
 
@@ -164,7 +164,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

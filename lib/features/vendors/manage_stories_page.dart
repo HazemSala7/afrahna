@@ -322,7 +322,7 @@ class _AddStoryPageState extends State<_AddStoryPage> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<Duration?>(
-            value: _duration,
+            initialValue: _duration,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'مدة عرض الستوري',

@@ -501,6 +501,7 @@ class ReviewModel {
     required this.rating,
     this.comment,
     this.user,
+    this.guestName,
     this.vendorId,
     this.createdAt,
   });
@@ -509,8 +510,15 @@ class ReviewModel {
   final double rating;
   final String? comment;
   final UserModel? user;
+
+  /// Alias for admin-created ("fake") reviews that have no real user account.
+  final String? guestName;
   final int? vendorId;
   final DateTime? createdAt;
+
+  /// Reviewer name to display: the real user's name, else the alias.
+  String get displayName =>
+      (user?.name.isNotEmpty ?? false) ? user!.name : (guestName ?? 'مستخدم');
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) => ReviewModel(
         id: _toInt(json['id']) ?? 0,
@@ -520,6 +528,7 @@ class ReviewModel {
             ? UserModel.fromJson(
                 Map<String, dynamic>.from(json['user'] as Map))
             : null,
+        guestName: _readT<String>(json, 'guest_name'),
         vendorId: _toInt(json['vendor_id']),
         createdAt: _toDate(json['created_at']),
       );

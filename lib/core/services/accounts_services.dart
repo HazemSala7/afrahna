@@ -64,9 +64,9 @@ class SubscriptionService {
   }) async {
     try {
       final res = await _dio.get('/subscriptions', queryParameters: {
-        if (status != null) 'status': status,
-        if (delegateId != null) 'delegate_id': delegateId,
-        if (userId != null) 'user_id': userId,
+        'status': ?status,
+        'delegate_id': ?delegateId,
+        'user_id': ?userId,
         'per_page': perPage,
       });
       return _unwrapList(res.data).map(SubscriptionModel.fromJson).toList();
@@ -85,8 +85,8 @@ class SubscriptionService {
   }) async {
     try {
       final res = await _dio.get('/subscriptions', queryParameters: {
-        if (status != null) 'status': status,
-        if (delegateId != null) 'delegate_id': delegateId,
+        'status': ?status,
+        'delegate_id': ?delegateId,
         if (search != null && search.isNotEmpty) 'search': search,
         'page': page,
         'per_page': perPage,
@@ -169,10 +169,10 @@ class AdminUserService {
   }) async {
     try {
       final res = await _dio.get('/users', queryParameters: {
-        if (role != null) 'role': role,
+        'role': ?role,
         if (search != null && search.isNotEmpty) 'search': search,
         if (isActive != null) 'is_active': isActive ? 1 : 0,
-        if (delegateId != null) 'delegate_id': delegateId,
+        'delegate_id': ?delegateId,
         'page': page,
         'per_page': perPage,
       });
@@ -291,7 +291,7 @@ class DelegateService {
   }) async {
     try {
       final res = await _dio.get('/delegate/commissions', queryParameters: {
-        if (status != null) 'status': status,
+        'status': ?status,
         if (commissionPaid != null) 'commission_paid': commissionPaid ? 1 : 0,
         'per_page': perPage,
       });
@@ -367,19 +367,19 @@ class DelegateService {
         'phone': phone,
         if (email != null && email.isNotEmpty) 'email': email,
         if (password != null && password.isNotEmpty) 'password': password,
-        if (cityId != null) 'city_id': cityId,
+        'city_id': ?cityId,
         if (workField != null && workField.isNotEmpty) 'work_field': workField,
         'plan_name': planName,
         'amount_paid': amountPaid,
-        if (totalAmount != null) 'total_amount': totalAmount,
-        if (commissionAmount != null) 'commission_amount': commissionAmount,
+        'total_amount': ?totalAmount,
+        'commission_amount': ?commissionAmount,
         if (paymentMethod != null && paymentMethod.isNotEmpty) 'payment_method': paymentMethod,
         'start_date': _date(startDate),
         'end_date': _date(endDate),
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         'shop_mode': shopMode,
         if (shopName != null && shopName.isNotEmpty) 'shop_name': shopName,
-        if (vendorId != null) 'vendor_id': vendorId,
+        'vendor_id': ?vendorId,
       });
       _throwIfError(res);
       final map = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : <String, dynamic>{};
@@ -420,8 +420,8 @@ class DelegateService {
         'user_id': userId,
         'plan_name': planName,
         'amount_paid': amountPaid,
-        if (totalAmount != null) 'total_amount': totalAmount,
-        if (commissionAmount != null) 'commission_amount': commissionAmount,
+        'total_amount': ?totalAmount,
+        'commission_amount': ?commissionAmount,
         if (paymentMethod != null && paymentMethod.isNotEmpty)
           'payment_method': paymentMethod,
         'start_date': _date(startDate),
@@ -451,15 +451,15 @@ class DelegateService {
   }) async {
     try {
       final res = await _dio.put('/delegate/subscriptions/$id', data: {
-        if (planName != null) 'plan_name': planName,
-        if (amountPaid != null) 'amount_paid': amountPaid,
-        if (totalAmount != null) 'total_amount': totalAmount,
-        if (commissionAmount != null) 'commission_amount': commissionAmount,
-        if (paymentMethod != null) 'payment_method': paymentMethod,
+        'plan_name': ?planName,
+        'amount_paid': ?amountPaid,
+        'total_amount': ?totalAmount,
+        'commission_amount': ?commissionAmount,
+        'payment_method': ?paymentMethod,
         if (startDate != null) 'start_date': _date(startDate),
         if (endDate != null) 'end_date': _date(endDate),
-        if (status != null) 'status': status,
-        if (notes != null) 'notes': notes,
+        'status': ?status,
+        'notes': ?notes,
       });
       _throwIfError(res);
       return SubscriptionModel.fromJson(
@@ -544,7 +544,7 @@ class PostService {
   }) async {
     try {
       final res = await _dio.get('/posts', queryParameters: {
-        if (vendorId != null) 'vendor_id': vendorId,
+        'vendor_id': ?vendorId,
         if (type != null) 'type': postTypeTo(type),
         if (mine) 'mine': 1,
         'per_page': perPage,
@@ -582,12 +582,12 @@ class PostService {
       final res = await _dio.post('/posts', data: {
         'vendor_id': vendorId,
         'type': postTypeTo(type),
-        if (title != null) 'title': title,
-        if (body != null) 'body': body,
-        if (mediaUrl != null) 'media_url': mediaUrl,
-        if (thumbnail != null) 'thumbnail': thumbnail,
-        if (price != null) 'price': price,
-        if (duration != null) 'duration': duration,
+        'title': ?title,
+        'body': ?body,
+        'media_url': ?mediaUrl,
+        'thumbnail': ?thumbnail,
+        'price': ?price,
+        'duration': ?duration,
         'is_published': isPublished,
       });
       return PostModel.fromJson(_unwrapObject(res.data));

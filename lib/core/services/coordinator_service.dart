@@ -169,7 +169,7 @@ class GuestService {
 
   Future<List<GuestModel>> list({String? rsvpStatus}) async {
     final res = await _dio.get('/guests', queryParameters: {
-      if (rsvpStatus != null) 'rsvp_status': rsvpStatus,
+      'rsvp_status': ?rsvpStatus,
     });
     return _asList(res.data).map(GuestModel.fromJson).toList();
   }

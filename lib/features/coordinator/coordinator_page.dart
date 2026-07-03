@@ -393,7 +393,7 @@ class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
             const SizedBox(height: 6),
             SwitchListTile(
               value: _paid,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               title: const Text('تم الدفع', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
               onChanged: (v) => setState(() => _paid = v),
@@ -805,7 +805,7 @@ class _GuestEditorSheetState extends State<_GuestEditorSheet> {
             ]),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _rsvp,
+              initialValue: _rsvp,
               decoration: const InputDecoration(labelText: 'حالة الدعوة', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'invited',   child: Text('مدعو')),

@@ -71,6 +71,7 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
         MaterialPageRoute(builder: (_) => const LoginPage()),
       );
       if (result != true && !session.isSignedIn) return;
+      if (!mounted) return;
     }
     if (_selected == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

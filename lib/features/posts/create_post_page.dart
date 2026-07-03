@@ -68,6 +68,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
       );
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -84,7 +85,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
           padding: const EdgeInsets.all(16),
           children: [
             DropdownButtonFormField<PostType>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(
                 labelText: 'النوع',
                 border: OutlineInputBorder(),

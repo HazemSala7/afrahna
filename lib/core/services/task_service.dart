@@ -163,7 +163,7 @@ class TaskService {
   Future<List<TaskModel>> list({String? status}) async {
     try {
       final res = await _dio.get('/tasks', queryParameters: {
-        if (status != null) 'status': status,
+        'status': ?status,
       });
       return _asList(res.data).map(TaskModel.fromJson).toList();
     } catch (e) {

@@ -211,17 +211,17 @@ class VendorService {
   }) async {
     try {
       final res = await _dio.get('/vendors', queryParameters: {
-        if (categoryId != null) 'category_id': categoryId,
-        if (parentCategoryId != null) 'parent_category_id': parentCategoryId,
-        if (cityId != null) 'city_id': cityId,
+        'category_id': ?categoryId,
+        'parent_category_id': ?parentCategoryId,
+        'city_id': ?cityId,
         if (query != null && query.isNotEmpty) 'q': query,
         if (featured == true) 'featured': 1,
         if (verified == true) 'verified': 1,
         if (vip == true) 'vip': 1,
-        if (userId != null) 'user_id': userId,
-        if (delegateId != null) 'delegate_id': delegateId,
+        'user_id': ?userId,
+        'delegate_id': ?delegateId,
         if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
-        if (perPage != null) 'per_page': perPage,
+        'per_page': ?perPage,
       });
       return _unwrapList(res.data).map(VendorModel.fromJson).toList();
     } catch (e) {
@@ -397,8 +397,8 @@ class ServiceService {
   Future<List<ServiceModel>> list({int? vendorId, int? categoryId, bool mine = false}) async {
     try {
       final res = await _dio.get('/services', queryParameters: {
-        if (vendorId != null) 'vendor_id': vendorId,
-        if (categoryId != null) 'category_id': categoryId,
+        'vendor_id': ?vendorId,
+        'category_id': ?categoryId,
         if (mine) 'mine': 1,
       });
       return _unwrapList(res.data).map(ServiceModel.fromJson).toList();
@@ -434,11 +434,11 @@ class ServiceService {
         'name_ar': nameAr,
         'name_en': nameEn,
         'price': price,
-        if (descriptionAr != null) 'description_ar': descriptionAr,
-        if (descriptionEn != null) 'description_en': descriptionEn,
-        if (discountPrice != null) 'discount_price': discountPrice,
-        if (duration != null) 'duration': duration,
-        if (image != null) 'image': image,
+        'description_ar': ?descriptionAr,
+        'description_en': ?descriptionEn,
+        'discount_price': ?discountPrice,
+        'duration': ?duration,
+        'image': ?image,
         'is_active': isActive,
       });
       return ServiceModel.fromJson(_unwrapObject(res.data));
@@ -460,15 +460,15 @@ class ServiceService {
   }) async {
     try {
       final res = await _dio.put('/services/$id', data: {
-        if (nameAr != null) 'name_ar': nameAr,
-        if (nameEn != null) 'name_en': nameEn,
-        if (descriptionAr != null) 'description_ar': descriptionAr,
-        if (descriptionEn != null) 'description_en': descriptionEn,
-        if (price != null) 'price': price,
-        if (discountPrice != null) 'discount_price': discountPrice,
-        if (duration != null) 'duration': duration,
-        if (image != null) 'image': image,
-        if (isActive != null) 'is_active': isActive,
+        'name_ar': ?nameAr,
+        'name_en': ?nameEn,
+        'description_ar': ?descriptionAr,
+        'description_en': ?descriptionEn,
+        'price': ?price,
+        'discount_price': ?discountPrice,
+        'duration': ?duration,
+        'image': ?image,
+        'is_active': ?isActive,
       });
       return ServiceModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
@@ -625,7 +625,7 @@ class PromotionService {
           'description_en': descriptionEn,
         if (image != null && image.isNotEmpty) 'image': image,
         'discount_type': discountType,
-        if (discountValue != null) 'discount_value': discountValue,
+        'discount_value': ?discountValue,
         if (startDate != null) 'start_date': _ymd(startDate),
         if (endDate != null) 'end_date': _ymd(endDate),
         'is_active': isActive,
@@ -826,7 +826,7 @@ class HighlightService {
         'vendor_id': vendorId,
         'title': title,
         if (coverImage != null && coverImage.isNotEmpty) 'cover_image': coverImage,
-        if (sortOrder != null) 'sort_order': sortOrder,
+        'sort_order': ?sortOrder,
       });
       return HighlightModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
@@ -843,10 +843,10 @@ class HighlightService {
   }) async {
     try {
       final res = await _dio.put('/highlights/$id', data: {
-        if (title != null) 'title': title,
-        if (coverImage != null) 'cover_image': coverImage,
-        if (sortOrder != null) 'sort_order': sortOrder,
-        if (isActive != null) 'is_active': isActive,
+        'title': ?title,
+        'cover_image': ?coverImage,
+        'sort_order': ?sortOrder,
+        'is_active': ?isActive,
       });
       return HighlightModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
@@ -876,7 +876,7 @@ class HighlightService {
         'type': type,
         'media_url': mediaUrl,
         if (caption != null && caption.isNotEmpty) 'caption': caption,
-        if (sortOrder != null) 'sort_order': sortOrder,
+        'sort_order': ?sortOrder,
       });
       return HighlightItemModel.fromJson(_unwrapObject(res.data));
     } catch (e) {

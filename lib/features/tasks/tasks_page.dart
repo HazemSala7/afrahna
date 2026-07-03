@@ -608,7 +608,7 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _priority,
+                    initialValue: _priority,
                     decoration: const InputDecoration(labelText: 'الأولوية', border: OutlineInputBorder()),
                     items: const [
                       DropdownMenuItem(value: 'low', child: Text('منخفض')),
@@ -649,7 +649,7 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
               if (isEdit) ...[
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: _status,
+                  initialValue: _status,
                   decoration: const InputDecoration(labelText: 'الحالة', border: OutlineInputBorder()),
                   items: const [
                     DropdownMenuItem(value: 'pending', child: Text('لم تبدأ')),
@@ -719,7 +719,7 @@ class _TemplatePickerSheet extends StatelessWidget {
               child: ListView.separated(
                 controller: scroll,
                 itemCount: templates.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
                   final t = templates[i];
                   return InkWell(

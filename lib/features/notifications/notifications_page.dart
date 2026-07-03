@@ -89,7 +89,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) => _NotificationTile(
                 n: items[i],
                 onTap: () => _onTap(items[i]),
@@ -158,13 +158,13 @@ class _NotificationTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: n.isRead
-                  ? AppColors.cardShadow.withOpacity(0.4)
-                  : accent.withOpacity(0.35),
+                  ? AppColors.cardShadow.withValues(alpha: 0.4)
+                  : accent.withValues(alpha: 0.35),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardShadow.withOpacity(0.5),
+                color: AppColors.cardShadow.withValues(alpha: 0.5),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -177,7 +177,7 @@ class _NotificationTile extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
+                  color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(_icon(), color: accent, size: 24),
@@ -230,7 +230,7 @@ class _NotificationTile extends StatelessWidget {
                     Text(
                       _timeAgo(n.createdAt),
                       style: TextStyle(
-                        color: AppColors.textMuted.withOpacity(0.85),
+                        color: AppColors.textMuted.withValues(alpha: 0.85),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),

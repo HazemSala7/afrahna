@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
@@ -747,7 +746,7 @@ class _CountUpState extends State<_CountUp>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _a,
-      builder: (_, __) {
+      builder: (_, _) {
         final v = (widget.value * _a.value).round();
         return Text(
           _formatCompact(v),
@@ -1372,7 +1371,7 @@ class _OffersRow extends StatelessWidget {
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _OfferCard(promo: items[i]),
           );
         },
@@ -1781,7 +1780,7 @@ class _TopRatedRow extends StatelessWidget {
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: top.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _TopRatedCard(vendor: top[i]),
           );
         },
@@ -2108,7 +2107,7 @@ class _SearchTabState extends State<_SearchTab> {
                           }
                           return ListView.separated(
                             itemCount: items.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (_, i) {
                               final v = items[i];
@@ -2194,125 +2193,3 @@ class _SearchResultTile extends StatelessWidget {
 // The bottom navigation bar now lives in `widgets/app_bottom_nav.dart`
 // (AppBottomNav) so it can be reused on full-screen pages such as the vendor
 // profile.
-
-// ===========================================================================
-// API DEBUG PANEL (visible in debug builds only)
-// ===========================================================================
-
-class _ApiCallLog {
-  _ApiCallLog({required this.url, required this.status, required this.body});
-  final String url;
-  final int? status;
-  final String body;
-}
-
-class _ApiDebugPanel extends StatelessWidget {
-  const _ApiDebugPanel({required this.logs});
-  final List<_ApiCallLog> logs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'API DEBUG',
-              style: TextStyle(
-                color: Colors.amberAccent,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (logs.isEmpty)
-              const Text(
-                'Loading...',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              )
-            else
-              ...logs.map((log) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: (log.status ?? 0) >= 200 &&
-                                        (log.status ?? 0) < 300
-                                    ? Colors.green
-                                    : Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${log.status ?? 'ERR'}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                log.url,
-                                style: const TextStyle(
-                                  color: Colors.cyanAccent,
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.copy,
-                                  size: 14, color: Colors.white54),
-                              onPressed: () => Clipboard.setData(
-                                  ClipboardData(text: log.body)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: double.infinity,
-                          constraints: const BoxConstraints(maxHeight: 160),
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: SingleChildScrollView(
-                            child: SelectableText(
-                              log.body,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontFamily: 'monospace',
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-          ],
-        ),
-      ),
-    );
-  }
-}

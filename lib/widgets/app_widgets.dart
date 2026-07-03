@@ -332,8 +332,8 @@ class AppNetworkImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url!,
       fit: fit,
-      placeholder: (_, __) => Container(color: color.withValues(alpha: .4)),
-      errorWidget: (_, __, ___) => Container(
+      placeholder: (_, _) => Container(color: color.withValues(alpha: .4)),
+      errorWidget: (_, _, _) => Container(
         color: color,
         alignment: Alignment.center,
         child: Icon(fallbackIcon, color: AppColors.primary, size: 36),

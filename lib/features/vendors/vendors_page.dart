@@ -106,7 +106,7 @@ class _VendorsPageState extends State<VendorsPage> {
                   padding:
                       const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(height: 12),
                   itemBuilder: (_, i) =>
                       _VendorTile(vendor: items[i]),

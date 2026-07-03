@@ -571,7 +571,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
             const SizedBox(height: 8),
             SwitchListTile(
               value: _isMain,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               title: const Text('اجعلها مناسبتي الرئيسية',
                   style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),

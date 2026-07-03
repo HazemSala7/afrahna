@@ -48,7 +48,7 @@ class _OffersPageState extends State<OffersPage> {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            separatorBuilder: (_, _) => const SizedBox(height: 14),
             itemBuilder: (_, i) => _PromoCard(promo: items[i]),
           );
         },

@@ -129,6 +129,7 @@ class _CreateServicePageState extends State<CreateServicePage> {
       }
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);

@@ -124,7 +124,7 @@ class _MyClientsPageState extends State<MyClientsPage> {
                 }
                 return ListView.separated(
                   itemCount: clients.length,
-                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  separatorBuilder: (_, _) => const Divider(height: 0),
                   itemBuilder: (_, i) {
                     final c = clients[i];
                     final hasShop = c.vendorName != null && c.vendorName!.isNotEmpty;

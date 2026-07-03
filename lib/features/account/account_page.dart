@@ -279,6 +279,7 @@ class _SignedInView extends StatelessWidget {
               ),
             );
             if (confirm != true) return;
+            if (!context.mounted) return;
 
             showDialog(
               context: context,

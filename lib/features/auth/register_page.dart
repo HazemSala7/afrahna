@@ -65,7 +65,7 @@ class _RegisterPageState extends State<RegisterPage> {
         PageRouteBuilder(
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-          pageBuilder: (_, __, ___) => const HomePage(),
+          pageBuilder: (_, _, _) => const HomePage(),
         ),
         (_) => false,
       );

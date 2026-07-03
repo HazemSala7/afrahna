@@ -126,7 +126,7 @@ class InvitationService {
       if (venue != null && venue.isNotEmpty) 'venue': venue,
       if (mapUrl != null && mapUrl.isNotEmpty) 'map_url': mapUrl,
       if (customMessage != null && customMessage.isNotEmpty) 'custom_message': customMessage,
-      if (templateId != null) 'template_id': templateId,
+      'template_id': ?templateId,
     });
     return InvitationModel.fromJson(_asMap(res.data));
   }

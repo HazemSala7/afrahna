@@ -303,7 +303,7 @@ class _VendorHeader extends StatelessWidget {
             Image.network(
               cover,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   Container(color: AppColors.primaryLight),
             )
           else
@@ -531,7 +531,7 @@ class _ServiceCard extends StatelessWidget {
               child: Image.network(
                 service.image!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: Colors.black12,
                   child: const Icon(Icons.broken_image),
                 ),
@@ -719,7 +719,7 @@ class _PostCard extends StatelessWidget {
               child: Image.network(
                 post.thumbnail ?? post.mediaUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     Container(color: Colors.black12, child: const Icon(Icons.broken_image)),
               ),
             ),

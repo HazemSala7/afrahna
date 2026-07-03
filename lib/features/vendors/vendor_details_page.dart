@@ -1339,7 +1339,7 @@ class _ContactActions extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primaryLight.withOpacity(.6)),
+        border: Border.all(color: AppColors.primaryLight.withValues(alpha: .6)),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -1540,7 +1540,7 @@ class _SocialRow extends StatelessWidget {
               Expanded(
                 child: Container(
                   height: 1,
-                  color: AppColors.primaryLight.withOpacity(.7),
+                  color: AppColors.primaryLight.withValues(alpha: .7),
                 ),
               ),
               Padding(
@@ -1565,7 +1565,7 @@ class _SocialRow extends StatelessWidget {
               Expanded(
                 child: Container(
                   height: 1,
-                  color: AppColors.primaryLight.withOpacity(.7),
+                  color: AppColors.primaryLight.withValues(alpha: .7),
                 ),
               ),
             ],
@@ -1626,7 +1626,7 @@ class _SocialTileState extends State<_SocialTile> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: it.glow.withOpacity(.35),
+                      color: it.glow.withValues(alpha: .35),
                       blurRadius: 12,
                       offset: const Offset(0, 5),
                     ),
@@ -1779,7 +1779,7 @@ class _Section extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            if (trailing != null) trailing!,
+            ?trailing,
           ],
         ),
         const SizedBox(height: 10),
@@ -2027,7 +2027,7 @@ class _ReviewCard extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  (review.user?.name ?? '؟').characters.first,
+                  review.displayName.characters.first,
                   style: const TextStyle(
                     color: AppColors.primaryDark,
                     fontWeight: FontWeight.w900,
@@ -2037,7 +2037,7 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  review.user?.name ?? 'مستخدم',
+                  review.displayName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.textDark,

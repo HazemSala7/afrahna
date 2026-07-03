@@ -54,6 +54,7 @@ class _FollowButtonState extends State<FollowButton> {
       });
       widget.onChanged?.call(res.following);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );

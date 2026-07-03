@@ -48,7 +48,7 @@ class _SplashPageState extends State<SplashPage>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 600),
-          pageBuilder: (_, a, __) => FadeTransition(
+          pageBuilder: (_, a, _) => FadeTransition(
             opacity: a,
             child:
                 session.isSignedIn ? const HomePage() : const LoginPage(),
@@ -72,7 +72,7 @@ class _SplashPageState extends State<SplashPage>
         children: [
           AnimatedBuilder(
             animation: _glowCtrl,
-            builder: (_, __) {
+            builder: (_, _) {
               final t = Curves.easeInOut.transform(_glowCtrl.value);
               return Container(
                 decoration: BoxDecoration(
@@ -96,7 +96,7 @@ class _SplashPageState extends State<SplashPage>
               children: [
                 AnimatedBuilder(
                   animation: Listenable.merge([_logoCtrl, _glowCtrl]),
-                  builder: (_, __) {
+                  builder: (_, _) {
                     final pulse = 1 +
                         Curves.easeInOut.transform(_glowCtrl.value) * 0.04;
                     return Opacity(

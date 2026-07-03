@@ -103,7 +103,7 @@ class EventService {
       if (endsAt != null) 'ends_at': _iso(endsAt),
       if (location != null && location.isNotEmpty) 'location': location,
       'is_main': isMain,
-      if (reminderMinutesBefore != null) 'reminder_minutes_before': reminderMinutesBefore,
+      'reminder_minutes_before': ?reminderMinutesBefore,
     });
     return EventModel.fromJson(_asMap(res.data) ?? {});
   }
