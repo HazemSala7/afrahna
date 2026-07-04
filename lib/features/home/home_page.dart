@@ -18,6 +18,7 @@ import '../assistant/assistant_page.dart';
 import '../calendar/calendar_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
+import 'home_feed_cache.dart';
 import '../coordinator/coordinator_page.dart';
 import '../favorites/favorites_page.dart';
 import '../invitations/invitations_page.dart';
@@ -104,49 +105,35 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(useCache: true);
     _loadLocation();
   }
 
-  void _load() {
-    _categoriesFuture = CategoryService().list(tree: true);
-    _promosFuture = PromotionService().list();
-    _topVendorsFuture = VendorService().list();
-    // Featured: fresh random order on each load.
-    _featuredVendorsFuture = VendorService()
-        .list(featured: true, perPage: 12)
-        .then((l) => l..shuffle());
-    // Hero slider = admin slides + VIP vendors, shuffled fresh each load.
-    _slidersFuture = _loadSliders();
-    _statsFuture = StatsService().get();
+  void _load({bool useCache = false}) {
+    final cache = HomeFeedCache.instance;
+    // On first show, consume the data prefetched during the splash screen so
+    // the home tab appears instantly. Refreshes always fetch fresh data.
+    if (useCache && cache.isReady) {
+      _categoriesFuture = cache.categories!;
+      _promosFuture = cache.promos!;
+      _topVendorsFuture = cache.topVendors!;
+      _featuredVendorsFuture = cache.featuredVendors!;
+      _slidersFuture = cache.sliders!;
+      _statsFuture = cache.stats!;
+      cache.clear();
+    } else {
+      _categoriesFuture = CategoryService().list(tree: true);
+      _promosFuture = PromotionService().list();
+      _topVendorsFuture = VendorService().list();
+      // Featured: fresh random order on each load.
+      _featuredVendorsFuture = VendorService()
+          .list(featured: true, perPage: 12)
+          .then((l) => l..shuffle());
+      // Hero slider = admin slides + VIP vendors, shuffled fresh each load.
+      _slidersFuture = HomeFeedCache.loadSliders();
+      _statsFuture = StatsService().get();
+    }
     _mainEventFuture = _loadMainEvent();
-  }
-
-  /// Hero slider content = admin-created slides + VIP vendors (as slides),
-  /// shuffled so the order is fresh on every load. VIP vendors literally
-  /// appearing here is part of the VIP subscription tier.
-  Future<List<SliderModel>> _loadSliders() async {
-    List<SliderModel> sliders = const [];
-    List<VendorModel> vips = const [];
-    try {
-      sliders = await SliderService().list();
-    } catch (_) {}
-    try {
-      vips = await VendorService().list(vip: true, perPage: 10);
-    } catch (_) {}
-    final vipSlides = vips
-        .where((v) => (v.cover ?? v.logo ?? '').isNotEmpty)
-        .map((v) => SliderModel(
-              id: -v.id, // negative id to avoid clashing with real slides
-              image: v.cover ?? v.logo ?? '',
-              titleAr: v.name,
-              subtitleAr: v.category?.name,
-              badgeAr: 'VIP ⭐',
-              vendorId: v.id,
-            ))
-        .toList();
-    final all = [...vipSlides, ...sliders]..shuffle();
-    return all;
   }
 
   /// Only signed-in users have a personal event; guests get nothing.
@@ -449,7 +436,7 @@ class _SearchBarState extends State<_SearchBar> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VendorsPage(title: 'نتائج: $v'),
+        builder: (_) => VendorsPage(title: 'نتائج: $v', initialQuery: v),
       ),
     );
   }
@@ -516,7 +503,7 @@ class _StatsBand extends StatelessWidget {
             <({IconData icon, int value, String label, Color color, VoidCallback? onTap, bool pulse})>[
           (icon: Icons.store_mall_directory_rounded, value: s.vendors, label: 'شركة',
               color: Color(0xFFF6B25C), onTap: null, pulse: false),
-          (icon: Icons.volunteer_activism_rounded, value: s.likes, label: 'إعجاب',
+          (icon: Icons.visibility_rounded, value: s.visitors, label: 'زائر',
               color: Color(0xFFF48CA0), onTap: null, pulse: false),
           (icon: Icons.groups_rounded, value: s.users, label: 'مستخدم',
               color: Color(0xFF7FC6C0), onTap: null, pulse: false),
@@ -2020,21 +2007,35 @@ class _SearchTab extends StatefulWidget {
 class _SearchTabState extends State<_SearchTab> {
   final _controller = TextEditingController();
   Future<List<VendorModel>>? _future;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
-  void _search(String q) {
-    // Close the keyboard once a search is triggered.
-    FocusScope.of(context).unfocus();
-    if (q.trim().isEmpty) {
+  void _runSearch(String q) {
+    final query = q.trim();
+    if (query.isEmpty) {
       setState(() => _future = null);
       return;
     }
-    setState(() => _future = VendorService().list(query: q.trim()));
+    setState(() => _future = VendorService().list(query: query));
+  }
+
+  /// Live search as the user types (debounced), keeping the keyboard open.
+  void _onChanged(String q) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(q));
+  }
+
+  void _search(String q) {
+    // Submit action: run immediately and close the keyboard.
+    _debounce?.cancel();
+    FocusScope.of(context).unfocus();
+    _runSearch(q);
   }
 
   @override
@@ -2065,6 +2066,7 @@ class _SearchTabState extends State<_SearchTab> {
                 child: TextField(
                   controller: _controller,
                   textInputAction: TextInputAction.search,
+                  onChanged: _onChanged,
                   onSubmitted: _search,
                   decoration: const InputDecoration(
                     hintText: 'ابحث عن خدمات، محلات، عروض...',

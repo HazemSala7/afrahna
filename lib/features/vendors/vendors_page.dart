@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/models/models.dart';
@@ -12,11 +14,16 @@ class VendorsPage extends StatefulWidget {
     this.category,
     this.title,
     this.featuredOnly = false,
+    this.initialQuery,
   });
 
   final CategoryModel? category;
   final String? title;
   final bool featuredOnly;
+
+  /// Text to pre-fill the search box with (and filter by) when opening the
+  /// page from a search action elsewhere.
+  final String? initialQuery;
 
   @override
   State<VendorsPage> createState() => _VendorsPageState();
@@ -26,10 +33,13 @@ class _VendorsPageState extends State<VendorsPage> {
   late Future<List<VendorModel>> _future;
   final _search = TextEditingController();
   String _query = '';
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
+    _query = widget.initialQuery?.trim() ?? '';
+    _search.text = _query;
     _load();
   }
 
@@ -41,8 +51,23 @@ class _VendorsPageState extends State<VendorsPage> {
     );
   }
 
+  /// Live search: re-query shortly after the user stops typing so every
+  /// keystroke updates the results without firing a request per character.
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      final q = value.trim();
+      if (q == _query) return;
+      setState(() {
+        _query = q;
+        _load();
+      });
+    });
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -70,7 +95,9 @@ class _VendorsPageState extends State<VendorsPage> {
               ),
               child: TextField(
                 controller: _search,
+                onChanged: _onSearchChanged,
                 onSubmitted: (v) {
+                  _debounce?.cancel();
                   setState(() {
                     _query = v.trim();
                     _load();

@@ -657,6 +657,7 @@ class HomeStats {
     this.vendors = 0,
     this.users = 0,
     this.likes = 0,
+    this.visitors = 0,
     this.offers = 0,
     this.cities = 0,
   });
@@ -664,6 +665,7 @@ class HomeStats {
   final int vendors;
   final int users;
   final int likes;
+  final int visitors;
   final int offers;
   final int cities;
 
@@ -671,6 +673,7 @@ class HomeStats {
         vendors: (json['vendors'] as num?)?.toInt() ?? 0,
         users: (json['users'] as num?)?.toInt() ?? 0,
         likes: (json['likes'] as num?)?.toInt() ?? 0,
+        visitors: (json['visitors'] as num?)?.toInt() ?? 0,
         offers: (json['offers'] as num?)?.toInt() ?? 0,
         cities: (json['cities'] as num?)?.toInt() ?? 0,
       );

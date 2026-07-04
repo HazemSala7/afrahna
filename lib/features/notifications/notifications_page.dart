@@ -46,7 +46,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
+    // Flat, light background (no darkening gradient) so the page reads bright.
+    return Scaffold(
+      backgroundColor: const Color(0xFFFCF8F3),
       appBar: PinkAppBar(
         title: 'الإشعارات',
         actions: [
@@ -57,46 +59,94 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: AppColors.primary,
-        child: FutureBuilder<List<NotificationModel>>(
-          future: _future,
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const CenteredLoader();
-            }
-            if (snap.hasError) {
-              return ErrorState(
-                message: snap.error.toString(),
-                onRetry: _refresh,
-              );
-            }
-            final items = snap.data ?? const [];
-            if (items.isEmpty) {
-              return ListView(
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          color: AppColors.primary,
+          child: FutureBuilder<List<NotificationModel>>(
+            future: _future,
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const CenteredLoader();
+              }
+              if (snap.hasError) {
+                return ErrorState(
+                  message: snap.error.toString(),
+                  onRetry: _refresh,
+                );
+              }
+              final items = snap.data ?? const [];
+              if (items.isEmpty) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 120),
+                    EmptyState(
+                      message: 'لا توجد إشعارات حالياً',
+                      icon: Icons.notifications_none_rounded,
+                    ),
+                  ],
+                );
+              }
+              final unread = items.where((n) => !n.isRead).length;
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 120),
-                  EmptyState(
-                    message: 'لا توجد إشعارات حالياً',
-                    icon: Icons.notifications_none_rounded,
-                  ),
-                ],
+                itemCount: items.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  if (i == 0) return _HeaderStrip(total: items.length, unread: unread);
+                  final n = items[i - 1];
+                  return _NotificationTile(n: n, onTap: () => _onTap(n));
+                },
               );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => _NotificationTile(
-                n: items[i],
-                onTap: () => _onTap(items[i]),
-              ),
-            );
-          },
+            },
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Small summary row above the list showing totals.
+class _HeaderStrip extends StatelessWidget {
+  const _HeaderStrip({required this.total, required this.unread});
+  final int total;
+  final int unread;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 4),
+      child: Row(
+        children: [
+          Text(
+            '$total إشعار',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.textDark,
+              fontSize: 14,
+            ),
+          ),
+          const Spacer(),
+          if (unread > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '$unread غير مقروء',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -147,32 +197,40 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _accent();
     return Material(
-      color: n.isRead ? Colors.white : const Color(0xFFFFF5F8),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: n.isRead
-                  ? AppColors.cardShadow.withValues(alpha: 0.4)
-                  : accent.withValues(alpha: 0.35),
+              color: const Color(0x0F000000),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardShadow.withValues(alpha: 0.5),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Accent side bar highlights unread notifications.
+                Container(width: 4, color: n.isRead ? Colors.transparent : accent),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
               Container(
                 width: 46,
                 height: 46,
@@ -239,9 +297,14 @@ class _NotificationTile extends StatelessWidget {
                 ),
               ),
             ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-    );
+      );
   }
 }

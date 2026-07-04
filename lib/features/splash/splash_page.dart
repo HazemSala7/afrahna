@@ -5,6 +5,7 @@ import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
 import '../auth/login_page.dart';
+import '../home/home_feed_cache.dart';
 import '../home/home_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -38,6 +39,9 @@ class _SplashPageState extends State<SplashPage>
   void initState() {
     super.initState();
     _logoCtrl.forward();
+    // Start fetching the home page's data now, in parallel with the splash
+    // animation and session bootstrap, so the home tab shows instantly.
+    HomeFeedCache.instance.prefetch();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final session = context.read<SessionController>();
       await Future.wait<dynamic>([
