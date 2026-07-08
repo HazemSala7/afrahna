@@ -235,6 +235,9 @@ class VendorModel {
     this.isPremium = false,
     this.isActive = true,
     this.delegateName,
+    this.ownerId,
+    this.ownerName,
+    this.ownerPhone,
   });
 
   final int id;
@@ -291,6 +294,13 @@ class VendorModel {
   /// Name of the delegate responsible for this shop's owner account.
   /// Only populated for admin requests (`/vendors` eager-loads it).
   final String? delegateName;
+
+  /// Owner (advertiser) account details — only populated for admin requests.
+  /// The phone doubles as the login username. Lets an admin reset the
+  /// advertiser's password directly from the shop-edit screen.
+  final int? ownerId;
+  final String? ownerName;
+  final String? ownerPhone;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
@@ -375,6 +385,17 @@ class VendorModel {
                 Map<String, dynamic>.from(
                     (json['user'] as Map)['delegate'] as Map),
                 'name')
+            : null,
+        ownerId: json['user'] is Map
+            ? _toInt((json['user'] as Map)['id'])
+            : _toInt(json['user_id']),
+        ownerName: json['user'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(json['user'] as Map), 'name')
+            : null,
+        ownerPhone: json['user'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(json['user'] as Map), 'phone')
             : null,
       );
 }
@@ -627,6 +648,7 @@ class StoryModel {
     this.vendor,
     this.createdAt,
     this.expiresAt,
+    this.isApproved = true,
   });
 
   final int id;
@@ -637,6 +659,11 @@ class StoryModel {
   final VendorModel? vendor;
   final DateTime? createdAt;
   final DateTime? expiresAt;
+
+  /// Whether an admin has approved this story. Vendor-submitted stories start
+  /// pending and only appear publicly once approved. Defaults to true for
+  /// responses that don't include the flag (older servers).
+  final bool isApproved;
 
   String get caption =>
       (captionAr?.isNotEmpty ?? false) ? captionAr! : (captionEn ?? '');
@@ -653,6 +680,9 @@ class StoryModel {
             : null,
         createdAt: _toDate(json['created_at']),
         expiresAt: _toDate(json['expires_at']),
+        isApproved: json['is_approved'] == null
+            ? true
+            : (json['is_approved'] == true || json['is_approved'] == 1),
       );
 }
 
@@ -1102,6 +1132,7 @@ class PostCommentModel {
     required this.body,
     required this.isApproved,
     this.user,
+    this.guestName,
     this.createdAt,
   });
 
@@ -1111,7 +1142,14 @@ class PostCommentModel {
   final String body;
   final bool isApproved;
   final UserModel? user;
+
+  /// Alias for admin-created ("fake") comments that have no real user account.
+  final String? guestName;
   final DateTime? createdAt;
+
+  /// Commenter name to display: the real user's name, else the alias.
+  String get displayName =>
+      (user?.name.isNotEmpty ?? false) ? user!.name : (guestName ?? 'مستخدم');
 
   factory PostCommentModel.fromJson(Map<String, dynamic> json) => PostCommentModel(
         id: _toInt(json['id']) ?? 0,
@@ -1122,6 +1160,7 @@ class PostCommentModel {
         user: json['user'] is Map
             ? UserModel.fromJson(Map<String, dynamic>.from(json['user'] as Map))
             : null,
+        guestName: _readT<String>(json, 'guest_name'),
         createdAt: _toDate(json['created_at']),
       );
 }

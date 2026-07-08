@@ -461,3 +461,55 @@ class RatingRow extends StatelessWidget {
     );
   }
 }
+
+/// Subscription-tier verification badge shown next to a vendor's name:
+///  - VIP      → a glowing GOLD verified check (premium)
+///  - featured → the classic BLUE verified check
+///  - neither (normal / no subscription) → nothing
+///
+/// Kept model-agnostic (takes booleans) so it can be dropped in anywhere.
+class TierBadge extends StatelessWidget {
+  const TierBadge({
+    super.key,
+    required this.vip,
+    required this.featured,
+    this.size = 18,
+  });
+
+  final bool vip;
+  final bool featured;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (vip) {
+      // Gold, shiny verified badge with a warm glow.
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE0A43B).withValues(alpha: 0.60),
+              blurRadius: 9,
+              spreadRadius: 0.5,
+            ),
+          ],
+        ),
+        child: ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (rect) => const LinearGradient(
+            colors: [Color(0xFFFFF1C4), Color(0xFFF4C64B), Color(0xFFC8901E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ).createShader(rect),
+          child: Icon(Icons.verified_rounded, color: Colors.white, size: size),
+        ),
+      );
+    }
+    if (featured) {
+      return Icon(Icons.verified_rounded,
+          color: const Color(0xFF1D9BF0), size: size);
+    }
+    return const SizedBox.shrink();
+  }
+}

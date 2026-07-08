@@ -18,6 +18,7 @@ class FollowButton extends StatefulWidget {
     this.initiallyFollowing = false,
     this.followersCount = 0,
     this.onChanged,
+    this.onFollowersChanged,
     this.compact = false,
   });
 
@@ -25,6 +26,10 @@ class FollowButton extends StatefulWidget {
   final bool initiallyFollowing;
   final int followersCount;
   final ValueChanged<bool>? onChanged;
+
+  /// Called with the up-to-date follower count so the surrounding UI (e.g. a
+  /// stats strip) can reflect the change immediately.
+  final ValueChanged<int>? onFollowersChanged;
   final bool compact;
 
   @override
@@ -45,16 +50,34 @@ class _FollowButtonState extends State<FollowButton> {
       );
       return;
     }
-    setState(() => _busy = true);
+    // Optimistic update: bump the count and flip the state immediately so the
+    // UI reacts the instant the user taps, then reconcile with the server.
+    final willFollow = !_following;
+    setState(() {
+      _busy = true;
+      _following = willFollow;
+      _followers = (_followers + (willFollow ? 1 : -1)).clamp(0, 1 << 31);
+    });
+    widget.onChanged?.call(willFollow);
+    widget.onFollowersChanged?.call(_followers);
     try {
       final res = await _service.toggle(widget.vendorId);
+      if (!mounted) return;
       setState(() {
         _following = res.following;
         _followers = res.followers;
       });
       widget.onChanged?.call(res.following);
+      widget.onFollowersChanged?.call(res.followers);
     } catch (e) {
       if (!mounted) return;
+      // Revert the optimistic change on failure.
+      setState(() {
+        _following = !willFollow;
+        _followers = (_followers + (willFollow ? -1 : 1)).clamp(0, 1 << 31);
+      });
+      widget.onChanged?.call(_following);
+      widget.onFollowersChanged?.call(_followers);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );

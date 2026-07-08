@@ -193,7 +193,7 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = comment.user?.name ?? 'مستخدم';
+    final name = comment.displayName;
     final avatar = comment.user?.avatar;
     return Container(
       padding: const EdgeInsets.all(12),

@@ -107,9 +107,13 @@ class _NewClientPageState extends State<NewClientPage> {
         planName: _plan,
         amountPaid: double.tryParse(_amountPaid.text.trim()) ?? 0,
         totalAmount: double.tryParse(_total.text.trim()),
-        commissionAmount: _commission.text.trim().isEmpty
-            ? null
-            : double.tryParse(_commission.text.trim()),
+        // Commission entered as a percentage of the full price → stored amount.
+        commissionAmount: () {
+          final pct = double.tryParse(_commission.text.trim());
+          if (pct == null) return null;
+          final total = double.tryParse(_total.text.trim()) ?? 0;
+          return double.parse((total * pct / 100).toStringAsFixed(2));
+        }(),
         paymentMethod: _paymentMethod.text.trim().isEmpty
             ? null
             : _paymentMethod.text.trim(),
@@ -258,7 +262,24 @@ class _NewClientPageState extends State<NewClientPage> {
                 ),
               );
             }),
-            _field(_commission, 'عمولة المندوب (افتراضي = إعدادات حسابك)', keyboard: TextInputType.number),
+            _field(_commission, 'نسبة عمولة المندوب %',
+                keyboard: TextInputType.number,
+                onChanged: (_) => setState(() {})),
+            Builder(builder: (_) {
+              final total = double.tryParse(_total.text.trim()) ?? 0;
+              final pct = double.tryParse(_commission.text.trim());
+              if (pct == null || total <= 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text('عمولتك = ${(total * pct / 100).toStringAsFixed(0)} شيكل',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary)),
+                ),
+              );
+            }),
             _field(_paymentMethod, 'طريقة الدفع (cash/transfer/...)'),
             Row(
               children: [

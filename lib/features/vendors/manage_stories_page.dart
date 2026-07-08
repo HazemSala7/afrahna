@@ -216,6 +216,28 @@ class _StoryTile extends StatelessWidget {
               ),
             ),
           ),
+          // Moderation status badge (pending until an admin approves).
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: story.isApproved
+                    ? const Color(0xCC1B9C5A)
+                    : const Color(0xCCD98A00),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                story.isApproved ? 'مقبولة' : 'قيد المراجعة',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

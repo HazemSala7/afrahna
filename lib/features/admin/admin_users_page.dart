@@ -131,6 +131,40 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     }
   }
 
+  Future<void> _delete(int index) async {
+    final u = _items[index];
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف الحساب'),
+        content: Text(
+            'سيتم حذف حساب "${u.name}" وكل بياناته نهائيًا. لا يمكن التراجع. متأكد؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.delete(u.id);
+      if (!mounted) return;
+      setState(() => _items.removeAt(index));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('تم حذف الحساب')));
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,6 +264,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   icon: const Icon(Icons.edit, color: AppColors.primary),
                   tooltip: 'تعديل',
                   onPressed: () => _edit(i),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  tooltip: 'حذف',
+                  onPressed: () => _delete(i),
                 ),
               ],
             ),

@@ -17,6 +17,12 @@ String planLabel(String value) => _planOptions
     .firstWhere((p) => p.value == value, orElse: () => (value: value, label: value))
     .label;
 
+/// Formats a number without a trailing ".0" (e.g. 10.0 → "10", 12.5 → "12.5").
+String _trimNum(num v) {
+  final s = v.toStringAsFixed(1);
+  return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
+}
+
 /// Lets a delegate manage a client's subscriptions: see current ones and
 /// add / renew / change the plan type and duration smoothly.
 class ManageClientSubscriptionPage extends StatefulWidget {
@@ -268,7 +274,7 @@ class _SubscriptionCard extends StatelessWidget {
           if (_active && daysLeft >= 0)
             _row(Icons.timelapse, 'متبقّي $daysLeft يوم'),
           _row(Icons.sell_outlined,
-              'السعر: ${sub.totalAmount.toStringAsFixed(0)} • المدفوع: ${sub.amountPaid.toStringAsFixed(0)} • عمولتك: ${sub.commissionAmount.toStringAsFixed(0)}'),
+              'السعر: ${sub.totalAmount.toStringAsFixed(0)} • المدفوع: ${sub.amountPaid.toStringAsFixed(0)} • عمولتك: ${sub.commissionAmount.toStringAsFixed(0)}${sub.totalAmount > 0 && sub.commissionAmount > 0 ? ' (${_trimNum(sub.commissionAmount / sub.totalAmount * 100)}%)' : ''}'),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -421,8 +427,12 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
             : '${planByKey(_plan).yearly}');
     _amount = TextEditingController(
         text: e != null ? e.amountPaid.toStringAsFixed(0) : '');
+    // Commission is entered as a percentage of the full price. When editing an
+    // existing subscription, back-compute the rate from the stored amount.
     _commission = TextEditingController(
-        text: e != null ? e.commissionAmount.toStringAsFixed(0) : '');
+        text: (e != null && e.totalAmount > 0 && e.commissionAmount > 0)
+            ? _trimNum(e.commissionAmount / e.totalAmount * 100)
+            : '');
   }
 
   @override
@@ -473,8 +483,11 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
     final total = _total.text.trim().isEmpty
         ? amount
         : (double.tryParse(_total.text.trim()) ?? amount);
-    final commission =
-        _commission.text.trim().isEmpty ? null : double.tryParse(_commission.text.trim());
+    // Commission entered as a percentage of the full price → stored amount.
+    final commissionPct = double.tryParse(_commission.text.trim());
+    final commission = commissionPct == null
+        ? null
+        : double.parse((total * commissionPct / 100).toStringAsFixed(2));
     setState(() => _saving = true);
     try {
       if (_editing) {
@@ -642,11 +655,32 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
               TextField(
                 controller: _commission,
                 keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
-                  labelText: 'عمولتك (افتراضي = إعدادات حسابك)',
+                  labelText: 'نسبة عمولتك %',
+                  hintText: 'مثال: 10',
+                  suffixText: '%',
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 6),
+              Builder(builder: (_) {
+                final t = double.tryParse(_total.text.trim()) ?? 0;
+                final pct = double.tryParse(_commission.text.trim());
+                if (pct == null || t <= 0) return const SizedBox.shrink();
+                final amount = t * pct / 100;
+                return Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    'عمولتك = ${amount.toStringAsFixed(0)} شيكل',
+                    style: const TextStyle(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(height: 18),
               FilledButton(
                 style: FilledButton.styleFrom(

@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
+import '../../core/services/accounts_services.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/image_upload_field.dart';
@@ -82,6 +83,35 @@ class _EditVendorPageState extends State<EditVendorPage> {
   String? _trim(TextEditingController c) {
     final v = c.text.trim();
     return v.isEmpty ? null : v;
+  }
+
+  /// Admin action: reset the advertiser (owner) account's password.
+  Future<void> _changeOwnerPassword() async {
+    final ownerId = widget.vendor.ownerId;
+    if (ownerId == null) return;
+    final newPass = await showDialog<String>(
+      context: context,
+      builder: (_) => const _OwnerPasswordDialog(),
+    );
+    if (newPass == null || newPass.isEmpty || !mounted) return;
+    if (newPass.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('كلمة المرور قصيرة (6 أحرف على الأقل)')),
+      );
+      return;
+    }
+    try {
+      await AdminUserService().update(ownerId, {'password': newPass});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تغيير كلمة مرور المعلن ✓')),
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -203,6 +233,16 @@ class _EditVendorPageState extends State<EditVendorPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Owner account card — only present for admin-loaded vendors
+            // (the owner details are eager-loaded for admins only). Lets the
+            // admin see the login username and reset the advertiser's password.
+            if (widget.vendor.ownerId != null &&
+                (widget.vendor.ownerPhone ?? '').isNotEmpty)
+              _OwnerAccountCard(
+                name: widget.vendor.ownerName ?? '—',
+                phone: widget.vendor.ownerPhone!,
+                onChangePassword: _changeOwnerPassword,
+              ),
             _field(_nameAr, 'الاسم بالعربية', required: true),
             _field(_nameEn, 'الاسم بالإنجليزية', required: true),
             _field(_descAr, 'الوصف بالعربية', maxLines: 3),
@@ -255,4 +295,131 @@ class _EditVendorPageState extends State<EditVendorPage> {
       ),
     );
   }
+}
+
+/// Dialog to enter a new password for the owner account. Owns its own
+/// controller so it's disposed with the dialog (not synchronously right after
+/// pop, which crashes the still-animating TextField).
+class _OwnerPasswordDialog extends StatefulWidget {
+  const _OwnerPasswordDialog();
+
+  @override
+  State<_OwnerPasswordDialog> createState() => _OwnerPasswordDialogState();
+}
+
+class _OwnerPasswordDialogState extends State<_OwnerPasswordDialog> {
+  final _ctrl = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('تغيير كلمة مرور المعلن'),
+      content: TextField(
+        controller: _ctrl,
+        obscureText: _obscure,
+        autofocus: false,
+        decoration: InputDecoration(
+          labelText: 'كلمة المرور الجديدة',
+          hintText: '6 أحرف على الأقل',
+          border: const OutlineInputBorder(),
+          suffixIcon: IconButton(
+            icon: Icon(_obscure
+                ? Icons.visibility_off_rounded
+                : Icons.visibility_rounded),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء')),
+        FilledButton(
+            onPressed: () => Navigator.pop(context, _ctrl.text.trim()),
+            child: const Text('حفظ')),
+      ],
+    );
+  }
+}
+
+/// Admin-only card at the top of the shop-edit screen showing the owner
+/// (advertiser) account: their name and login username (phone), plus a button
+/// to reset their password.
+class _OwnerAccountCard extends StatelessWidget {
+  const _OwnerAccountCard({
+    required this.name,
+    required this.phone,
+    required this.onChangePassword,
+  });
+  final String name;
+  final String phone;
+  final VoidCallback onChangePassword;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.manage_accounts_rounded,
+                  color: AppColors.primaryDark, size: 20),
+              const SizedBox(width: 6),
+              const Text('حساب المعلن المالك',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryDark)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _row('الاسم', name),
+          const SizedBox(height: 4),
+          _row('اسم المستخدم (الهاتف)', phone),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onChangePassword,
+              icon: const Icon(Icons.lock_reset_rounded, size: 18),
+              label: const Text('تغيير كلمة مرور المعلن'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) => Row(
+        children: [
+          Text('$label: ',
+              style: const TextStyle(
+                  color: AppColors.textMuted, fontSize: 12.5)),
+          Expanded(
+            child: Text(value,
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.start,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 13.5)),
+          ),
+        ],
+      );
 }

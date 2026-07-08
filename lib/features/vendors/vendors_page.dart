@@ -192,15 +192,32 @@ class _VendorTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    vendor.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: AppColors.textDark,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          vendor.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      ),
+                      if (vendor.isVip ||
+                          vendor.isPremium ||
+                          vendor.activePlan == 'featured') ...[
+                        const SizedBox(width: 4),
+                        TierBadge(
+                          vip: vendor.isVip,
+                          featured: vendor.isPremium ||
+                              vendor.activePlan == 'featured',
+                          size: 16,
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   if (vendor.category != null)

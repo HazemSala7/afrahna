@@ -1663,13 +1663,16 @@ class _FeaturedVendorCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (vendor.isVerified)
-                  const PositionedDirectional(
-                    bottom: -2,
-                    end: -2,
-                    child: Icon(Icons.verified_rounded,
-                        color: Color(0xFF1DA1F2), size: 18),
+                PositionedDirectional(
+                  bottom: -2,
+                  end: -2,
+                  child: TierBadge(
+                    vip: vendor.isVip,
+                    featured: vendor.isPremium ||
+                        vendor.activePlan == 'featured',
+                    size: 19,
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 6),

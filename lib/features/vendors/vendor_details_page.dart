@@ -39,6 +39,10 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   bool _favLoading = false;
   bool? _favLocal;
 
+  /// Live follower count once the user follows/unfollows (overrides the value
+  /// loaded with the vendor so the stats strip updates instantly).
+  int? _followersLive;
+
   @override
   void initState() {
     super.initState();
@@ -170,6 +174,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             _StatsStrip(
                               vendor: vendor,
                               servicesFuture: _servicesFuture,
+                              followers: _followersLive ?? vendor.followersCount,
                             ),
                             const SizedBox(height: 18),
                             _HighlightsSection(
@@ -415,8 +420,10 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                     FollowButton(
                       vendorId: vendor.id,
                       initiallyFollowing: vendor.isFollowing,
-                      followersCount: vendor.followersCount,
+                      followersCount: _followersLive ?? vendor.followersCount,
                       compact: true,
+                      onFollowersChanged: (c) =>
+                          setState(() => _followersLive = c),
                     ),
                     const SizedBox(width: 8),
                     _GlassIconButton(
@@ -565,10 +572,16 @@ class _IdentityHeader extends StatelessWidget {
                 ),
               ),
             ),
-            if (vendor.isVerified) ...[
+            if (vendor.isVip ||
+                vendor.isPremium ||
+                vendor.activePlan == 'featured') ...[
               const SizedBox(width: 6),
-              const Icon(Icons.verified_rounded,
-                  color: AppColors.primary, size: 22),
+              TierBadge(
+                vip: vendor.isVip,
+                featured:
+                    vendor.isPremium || vendor.activePlan == 'featured',
+                size: 24,
+              ),
             ],
           ],
         ),
@@ -1188,9 +1201,14 @@ class _StoriesSection extends StatelessWidget {
 // ============================================================
 
 class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.vendor, required this.servicesFuture});
+  const _StatsStrip({
+    required this.vendor,
+    required this.servicesFuture,
+    required this.followers,
+  });
   final VendorModel vendor;
   final Future<List<ServiceModel>> servicesFuture;
+  final int followers;
 
   @override
   Widget build(BuildContext context) {
@@ -1241,6 +1259,16 @@ class _StatsStrip extends StatelessWidget {
                 label: 'مشاهدة',
                 icon: Icons.visibility_outlined,
                 iconColor: const Color(0xFF6B8E7F),
+              ),
+            ),
+            const VerticalDivider(
+                color: Color(0x22B8835A), thickness: 1, width: 1),
+            Expanded(
+              child: _Stat(
+                value: _formatCompact(followers),
+                label: 'متابع',
+                icon: Icons.groups_rounded,
+                iconColor: const Color(0xFFC77DAE),
               ),
             ),
             const VerticalDivider(

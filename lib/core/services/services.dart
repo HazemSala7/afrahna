@@ -109,6 +109,24 @@ class AuthService {
     }
   }
 
+  /// Changes the signed-in user's own password (any role). Requires the
+  /// current password. Throws [ApiException] with the server message on failure.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _dio.post('/auth/change-password', data: {
+        'current_password': currentPassword,
+        'password': newPassword,
+        'password_confirmation': newPassword,
+      });
+      if (res.statusCode != 200) throw _err(res.data);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Permanently deletes the authenticated user's account on the server, then
   /// clears the local session. Throws on failure (session is kept intact).
   Future<void> deleteAccount() async {
@@ -252,6 +270,15 @@ class VendorService {
     try {
       final res = await _dio.put('/vendors/$id', data: data);
       return VendorModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Admin (or owner): permanently delete a vendor/shop.
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/vendors/$id');
     } catch (e) {
       throw toApiException(e);
     }

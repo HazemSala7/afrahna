@@ -330,38 +330,94 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 6),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Text(
-                                          'ليس لديك حساب؟ ',
-                                          style: TextStyle(
-                                            color: AppColors.textMuted,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                  // Create-account banner — a tidy hook to sign up.
+                                  GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const RegisterPage(),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFF6E6D3),
+                                            Color(0xFFFBF4EB)
+                                          ],
+                                          begin: Alignment.centerRight,
+                                          end: Alignment.centerLeft,
                                         ),
-                                        GestureDetector(
-                                          onTap: () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => const RegisterPage(),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                            color: AppColors.primary
+                                                .withValues(alpha: 0.25)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 42,
+                                            height: 42,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Icon(
+                                                Icons.card_giftcard_rounded,
+                                                color: AppColors.primaryDark,
+                                                size: 22),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text('ليس لديك حساب؟',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        fontSize: 13.5,
+                                                        color:
+                                                            AppColors.textDark)),
+                                                SizedBox(height: 2),
+                                                Text(
+                                                    'أنشئ حسابك واستمتع بالعروض الحصرية',
+                                                    style: TextStyle(
+                                                        color:
+                                                            AppColors.textMuted,
+                                                        fontSize: 11.5)),
+                                              ],
                                             ),
                                           ),
-                                          child: const Text(
-                                            'أنشئ حساب جديد',
-                                            style: TextStyle(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w900,
-                                              decoration: TextDecoration.underline,
-                                              decorationColor: AppColors.primary,
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 9),
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFD4A373),
+                                                  Color(0xFF8B5A3C)
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
+                                            child: const Text('أنشئ حساب',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w900,
+                                                    fontSize: 13)),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(height: 6),
                                 ],
                               ),
                             ),

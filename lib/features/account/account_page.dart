@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
+import '../auth/register_page.dart';
 import '../bookings/bookings_page.dart';
 import '../delegate/delegate_dashboard_page.dart';
 import '../favorites/favorites_page.dart';
@@ -22,53 +25,223 @@ class AccountPage extends StatelessWidget {
     return AppScaffold(
       appBar: const PinkAppBar(title: 'حسابي', showBack: false),
       body: !session.isSignedIn
-          ? _GuestView()
+          ? const _GuestView()
           : _SignedInView(session: session),
     );
   }
 }
 
 class _GuestView extends StatelessWidget {
+  const _GuestView();
+
+  static const _benefits = <({IconData icon, String title, String sub})>[
+    (
+      icon: Icons.local_fire_department_rounded,
+      title: 'عروض وخصومات حصرية',
+      sub: 'كن أول من يستلم أحدث العروض الخاصة'
+    ),
+    (
+      icon: Icons.favorite_rounded,
+      title: 'قائمة المفضّلة',
+      sub: 'احفظ المحلات والخدمات التي تعجبك'
+    ),
+    (
+      icon: Icons.event_available_rounded,
+      title: 'تابع حجوزاتك',
+      sub: 'كل مناسباتك ومواعيدك في مكان واحد'
+    ),
+    (
+      icon: Icons.notifications_active_rounded,
+      title: 'إشعارات فورية',
+      sub: 'ابقَ على اطّلاع بكل جديد يخصّك'
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 110,
-              height: 110,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.person_outline,
-                  size: 56, color: AppColors.primary),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+      children: [
+        // Hero header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
             ),
-            const SizedBox(height: 16),
-            const Text('سجّل الدخول لتجربة كاملة',
-                style: TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            const Text('احفظ المفضلة، تابع حجوزاتك، واستلم العروض',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted)),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryDark.withValues(alpha: 0.35),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.6), width: 2),
                 ),
-                child: const Text('تسجيل الدخول'),
+                child: const Icon(Icons.card_giftcard_rounded,
+                    color: Colors.white, size: 42),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'أنشئ حسابك واستفد من العروض 🎁',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'سجّل مجانًا ودع أفراحنا يخطّط معك ليومك المميّز',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontSize: 13.5,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        // Benefit rows
+        for (final b in _benefits) ...[
+          _BenefitRow(icon: b.icon, title: b.title, sub: b.sub),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 10),
+        // Primary CTA — create account
+        SizedBox(
+          height: 54,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFD4A373), Color(0xFF8B5A3C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x558B5A3C),
+                    blurRadius: 16,
+                    offset: Offset(0, 8)),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RegisterPage()),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person_add_alt_1_rounded,
+                        color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('أنشئ حساب جديد',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w900)),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
         ),
+        const SizedBox(height: 12),
+        // Secondary — already have an account
+        SizedBox(
+          height: 50,
+          child: OutlinedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.primary, width: 1.4),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text('لديّ حساب — تسجيل الدخول',
+                style: TextStyle(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BenefitRow extends StatelessWidget {
+  const _BenefitRow(
+      {required this.icon, required this.title, required this.sub});
+  final IconData icon;
+  final String title;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: AppColors.primaryDark, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 14.5)),
+                const SizedBox(height: 2),
+                Text(sub,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 12, height: 1.3)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -206,6 +379,11 @@ class _SignedInView extends StatelessWidget {
             context,
             MaterialPageRoute(builder: (_) => const NotificationsPage()),
           ),
+        ),
+        _MenuTile(
+          icon: Icons.lock_outline,
+          label: 'تغيير كلمة المرور',
+          onTap: () => _showChangePasswordSheet(context),
         ),
         _MenuTile(
           icon: Icons.language,
@@ -398,6 +576,144 @@ void _showAboutSheet(BuildContext context) {
       ),
     ],
   );
+}
+
+void _showChangePasswordSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const _ChangePasswordDialog(),
+  );
+}
+
+/// Bottom sheet letting the signed-in user (any role) change their own
+/// password: current + new + confirm, with show/hide toggles.
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _form = GlobalKey<FormState>();
+  final _current = TextEditingController();
+  final _new = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _current.dispose();
+    _new.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await AuthService().changePassword(
+        currentPassword: _current.text,
+        newPassword: _new.text,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تغيير كلمة المرور ✓')),
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+        child: Form(
+          key: _form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const Text('تغيير كلمة المرور',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 16),
+              _field(_current, 'كلمة المرور الحالية'),
+              const SizedBox(height: 12),
+              _field(_new, 'كلمة المرور الجديدة',
+                  validator: (v) =>
+                      (v == null || v.length < 6) ? 'الحد الأدنى 6 أحرف' : null),
+              const SizedBox(height: 12),
+              _field(_confirm, 'تأكيد كلمة المرور الجديدة',
+                  validator: (v) =>
+                      v != _new.text ? 'كلمتا المرور غير متطابقتين' : null),
+              const SizedBox(height: 18),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('حفظ'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(TextEditingController c, String label,
+      {String? Function(String?)? validator}) {
+    return TextFormField(
+      controller: c,
+      obscureText: _obscure,
+      validator: validator ??
+          (v) => (v == null || v.isEmpty) ? 'حقل مطلوب' : null,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        suffixIcon: IconButton(
+          icon: Icon(_obscure
+              ? Icons.visibility_off_rounded
+              : Icons.visibility_rounded),
+          onPressed: () => setState(() => _obscure = !_obscure),
+        ),
+      ),
+    );
+  }
 }
 
 class _MenuTile extends StatelessWidget {
