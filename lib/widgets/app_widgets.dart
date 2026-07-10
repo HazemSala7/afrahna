@@ -483,33 +483,231 @@ class TierBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (vip) {
-      // Gold, shiny verified badge with a warm glow.
-      return Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFE0A43B).withValues(alpha: 0.60),
-              blurRadius: 9,
-              spreadRadius: 0.5,
-            ),
-          ],
-        ),
-        child: ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (rect) => const LinearGradient(
-            colors: [Color(0xFFFFF1C4), Color(0xFFF4C64B), Color(0xFFC8901E)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ).createShader(rect),
-          child: Icon(Icons.verified_rounded, color: Colors.white, size: size),
-        ),
-      );
+      return _ShinyVipBadge(size: size * 1.15);
     }
     if (featured) {
       return Icon(Icons.verified_rounded,
           color: const Color(0xFF1D9BF0), size: size);
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// Scalloped-edge gold "verified" seal (a rosette/medal): premium gold fill,
+/// dark outline, an inner ring, a light sweep gliding across, a softly pulsing
+/// glow and a twinkling sparkle — animated and eye-catching.
+class _ShinyVipBadge extends StatefulWidget {
+  const _ShinyVipBadge({required this.size});
+  final double size;
+
+  @override
+  State<_ShinyVipBadge> createState() => _ShinyVipBadgeState();
+}
+
+/// Builds the scalloped rosette outline for a given box (shared by the painter
+/// and the clipper so the shine is masked to the exact shape).
+Path _sealPath(Size size) {
+  final c = Offset(size.width / 2, size.height / 2);
+  const scallops = 12;
+  final baseR = size.width * 0.36;
+  final amp = size.width * 0.055;
+  final path = Path();
+  const steps = 240;
+  for (var i = 0; i <= steps; i++) {
+    final th = 2 * math.pi * i / steps;
+    final r = baseR + amp * math.cos(scallops * th);
+    final p = Offset(c.dx + r * math.cos(th), c.dy + r * math.sin(th));
+    if (i == 0) {
+      path.moveTo(p.dx, p.dy);
+    } else {
+      path.lineTo(p.dx, p.dy);
+    }
+  }
+  path.close();
+  return path;
+}
+
+class _SealPainter extends CustomPainter {
+  _SealPainter(this.glow);
+  final double glow; // 0..1 pulsing
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _sealPath(size);
+    final rect = Offset.zero & size;
+
+    // Warm glow behind the seal.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFFF3B63C).withValues(alpha: 0.35 + 0.4 * glow)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.12),
+    );
+
+    // Gold gradient fill.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFFFFF3B8), Color(0xFFF7C948), Color(0xFFB9791A)],
+          stops: [0.0, 0.55, 1.0],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(rect),
+    );
+
+    // Dark outline for definition.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.05
+        ..strokeJoin = StrokeJoin.round
+        ..color = const Color(0xFF241703),
+    );
+
+    // Inner engraved ring (subtle, so it doesn't compete with the check).
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      size.width * 0.27,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.018
+        ..color = Colors.white.withValues(alpha: 0.35),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SealPainter old) => old.glow != glow;
+}
+
+class _SealClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => _sealPath(size);
+  @override
+  bool shouldReclip(_SealClipper old) => false;
+}
+
+class _ShinyVipBadgeState extends State<_ShinyVipBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.size * 1.15; // seals read better a touch larger
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = _c.value;
+        final sweep = Curves.easeInOut.transform((t / 0.45).clamp(0.0, 1.0));
+        final sweepX = (sweep * 2 - 1) * d * 1.3;
+        final glow = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
+        final twinklePhase = (t - 0.55).clamp(0.0, 0.25) / 0.25;
+        final twinkle = math.sin(twinklePhase * math.pi);
+
+        return SizedBox(
+          width: d,
+          height: d,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              CustomPaint(size: Size(d, d), painter: _SealPainter(glow)),
+              // Light sweep + top gloss, masked to the seal shape.
+              ClipPath(
+                clipper: _SealClipper(),
+                child: SizedBox(
+                  width: d,
+                  height: d,
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          margin: EdgeInsets.only(top: d * 0.16),
+                          width: d * 0.42,
+                          height: d * 0.16,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.all(
+                                Radius.elliptical(d * 0.42, d * 0.16)),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.8),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Transform.translate(
+                        offset: Offset(sweepX, 0),
+                        child: Transform.rotate(
+                          angle: -0.5,
+                          child: Container(
+                            width: d * 0.4,
+                            height: d * 2,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.0),
+                                  Colors.white.withValues(alpha: 0.8),
+                                  Colors.white.withValues(alpha: 0.0),
+                                ],
+                                stops: const [0.3, 0.5, 0.7],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Bold, clearly-visible check: a dark outline behind a larger
+              // white tick so it pops against the gold.
+              Icon(
+                Icons.check_rounded,
+                color: const Color(0xFF3A2405),
+                size: d * 0.62,
+              ),
+              Icon(
+                Icons.check_rounded,
+                color: Colors.white,
+                size: d * 0.54,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+              if (twinkle > 0.02)
+                Positioned(
+                  top: d * 0.02,
+                  right: d * 0.06,
+                  child: Opacity(
+                    opacity: twinkle.clamp(0.0, 1.0),
+                    child: Icon(Icons.auto_awesome,
+                        color: Colors.white, size: d * 0.26),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

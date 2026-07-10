@@ -15,6 +15,7 @@ import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../account/account_page.dart';
 import '../assistant/assistant_page.dart';
+import '../auth/login_page.dart';
 import '../calendar/calendar_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
@@ -44,6 +45,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Guest encouragement banner: pinned above the bottom nav on the home tab.
+    // It stays visible for as long as the user has no account (not dismissible).
+    final isGuest = !context.watch<SessionController>().isSignedIn;
+    final showGuestBanner = isGuest && _currentTab == 2;
     // In an RTL Row, the first child is rendered at the start (visual RIGHT).
     // For natural Arabic UX we want: حسابي (account) on the RIGHT
     // and بحث (search) on the LEFT, with الرئيسية in the centre.
@@ -72,9 +77,114 @@ class _HomePageState extends State<HomePage> {
           : null,
       floatingActionButtonLocation:
           FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: AppBottomNav(
-        current: _currentTab,
-        onTap: (i) => setState(() => _currentTab = i),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showGuestBanner)
+            _GuestPromoBanner(
+              onLogin: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+              ),
+            ),
+          AppBottomNav(
+            current: _currentTab,
+            onTap: (i) => setState(() => _currentTab = i),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pinned bottom banner encouraging guests to create an account / log in.
+class _GuestPromoBanner extends StatelessWidget {
+  const _GuestPromoBanner({required this.onLogin});
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.primary, AppColors.primaryDark],
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryDark.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.celebration_rounded,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'انضم إلى أفراحنا! ✨',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'سجّل حسابك لتتابع، تقيّم، وتحفظ مفضّلاتك',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primaryDark,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              onPressed: onLogin,
+              child: const Text(
+                'تسجيل الدخول',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
       ),
     );
   }
@@ -127,7 +237,7 @@ class _HomeTabState extends State<_HomeTab> {
       _topVendorsFuture = VendorService().list();
       // Featured: fresh random order on each load.
       _featuredVendorsFuture = VendorService()
-          .list(featured: true, perPage: 12)
+          .list(featured: true, perPage: 1000)
           .then((l) => l..shuffle());
       // Hero slider = admin slides + VIP vendors, shuffled fresh each load.
       _slidersFuture = HomeFeedCache.loadSliders();
@@ -196,10 +306,11 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _HeroBanner(future: _slidersFuture),
               ),
               const SizedBox(height: 15),
-              _hpad(FadeSlideIn(
+              // Full-width stats band.
+              FadeSlideIn(
                 delay: const Duration(milliseconds: 340),
                 child: _StatsBand(future: _statsFuture),
-              )),
+              ),
               const SizedBox(height: 15),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 380),
@@ -257,10 +368,11 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               )),
               const SizedBox(height: 12),
-              _hpad(FadeSlideIn(
+              // Full-width offers row.
+              FadeSlideIn(
                 delay: const Duration(milliseconds: 540),
                 child: _OffersRow(future: _promosFuture),
-              )),
+              ),
               const SizedBox(height: 22),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 520),
@@ -274,10 +386,11 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               )),
               const SizedBox(height: 12),
-              _hpad(FadeSlideIn(
+              // Full-width top-rated row.
+              FadeSlideIn(
                 delay: const Duration(milliseconds: 580),
                 child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
-              )),
+              ),
               const SizedBox(height: 22),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 660),
@@ -517,19 +630,19 @@ class _StatsBand extends StatelessWidget {
               color: Color(0xFFC7A9E0), onTap: null, pulse: false),
         ];
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 6),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),
-            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
                 color: AppColors.primaryDark.withValues(alpha: 0.35),
                 blurRadius: 20,
-                offset: const Offset(0, 10),
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -883,12 +996,12 @@ class _HeroBannerState extends State<_HeroBanner> {
           if (_index >= _slides.length) _index = 0;
           WidgetsBinding.instance.addPostFrameCallback((_) => _startTimer());
         }
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+        return ClipRRect(
+          // Edge-to-edge, full screen width. A slight bottom rounding keeps it tidy.
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
           child: SizedBox(
-            height: 235,
+            width: double.infinity,
+            height: 240,
             child: Stack(
               children: [
                 PageView.builder(
@@ -929,7 +1042,6 @@ class _HeroBannerState extends State<_HeroBanner> {
               ],
             ),
           ),
-        ),
         );
       },
     );
@@ -1357,6 +1469,7 @@ class _OffersRow extends StatelessWidget {
           }
           return ListView.separated(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
             itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _OfferCard(promo: items[i]),
@@ -1769,6 +1882,7 @@ class _TopRatedRow extends StatelessWidget {
           }
           return ListView.separated(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
             itemCount: top.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _TopRatedCard(vendor: top[i]),

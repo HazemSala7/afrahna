@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/services/accounts_services.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../subscriptions/subscription_plans.dart';
 
@@ -47,6 +49,17 @@ class _NewClientPageState extends State<NewClientPage> {
   bool _submitting = false;
 
   final _service = DelegateService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill the commission % with the delegate's own default rate so it is
+    // applied automatically (they can still override it per subscription).
+    final rate = context.read<SessionController>().user?.commissionPerSubscription;
+    if (rate != null && rate > 0) {
+      _commission.text = rate.toStringAsFixed(rate == rate.roundToDouble() ? 0 : 1);
+    }
+  }
 
   @override
   void dispose() {

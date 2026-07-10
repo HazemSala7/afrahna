@@ -44,6 +44,7 @@ class UserModel {
     this.vendorName,
     this.vendorLogo,
     this.activePlan,
+    this.notificationsEnabled = true,
   });
 
   final int id;
@@ -71,6 +72,10 @@ class UserModel {
   /// Current active subscription plan key (normal|featured|vip), or null when
   /// the client has no active subscription. Provided by the delegate clients list.
   final String? activePlan;
+
+  /// Whether the user receives notifications (offer alerts, etc.). Can be
+  /// toggled off from the app. Defaults to true.
+  final bool notificationsEnabled;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -100,6 +105,10 @@ class UserModel {
                 Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
             : null,
         activePlan: _readT<String>(json, 'active_plan'),
+        notificationsEnabled: json['notifications_enabled'] == null
+            ? true
+            : (json['notifications_enabled'] == true ||
+                json['notifications_enabled'] == 1),
       );
 
   Map<String, dynamic> toJson() => {
@@ -115,7 +124,27 @@ class UserModel {
         'city_id': cityId,
         'commission_per_subscription': commissionPerSubscription,
         'permissions': permissions,
+        'notifications_enabled': notificationsEnabled,
       };
+
+  UserModel copyWith({bool? notificationsEnabled}) => UserModel(
+        id: id,
+        name: name,
+        phone: phone,
+        email: email,
+        role: role,
+        avatar: avatar,
+        isActive: isActive,
+        delegateId: delegateId,
+        workField: workField,
+        cityId: cityId,
+        commissionPerSubscription: commissionPerSubscription,
+        permissions: permissions,
+        vendorName: vendorName,
+        vendorLogo: vendorLogo,
+        activePlan: activePlan,
+        notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      );
 
   bool get isVendor   => role == 'vendor';
   bool get isAdmin    => role == 'admin';

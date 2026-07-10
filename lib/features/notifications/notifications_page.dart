@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 
@@ -61,7 +63,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       body: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
+        child: Column(
+          children: [
+            const _NotificationsToggle(),
+            Expanded(
+              child: RefreshIndicator(
           onRefresh: _refresh,
           color: AppColors.primary,
           child: FutureBuilder<List<NotificationModel>>(
@@ -103,7 +109,84 @@ class _NotificationsPageState extends State<NotificationsPage> {
               );
             },
           ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+/// Switch that lets the user turn all notifications on/off (offer alerts, …).
+class _NotificationsToggle extends StatefulWidget {
+  const _NotificationsToggle();
+
+  @override
+  State<_NotificationsToggle> createState() => _NotificationsToggleState();
+}
+
+class _NotificationsToggleState extends State<_NotificationsToggle> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionController>();
+    final user = session.user;
+    if (user == null) return const SizedBox.shrink(); // guests have no prefs
+    final enabled = user.notificationsEnabled;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x14000000)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            enabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+            color: enabled ? AppColors.primary : AppColors.textMuted,
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('تلقّي الإشعارات',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800, color: AppColors.textDark)),
+                Text('عروض المعلنين الذين تتابعهم وتنبيهات أخرى',
+                    style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+              ],
+            ),
+          ),
+          if (_busy)
+            const SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch(
+              value: enabled,
+              activeThumbColor: AppColors.primary,
+              onChanged: (v) async {
+                final ctrl = context.read<SessionController>();
+                final messenger = ScaffoldMessenger.of(context);
+                setState(() => _busy = true);
+                try {
+                  await ctrl.setNotificationsEnabled(v);
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+                } finally {
+                  if (mounted) setState(() => _busy = false);
+                }
+              },
+            ),
+        ],
       ),
     );
   }

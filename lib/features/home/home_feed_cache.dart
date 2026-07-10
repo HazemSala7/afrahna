@@ -26,7 +26,7 @@ class HomeFeedCache {
     promos = PromotionService().list();
     topVendors = VendorService().list();
     featuredVendors =
-        VendorService().list(featured: true, perPage: 12).then((l) => l..shuffle());
+        VendorService().list(featured: true, perPage: 1000).then((l) => l..shuffle());
     sliders = loadSliders();
     stats = StatsService().get();
   }

@@ -109,6 +109,22 @@ class AuthService {
     }
   }
 
+  /// Enables/disables the signed-in user's notifications. Returns the new value.
+  Future<bool> updateNotifications(bool enabled) async {
+    try {
+      final res = await _dio.patch('/auth/notifications',
+          data: {'notifications_enabled': enabled});
+      final data = res.data;
+      if (data is Map && data['notifications_enabled'] != null) {
+        final v = data['notifications_enabled'];
+        return v == true || v == 1;
+      }
+      return enabled;
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Changes the signed-in user's own password (any role). Requires the
   /// current password. Throws [ApiException] with the server message on failure.
   Future<void> changePassword({

@@ -1,10 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/services/coordinator_service.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/feedback_snack.dart';
+
+// ---------------------------------------------------------------------------
+// BUDGET CURRENCY (user-selectable: Jordanian Dinar / Shekel / Dollar)
+// ---------------------------------------------------------------------------
+
+/// Selectable currencies for the budget, with their display symbols.
+const Map<String, String> kBudgetCurrencies = {
+  'JOD': 'د.أ',
+  'ILS': '₪',
+  'USD': '\$',
+};
+
+/// Currently selected budget currency code. Persisted in SharedPreferences and
+/// exposed as a notifier so the budget UI rebuilds when it changes.
+final ValueNotifier<String> budgetCurrency = ValueNotifier<String>('JOD');
+bool _budgetCurrencyLoaded = false;
+
+Future<void> _loadBudgetCurrency() async {
+  if (_budgetCurrencyLoaded) return;
+  _budgetCurrencyLoaded = true;
+  final prefs = await SharedPreferences.getInstance();
+  final code = prefs.getString('budget_currency');
+  if (code != null && kBudgetCurrencies.containsKey(code)) {
+    budgetCurrency.value = code;
+  }
+}
+
+Future<void> _setBudgetCurrency(String code) async {
+  budgetCurrency.value = code;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('budget_currency', code);
+}
+
+String _currencySymbol() => kBudgetCurrencies[budgetCurrency.value] ?? 'د.أ';
 
 class CoordinatorPage extends StatefulWidget {
   const CoordinatorPage({super.key});
@@ -59,6 +94,9 @@ class _BudgetTabState extends State<_BudgetTab> {
   void initState() {
     super.initState();
     _future = _load();
+    _loadBudgetCurrency().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<_BudgetData> _load() async {
@@ -148,6 +186,13 @@ class _BudgetTabState extends State<_BudgetTab> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 96),
               children: [
+                _CurrencySelector(
+                  onChanged: (code) async {
+                    await _setBudgetCurrency(code);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const SizedBox(height: 12),
                 _BudgetSummaryCard(summary: data.summary),
                 const SizedBox(height: 14),
                 if (data.items.isEmpty)
@@ -377,7 +422,9 @@ class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
                   controller: _estimated,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                  decoration: const InputDecoration(labelText: 'مبلغ تقديري', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                      labelText: 'مبلغ تقديري (${_currencySymbol()})',
+                      border: const OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: 10),
@@ -386,7 +433,9 @@ class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
                   controller: _actual,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                  decoration: const InputDecoration(labelText: 'مبلغ فعلي', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                      labelText: 'مبلغ فعلي (${_currencySymbol()})',
+                      border: const OutlineInputBorder()),
                 ),
               ),
             ]),
@@ -892,6 +941,67 @@ class _EmptyTab extends StatelessWidget {
   }
 }
 
+/// Row of currency choices for the budget (دينار / شيكل / دولار).
+class _CurrencySelector extends StatelessWidget {
+  const _CurrencySelector({required this.onChanged});
+  final ValueChanged<String> onChanged;
+
+  static const _labels = {
+    'JOD': 'دينار د.أ',
+    'ILS': 'شيكل ₪',
+    'USD': 'دولار \$',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: budgetCurrency,
+      builder: (context, current, _) {
+        return Row(
+          children: [
+            const Icon(Icons.payments_outlined,
+                size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text('العملة:',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, color: AppColors.textDark)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                children: kBudgetCurrencies.keys.map((code) {
+                  final selected = code == current;
+                  return ChoiceChip(
+                    label: Text(_labels[code] ?? code),
+                    selected: selected,
+                    onSelected: (_) => onChanged(code),
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : AppColors.textDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.primaryLight,
+                      ),
+                    ),
+                    showCheckmark: false,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 String _fmtMoney(double v) {
   final s = v.toStringAsFixed(v.truncateToDouble() == v ? 0 : 2);
   // Insert thousands separators.
@@ -901,5 +1011,5 @@ String _fmtMoney(double v) {
     (m) => '${m[1]},',
   );
   final result = parts.length > 1 ? '$intPart.${parts[1]}' : intPart;
-  return '$result د.أ';
+  return '$result ${_currencySymbol()}';
 }

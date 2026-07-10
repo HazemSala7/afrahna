@@ -110,6 +110,15 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Enables/disables notifications for the signed-in user (offer alerts, etc.).
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    final v = await _auth.updateNotifications(enabled);
+    if (_user != null) {
+      _user = _user!.copyWith(notificationsEnabled: v);
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     _stopHeartbeat();
     await PushNotificationService.instance.unregisterToken();

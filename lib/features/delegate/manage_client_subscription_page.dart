@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../subscriptions/subscription_plans.dart';
 
@@ -428,11 +430,16 @@ class _SubscriptionFormSheetState extends State<_SubscriptionFormSheet> {
     _amount = TextEditingController(
         text: e != null ? e.amountPaid.toStringAsFixed(0) : '');
     // Commission is entered as a percentage of the full price. When editing an
-    // existing subscription, back-compute the rate from the stored amount.
+    // existing subscription, back-compute the rate from the stored amount;
+    // for a new one, prefill with the delegate's own default commission rate.
+    final delegateRate =
+        context.read<SessionController>().user?.commissionPerSubscription;
     _commission = TextEditingController(
         text: (e != null && e.totalAmount > 0 && e.commissionAmount > 0)
             ? _trimNum(e.commissionAmount / e.totalAmount * 100)
-            : '');
+            : (delegateRate != null && delegateRate > 0
+                ? _trimNum(delegateRate)
+                : ''));
   }
 
   @override

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
+import '../../core/state/session.dart';
 import '../../core/services/local_favorites.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/follow_button.dart';
+import '../../widgets/login_required_dialog.dart';
 import '../bookings/booking_create_page.dart';
 import '../home/home_page.dart';
 import '../services/service_details_page.dart';
@@ -102,6 +105,17 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   }
 
   Future<void> _openRatingSheet(VendorModel vendor) async {
+    // Reviewing requires an account.
+    if (!context.read<SessionController>().isSignedIn) {
+      await showLoginRequiredDialog(
+        context,
+        title: 'أضف تقييمك',
+        message: 'سجّل الدخول بحساب لتتمكن من إضافة تقييم لهذا المزوّد،'
+            ' أو تابع التصفح كزائر.',
+        icon: Icons.star_rounded,
+      );
+      return;
+    }
     final submitted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -114,7 +128,9 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
         _vendorFuture = VendorService().show(widget.vendorId);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('شكراً! تم إرسال تقييمك')),
+        const SnackBar(
+          content: Text('شكراً! سيظهر تقييمك بعد موافقة الإدارة'),
+        ),
       );
     }
   }

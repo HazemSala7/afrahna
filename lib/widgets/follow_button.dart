@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import 'login_required_dialog.dart';
 
 /// Drop-in follow/unfollow button for a vendor profile.
 /// Customer accounts can follow an advertiser to receive notifications
@@ -45,8 +46,12 @@ class _FollowButtonState extends State<FollowButton> {
   Future<void> _toggle() async {
     final session = context.read<SessionController>();
     if (!session.isSignedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('سجّل الدخول لمتابعة المعلِن')),
+      await showLoginRequiredDialog(
+        context,
+        title: 'متابعة المعلِن',
+        message: 'سجّل الدخول بحساب لمتابعة هذا المعلِن وتصلك إشعاراته،'
+            ' أو تابع التصفح كزائر.',
+        icon: Icons.person_add_alt_1_rounded,
       );
       return;
     }

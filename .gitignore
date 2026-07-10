@@ -54,4 +54,9 @@ deploy/logs/
 /afrahna-admin-panel/
 afrahna-admin.zip
 
+# Firebase / Google service-account credentials — SECRETS, never commit
+*firebase-adminsdk*.json
+service-account.json
+afrahna-88a2c-firebase-adminsdk-fbsvc-d9d1fb8014.json
+
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../core/services/location_service.dart';
 import '../core/theme.dart';
 
 /// Full-screen OpenStreetMap that lets the user pick a location by tapping the
@@ -34,23 +34,91 @@ class _MapPickerPageState extends State<MapPickerPage> {
   void _setPoint(LatLng p) => setState(() => _picked = p);
 
   /// Fetches the device's current location, moves the marker there and
-  /// recenters the map. Shows a hint if location is off / permission denied.
+  /// recenters the map. Explicitly walks the permission flow: prompts the
+  /// system "allow location" dialog when needed, and offers to open settings
+  /// if the service is off or the permission was permanently denied.
   Future<void> _useCurrentLocation() async {
     setState(() => _locating = true);
-    final pos = await LocationService.instance.current();
-    if (!mounted) return;
-    setState(() => _locating = false);
-    if (pos == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذّر تحديد موقعك. فعّل خدمة الموقع وامنح الإذن.'),
+    try {
+      // 1) Location services (GPS) must be on.
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (!mounted) return;
+        final open = await _confirm(
+          'خدمة الموقع مُعطّلة',
+          'فعّل خدمة الموقع (GPS) لتحديد موقعك الحالي على الخريطة.',
+          'فتح الإعدادات',
+        );
+        if (open) await Geolocator.openLocationSettings();
+        return;
+      }
+
+      // 2) Permission — request it (shows the system "allow location" dialog).
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        final open = await _confirm(
+          'إذن الموقع مرفوض',
+          'تم رفض إذن الوصول للموقع نهائيًا. افتح إعدادات التطبيق وامنح إذن الموقع لاستخدام هذه الميزة.',
+          'فتح إعدادات التطبيق',
+        );
+        if (open) await Geolocator.openAppSettings();
+        return;
+      }
+      if (perm == LocationPermission.denied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يلزم السماح بالوصول للموقع لاستخدام هذه الميزة.')),
+        );
+        return;
+      }
+
+      // 3) Fetch the position (capped so it never hangs).
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
         ),
       );
-      return;
+      if (!mounted) return;
+      final here = LatLng(pos.latitude, pos.longitude);
+      _setPoint(here);
+      _controller.move(here, 16);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذّر تحديد موقعك، حاول مرة أخرى.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
-    final here = LatLng(pos.latitude, pos.longitude);
-    _setPoint(here);
-    _controller.move(here, 16);
+  }
+
+  /// Small confirm dialog offering to open a settings screen. Returns true if
+  /// the user chose to open settings.
+  Future<bool> _confirm(String title, String message, String confirmLabel) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override

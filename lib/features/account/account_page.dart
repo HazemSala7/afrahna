@@ -15,6 +15,7 @@ import '../delegate/delegate_dashboard_page.dart';
 import '../favorites/favorites_page.dart';
 import '../notifications/notifications_page.dart';
 import '../posts/vendor_posts_page.dart';
+import 'vendor_statement_page.dart';
 
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
@@ -354,6 +355,15 @@ class _SignedInView extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const VendorPostsPage()),
+            ),
+          ),
+        if (user.isVendor)
+          _MenuTile(
+            icon: Icons.receipt_long_outlined,
+            label: 'كشف حساب (الاشتراكات والدفعات)',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VendorStatementPage()),
             ),
           ),
         _MenuTile(
