@@ -4,7 +4,7 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
-import '../vendors/vendor_details_page.dart';
+import 'offer_details_page.dart';
 
 class OffersPage extends StatefulWidget {
   const OffersPage({super.key});
@@ -65,17 +65,12 @@ class _PromoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
-      onTap: () {
-        if (promo.vendorId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  VendorDetailsPage(vendorId: promo.vendorId!),
-            ),
-          );
-        }
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OfferDetailsPage(promo: promo),
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -94,13 +89,7 @@ class _PromoCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: AppNetworkImage(
-                    url: promo.image,
-                    fallbackIcon: Icons.local_offer,
-                  ),
-                ),
+                _PromoGallery(images: promo.gallery),
                 if (promo.discountPercent != null)
                   PositionedDirectional(
                     top: 12,
@@ -162,6 +151,96 @@ class _PromoCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Swipeable image gallery for an offer. Shows a single image when there is
+/// only one, otherwise a paged view with a counter and dot indicators.
+class _PromoGallery extends StatefulWidget {
+  const _PromoGallery({required this.images});
+  final List<String> images;
+
+  @override
+  State<_PromoGallery> createState() => _PromoGalleryState();
+}
+
+class _PromoGalleryState extends State<_PromoGallery> {
+  final _controller = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imgs = widget.images;
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: imgs.length <= 1
+          ? AppNetworkImage(
+              url: imgs.isNotEmpty ? imgs.first : null,
+              fallbackIcon: Icons.local_offer,
+            )
+          : Stack(
+              children: [
+                PageView.builder(
+                  controller: _controller,
+                  itemCount: imgs.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (_, i) => AppNetworkImage(
+                    url: imgs[i],
+                    fallbackIcon: Icons.local_offer,
+                  ),
+                ),
+                PositionedDirectional(
+                  top: 10,
+                  end: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_index + 1}/${imgs.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  start: 0,
+                  end: 0,
+                  bottom: 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(imgs.length, (i) {
+                      final active = i == _index;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                        width: active ? 16 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

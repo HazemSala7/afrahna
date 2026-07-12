@@ -555,6 +555,16 @@ class PostService {
     }
   }
 
+  /// Fetch a single post/reel by id (public).
+  Future<PostModel> show(int id) async {
+    try {
+      final res = await _dio.get('/posts/$id');
+      return PostModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Posts from vendors the current user follows.
   Future<List<PostModel>> feed({int perPage = 20}) async {
     try {
@@ -574,6 +584,7 @@ class PostService {
     String? body,
     String? mediaUrl,
     String? thumbnail,
+    List<String>? images,
     double? price,
     String? duration,
     bool isPublished = true,
@@ -586,6 +597,7 @@ class PostService {
         'body': ?body,
         'media_url': ?mediaUrl,
         'thumbnail': ?thumbnail,
+        'images': ?images,
         'price': ?price,
         'duration': ?duration,
         'is_published': isPublished,

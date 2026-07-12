@@ -493,9 +493,8 @@ class TierBadge extends StatelessWidget {
   }
 }
 
-/// Scalloped-edge gold "verified" seal (a rosette/medal): premium gold fill,
-/// dark outline, an inner ring, a light sweep gliding across, a softly pulsing
-/// glow and a twinkling sparkle — animated and eye-catching.
+/// VIP badge: a lustrous gold crown inside a glossy black disc with a gold rim,
+/// a soft pulsing gold glow and an occasional sparkle.
 class _ShinyVipBadge extends StatefulWidget {
   const _ShinyVipBadge({required this.size});
   final double size;
@@ -504,88 +503,182 @@ class _ShinyVipBadge extends StatefulWidget {
   State<_ShinyVipBadge> createState() => _ShinyVipBadgeState();
 }
 
-/// Builds the scalloped rosette outline for a given box (shared by the painter
-/// and the clipper so the shine is masked to the exact shape).
-Path _sealPath(Size size) {
-  final c = Offset(size.width / 2, size.height / 2);
-  const scallops = 12;
-  final baseR = size.width * 0.36;
-  final amp = size.width * 0.055;
-  final path = Path();
-  const steps = 240;
-  for (var i = 0; i <= steps; i++) {
-    final th = 2 * math.pi * i / steps;
-    final r = baseR + amp * math.cos(scallops * th);
-    final p = Offset(c.dx + r * math.cos(th), c.dy + r * math.sin(th));
-    if (i == 0) {
-      path.moveTo(p.dx, p.dy);
-    } else {
-      path.lineTo(p.dx, p.dy);
-    }
-  }
-  path.close();
-  return path;
+/// A royal crown silhouette with curved dips between the points (drawn inside
+/// [r]). Reads far more premium than sharp triangles.
+Path _crownPath(Rect r) {
+  double x(double n) => r.left + n * r.width;
+  double y(double n) => r.top + n * r.height;
+  return Path()
+    ..moveTo(x(0.02), y(1.0)) // band bottom-left
+    ..lineTo(x(0.0), y(0.56)) // up the left side of the band
+    ..lineTo(x(0.13), y(0.14)) // left point
+    ..quadraticBezierTo(x(0.31), y(0.62), x(0.5), y(0.04)) // dip → center point
+    ..quadraticBezierTo(x(0.69), y(0.62), x(0.87), y(0.14)) // dip → right point
+    ..lineTo(x(1.0), y(0.56)) // down the right side
+    ..lineTo(x(0.98), y(1.0)) // band bottom-right
+    ..close();
 }
 
-class _SealPainter extends CustomPainter {
-  _SealPainter(this.glow);
+/// Positions of the three crown points (for the jewel balls), as fractions.
+const List<Offset> _crownPeaks = [
+  Offset(0.13, 0.14),
+  Offset(0.5, 0.04),
+  Offset(0.87, 0.14),
+];
+
+class _VipCrownPainter extends CustomPainter {
+  _VipCrownPainter(this.glow, this.sweep);
   final double glow; // 0..1 pulsing
+  final double sweep; // 0..1 light-sweep position
+
+  static const _gold = LinearGradient(
+    colors: [Color(0xFFFFF6C9), Color(0xFFF7C948), Color(0xFFB9791A)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = _sealPath(size);
-    final rect = Offset.zero & size;
+    final w = size.width;
+    // Disc sits in the lower part; a small crown perches on top of it.
+    final cc = Offset(w / 2, w * 0.60);
+    final r = w * 0.36;
 
-    // Warm glow behind the seal.
-    canvas.drawPath(
-      path,
+    // Warm gold glow behind the disc — pulses for a lively shine.
+    canvas.drawCircle(
+      cc,
+      r * (1.08 + 0.10 * glow),
       Paint()
-        ..color = const Color(0xFFF3B63C).withValues(alpha: 0.35 + 0.4 * glow)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.12),
+        ..color = const Color(0xFFF3B63C).withValues(alpha: 0.40 + 0.55 * glow)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * (0.12 + 0.06 * glow)),
     );
 
-    // Gold gradient fill.
-    canvas.drawPath(
-      path,
+    // Glossy black disc.
+    canvas.drawCircle(
+      cc,
+      r,
       Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFFFF3B8), Color(0xFFF7C948), Color(0xFFB9791A)],
-          stops: [0.0, 0.55, 1.0],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(rect),
+        ..shader = RadialGradient(
+          colors: const [Color(0xFF3C3C3C), Color(0xFF0A0A0A)],
+          center: const Alignment(-0.3, -0.4),
+        ).createShader(Rect.fromCircle(center: cc, radius: r)),
     );
 
+    // Gold rim.
+    canvas.drawCircle(
+      cc,
+      r - w * 0.018,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w * 0.038
+        ..shader = const SweepGradient(
+          colors: [
+            Color(0xFFFFF3B8),
+            Color(0xFFF7C948),
+            Color(0xFFB9791A),
+            Color(0xFFFFF3B8),
+          ],
+        ).createShader(Rect.fromCircle(center: cc, radius: r)),
+    );
+
+    // Light sweep gliding across the disc.
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: cc, radius: r)));
+    final sweepX = cc.dx + (sweep * 2 - 1) * r * 1.7;
+    canvas.translate(sweepX, cc.dy);
+    canvas.rotate(-0.5);
+    final band = Rect.fromCenter(
+        center: Offset.zero, width: r * 0.55, height: r * 3);
+    canvas.drawRect(
+      band,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.38),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          stops: const [0.3, 0.5, 0.7],
+        ).createShader(band),
+    );
+    canvas.restore();
+
+    // Royal gold crown perched on top of the disc.
+    final cr = Rect.fromLTWH(w * 0.28, w * 0.02, w * 0.44, w * 0.30);
+    final crown = _crownPath(cr);
     // Dark outline for definition.
     canvas.drawPath(
-      path,
+      crown,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * 0.05
+        ..strokeWidth = w * 0.04
         ..strokeJoin = StrokeJoin.round
-        ..color = const Color(0xFF241703),
+        ..color = const Color(0xFF2A1A02),
+    );
+    // Gold fill.
+    canvas.drawPath(crown, Paint()..shader = _gold.createShader(cr));
+    // Glossy top highlight across the band.
+    canvas.drawPath(
+      crown,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.02)
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.5),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.5],
+        ).createShader(cr),
     );
 
-    // Inner engraved ring (subtle, so it doesn't compete with the check).
+    // Rounded jewel balls on the three points.
+    final rj = w * 0.036;
+    for (final peak in _crownPeaks) {
+      final c = Offset(cr.left + peak.dx * cr.width, cr.top + peak.dy * cr.height);
+      canvas.drawCircle(
+        c,
+        rj,
+        Paint()
+          ..shader = const RadialGradient(
+            colors: [Color(0xFFFFFDF5), Color(0xFFF3C969)],
+            center: Alignment(-0.3, -0.3),
+          ).createShader(Rect.fromCircle(center: c, radius: rj)),
+      );
+      canvas.drawCircle(
+        c,
+        rj,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.012
+          ..color = const Color(0xFF2A1A02),
+      );
+    }
+
+    // Center gem on the band.
+    final gem = Offset(cr.center.dx, cr.top + cr.height * 0.72);
     canvas.drawCircle(
-      Offset(size.width / 2, size.height / 2),
-      size.width * 0.27,
+      gem,
+      w * 0.03,
+      Paint()..color = const Color(0xFFE0353B),
+    );
+    canvas.drawCircle(
+      gem,
+      w * 0.03,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * 0.018
-        ..color = Colors.white.withValues(alpha: 0.35),
+        ..strokeWidth = w * 0.01
+        ..color = const Color(0xFF2A1A02),
     );
   }
 
   @override
-  bool shouldRepaint(_SealPainter old) => old.glow != glow;
-}
-
-class _SealClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) => _sealPath(size);
-  @override
-  bool shouldReclip(_SealClipper old) => false;
+  bool shouldRepaint(_VipCrownPainter old) =>
+      old.glow != glow || old.sweep != sweep;
 }
 
 class _ShinyVipBadgeState extends State<_ShinyVipBadge>
@@ -603,108 +696,57 @@ class _ShinyVipBadgeState extends State<_ShinyVipBadge>
 
   @override
   Widget build(BuildContext context) {
-    final d = widget.size * 1.15; // seals read better a touch larger
+    final d = widget.size * 1.35; // room for the small crown above the disc
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
         final t = _c.value;
-        final sweep = Curves.easeInOut.transform((t / 0.45).clamp(0.0, 1.0));
-        final sweepX = (sweep * 2 - 1) * d * 1.3;
         final glow = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
+        // Light sweep during the first ~40% of each cycle.
+        final sweep = Curves.easeInOut.transform((t / 0.4).clamp(0.0, 1.0));
+        // Gentle breathing scale.
+        final scale = 1.0 + 0.05 * math.sin(t * 2 * math.pi);
         final twinklePhase = (t - 0.55).clamp(0.0, 0.25) / 0.25;
         final twinkle = math.sin(twinklePhase * math.pi);
 
-        return SizedBox(
+        return Transform.scale(
+          scale: scale,
+          child: SizedBox(
           width: d,
           height: d,
           child: Stack(
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              CustomPaint(size: Size(d, d), painter: _SealPainter(glow)),
-              // Light sweep + top gloss, masked to the seal shape.
-              ClipPath(
-                clipper: _SealClipper(),
-                child: SizedBox(
-                  width: d,
-                  height: d,
-                  child: Stack(
-                    children: [
-                      Align(
-                        alignment: Alignment.topCenter,
-                        child: Container(
-                          margin: EdgeInsets.only(top: d * 0.16),
-                          width: d * 0.42,
-                          height: d * 0.16,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.all(
-                                Radius.elliptical(d * 0.42, d * 0.16)),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.white.withValues(alpha: 0.8),
-                                Colors.white.withValues(alpha: 0.0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Transform.translate(
-                        offset: Offset(sweepX, 0),
-                        child: Transform.rotate(
-                          angle: -0.5,
-                          child: Container(
-                            width: d * 0.4,
-                            height: d * 2,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.0),
-                                  Colors.white.withValues(alpha: 0.8),
-                                  Colors.white.withValues(alpha: 0.0),
-                                ],
-                                stops: const [0.3, 0.5, 0.7],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              CustomPaint(
+                  size: Size(d, d), painter: _VipCrownPainter(glow, sweep)),
+              // White check inside the black disc (at y ≈ 0.60d).
+              Align(
+                alignment: const Alignment(0, 0.22),
+                child: Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: d * 0.32,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 1.5,
+                    ),
+                  ],
                 ),
-              ),
-              // Bold, clearly-visible check: a dark outline behind a larger
-              // white tick so it pops against the gold.
-              Icon(
-                Icons.check_rounded,
-                color: const Color(0xFF3A2405),
-                size: d * 0.62,
-              ),
-              Icon(
-                Icons.check_rounded,
-                color: Colors.white,
-                size: d * 0.54,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 2,
-                  ),
-                ],
               ),
               if (twinkle > 0.02)
                 Positioned(
-                  top: d * 0.02,
-                  right: d * 0.06,
+                  top: d * 0.0,
+                  right: d * 0.08,
                   child: Opacity(
                     opacity: twinkle.clamp(0.0, 1.0),
                     child: Icon(Icons.auto_awesome,
-                        color: Colors.white, size: d * 0.26),
+                        color: const Color(0xFFFFF6D6), size: d * 0.2),
                   ),
                 ),
             ],
+          ),
           ),
         );
       },

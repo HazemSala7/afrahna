@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
 import '../../core/services/event_service.dart';
@@ -24,6 +25,7 @@ import '../coordinator/coordinator_page.dart';
 import '../favorites/favorites_page.dart';
 import '../invitations/invitations_page.dart';
 import '../notifications/notifications_page.dart';
+import '../offers/offer_details_page.dart';
 import '../offers/offers_page.dart';
 import '../reels/reels_page.dart';
 import '../tasks/tasks_page.dart';
@@ -300,17 +302,24 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _CategoriesGrid(future: _categoriesFuture),
               ),
               const SizedBox(height: 22),
-              // Full-width hero slider.
-              FadeSlideIn(
+              // Hero slider with side margins (aligned with the rest of the page).
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
-              ),
+              )),
               const SizedBox(height: 15),
-              // Full-width stats band.
-              FadeSlideIn(
+              // Stats band with side margins.
+              _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 340),
                 child: _StatsBand(future: _statsFuture),
-              ),
+              )),
+              const SizedBox(height: 15),
+              // "Advertise with us" call-to-action aimed at business owners:
+              // placed right after the reach stats so the numbers prime them.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 360),
+                child: const _AdvertiseCta(),
+              )),
               const SizedBox(height: 15),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 380),
@@ -633,6 +642,7 @@ class _StatsBand extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
             gradient: const LinearGradient(
               colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
               begin: Alignment.topRight,
@@ -997,8 +1007,8 @@ class _HeroBannerState extends State<_HeroBanner> {
           WidgetsBinding.instance.addPostFrameCallback((_) => _startTimer());
         }
         return ClipRRect(
-          // Edge-to-edge, full screen width. A slight bottom rounding keeps it tidy.
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+          // Rounded card that sits within the page's side margins.
+          borderRadius: BorderRadius.circular(18),
           child: SizedBox(
             width: double.infinity,
             height: 240,
@@ -1487,16 +1497,12 @@ class _OfferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        if (promo.vendorId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VendorDetailsPage(vendorId: promo.vendorId!),
-            ),
-          );
-        }
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OfferDetailsPage(promo: promo),
+        ),
+      ),
       child: Container(
         width: 180,
         decoration: BoxDecoration(
@@ -1630,9 +1636,8 @@ class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
     final future = widget.future;
     final userPos = widget.userPos;
     return SizedBox(
-      // Compact circular row — deliberately smaller / less prominent than the
-      // hero slider above it.
-      height: 116,
+      // Prominent circular row of featured shops.
+      height: 150,
       child: FutureBuilder<List<VendorModel>>(
         future: future,
         builder: (context, snap) {
@@ -1736,7 +1741,7 @@ class _FeaturedVendorCard extends StatelessWidget {
         ),
       ),
       child: SizedBox(
-        width: 80,
+        width: 100,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1746,8 +1751,8 @@ class _FeaturedVendorCard extends StatelessWidget {
               children: [
                 // Thin gold ring around the logo.
                 Container(
-                  width: 66,
-                  height: 66,
+                  width: 84,
+                  height: 84,
                   padding: const EdgeInsets.all(2),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
@@ -1783,20 +1788,20 @@ class _FeaturedVendorCard extends StatelessWidget {
                     vip: vendor.isVip,
                     featured: vendor.isPremium ||
                         vendor.activePlan == 'featured',
-                    size: 19,
+                    size: 26,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               vendor.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
                 color: AppColors.textDark,
               ),
             ),
@@ -1805,12 +1810,12 @@ class _FeaturedVendorCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.star_rounded,
-                      size: 11, color: Color(0xFFE6A800)),
+                      size: 13, color: Color(0xFFE6A800)),
                   const SizedBox(width: 2),
                   Text(
                     vendor.rating!.toStringAsFixed(1),
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textMuted,
                     ),
@@ -1910,7 +1915,7 @@ class _TopRatedCard extends StatelessWidget {
         width: 195,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.zero,
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
               color: AppColors.cardShadow,
@@ -1973,6 +1978,122 @@ class _TopRatedCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// ADVERTISE-WITH-US CTA (direct WhatsApp contact for business owners)
+// ===========================================================================
+
+/// WhatsApp number business owners reach out to when they want to advertise.
+/// Same line the app uses for support elsewhere.
+const String _kAdvertisePhone = '+972599252493';
+
+/// Eye-catching card inviting shop/service owners to advertise on Afrahna,
+/// with a one-tap WhatsApp button that opens a pre-filled message.
+class _AdvertiseCta extends StatelessWidget {
+  const _AdvertiseCta();
+
+  Future<void> _contact() async {
+    final digits = _kAdvertisePhone.replaceAll(RegExp(r'\D'), '');
+    final msg = Uri.encodeComponent(
+        'مرحباً، عندي محل/خدمة وأرغب بالإعلان في تطبيق أفراحنا. ممكن التفاصيل؟');
+    final uri = Uri.parse('https://wa.me/$digits?text=$msg');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: _contact,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [AppColors.primaryDark, AppColors.primary],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryDark.withValues(alpha: 0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.campaign_rounded,
+                    color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'عندك محل أو خدمة؟ 📣',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'أعلن في أفراحنا ووصّل لآلاف العرسان',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: _contact,
+                icon: const Icon(Icons.chat_rounded, size: 18),
+                label: const Text(
+                  'تواصل معنا',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2124,7 +2245,20 @@ class _SearchTab extends StatefulWidget {
 class _SearchTabState extends State<_SearchTab> {
   final _controller = TextEditingController();
   Future<List<VendorModel>>? _future;
+  late Future<List<VendorModel>> _topRated;
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _topRated = _loadTopRated();
+  }
+
+  Future<List<VendorModel>> _loadTopRated() async {
+    final all = await VendorService().list(perPage: 60);
+    all.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    return all.where((v) => (v.rating ?? 0) > 0).take(20).toList();
+  }
 
   @override
   void dispose() {
@@ -2160,8 +2294,9 @@ class _SearchTabState extends State<_SearchTab> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2200,12 +2335,7 @@ class _SearchTabState extends State<_SearchTab> {
               const SizedBox(height: 18),
               Expanded(
                 child: _future == null
-                    ? const Center(
-                        child: Text(
-                          'ابدأ بكتابة ما تبحث عنه',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      )
+                    ? _buildTopRated()
                     : FutureBuilder<List<VendorModel>>(
                         future: _future,
                         builder: (context, snap) {
@@ -2225,6 +2355,7 @@ class _SearchTabState extends State<_SearchTab> {
                             );
                           }
                           return ListView.separated(
+                            padding: const EdgeInsets.only(bottom: 110),
                             itemCount: items.length,
                             separatorBuilder: (_, _) =>
                                 const SizedBox(height: 10),
@@ -2242,15 +2373,76 @@ class _SearchTabState extends State<_SearchTab> {
       ),
     );
   }
+
+  /// Default view (empty search): the top-rated shops, so the page looks lively.
+  Widget _buildTopRated() {
+    return FutureBuilder<List<VendorModel>>(
+      future: _topRated,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const CenteredLoader();
+        }
+        final items = snap.data ?? const <VendorModel>[];
+        if (items.isEmpty) {
+          return const Center(
+            child: Text(
+              'ابدأ بكتابة ما تبحث عنه',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.star_rounded,
+                    color: Color(0xFFFFC107), size: 20),
+                const SizedBox(width: 6),
+                const Text(
+                  'المحلات الأكثر تقييماً',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.only(bottom: 110),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (_, i) => _SearchResultTile(vendor: items[i]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _SearchResultTile extends StatelessWidget {
   const _SearchResultTile({required this.vendor});
   final VendorModel vendor;
+  String _money(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
   @override
   Widget build(BuildContext context) {
+    final showBadge =
+        vendor.isVip || vendor.isPremium || vendor.activePlan == 'featured';
+    final priceRange = (vendor.minPrice != null && vendor.minPrice! > 0)
+        ? (vendor.maxPrice != null && vendor.maxPrice! > vendor.minPrice!
+            ? '${_money(vendor.minPrice!)}–${_money(vendor.maxPrice!)} ₪'
+            : '${_money(vendor.minPrice!)} ₪')
+        : null;
+
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
@@ -2258,50 +2450,193 @@ class _SearchResultTile extends StatelessWidget {
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: AppNetworkImage(
-                  url: vendor.logo ?? vendor.cover,
-                  fallbackIcon: Icons.storefront,
+            // Logo with a subtle ring + tier badge.
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: AppColors.primaryLight.withValues(alpha: 0.6),
+                        width: 1.5),
+                  ),
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: AppNetworkImage(
+                        url: vendor.logo ?? vendor.cover,
+                        fit: BoxFit.cover,
+                        fallbackIcon: Icons.storefront,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                if (showBadge)
+                  PositionedDirectional(
+                    bottom: -2,
+                    end: -2,
+                    child: TierBadge(
+                      vip: vendor.isVip,
+                      featured: vendor.isPremium ||
+                          vendor.activePlan == 'featured',
+                      size: 18,
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(vendor.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800, fontSize: 14)),
-                  if (vendor.category != null)
-                    Text(vendor.category!.name,
-                        style: const TextStyle(
-                            color: AppColors.primary, fontSize: 12)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          vendor.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: AppColors.textDark),
+                        ),
+                      ),
+                      if (vendor.isStore) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('متجر',
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (vendor.category != null)
+                        Flexible(
+                          child: Text(
+                            vendor.category!.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      if (vendor.city != null) ...[
+                        const Text('  ·  ',
+                            style: TextStyle(color: AppColors.textMuted)),
+                        const Icon(Icons.location_on,
+                            size: 12, color: AppColors.textMuted),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            vendor.city!.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Stats row.
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _Stat(
+                        icon: Icons.star_rounded,
+                        iconColor: const Color(0xFFFFC107),
+                        text: (vendor.rating ?? 0).toStringAsFixed(1) +
+                            ((vendor.reviewsCount ?? 0) > 0
+                                ? ' (${vendor.reviewsCount})'
+                                : ''),
+                      ),
+                      _Stat(
+                        icon: Icons.groups_rounded,
+                        text: _compact(vendor.followersCount),
+                      ),
+                      if (priceRange != null)
+                        _Stat(
+                          icon: Icons.sell_outlined,
+                          text: priceRange,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            RatingRow(rating: vendor.rating ?? 0),
+            const Padding(
+              padding: EdgeInsets.only(top: 20),
+              child: Icon(Icons.arrow_back_ios_new,
+                  size: 14, color: AppColors.textMuted),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  static String _compact(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.icon, required this.text, this.iconColor});
+  final IconData icon;
+  final String text;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor ?? AppColors.textMuted),
+        const SizedBox(width: 3),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark)),
+      ],
     );
   }
 }

@@ -12,7 +12,10 @@ import '../vendors/vendor_details_page.dart';
 import 'reel_comments_sheet.dart';
 
 class ReelsPage extends StatefulWidget {
-  const ReelsPage({super.key});
+  const ReelsPage({super.key, this.initialPostId});
+
+  /// When set (e.g. opened from a notification), the feed opens on this reel.
+  final int? initialPostId;
 
   @override
   State<ReelsPage> createState() => _ReelsPageState();
@@ -32,11 +35,31 @@ class _ReelsPageState extends State<ReelsPage> {
   Future<List<PostModel>> _load() async {
     final all = await _service.list(type: PostType.reel, perPage: 30);
     // Skip reels with no media at all (broken uploads).
-    return all
+    final list = all
         .where((r) =>
             (r.mediaUrl?.isNotEmpty ?? false) ||
             (r.thumbnail?.isNotEmpty ?? false))
         .toList();
+
+    // Deep link: float the requested reel to the front so the feed opens on it.
+    final target = widget.initialPostId;
+    if (target != null) {
+      final idx = list.indexWhere((r) => r.id == target);
+      if (idx > 0) {
+        final t = list.removeAt(idx);
+        list.insert(0, t);
+      } else if (idx == -1) {
+        // Not in the recent feed — fetch it directly and prepend.
+        try {
+          final p = await _service.show(target);
+          if ((p.mediaUrl?.isNotEmpty ?? false) ||
+              (p.thumbnail?.isNotEmpty ?? false)) {
+            list.insert(0, p);
+          }
+        } catch (_) {}
+      }
+    }
+    return list;
   }
 
   Future<void> _refresh() async {
@@ -286,11 +309,11 @@ class _ReelItemState extends State<_ReelItem> {
                 onComment: () => _openComments(context),
               ),
             ),
-            // Bottom info (vendor + caption)
+            // Bottom info (vendor + caption) — kept above the bottom nav bar.
             Positioned(
               right: 16,
               left: 80,
-              bottom: 28,
+              bottom: 100,
               child: _BottomInfo(
                 vendor: vendor,
                 title: reel.title,

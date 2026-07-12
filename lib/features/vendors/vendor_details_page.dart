@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
@@ -16,14 +18,24 @@ import '../home/home_page.dart';
 import '../services/service_details_page.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../posts/vendor_posts_feed.dart';
 import 'highlight_viewer_page.dart';
+import 'store_section.dart';
 import 'story_viewer_page.dart';
 import 'vendor_map_page.dart';
 
 class VendorDetailsPage extends StatefulWidget {
-  const VendorDetailsPage({super.key, required this.vendorId});
+  const VendorDetailsPage({
+    super.key,
+    required this.vendorId,
+    this.highlightProductId,
+  });
 
   final int vendorId;
+
+  /// When set (opened from a product notification), the store section scrolls
+  /// to this product and highlights it.
+  final int? highlightProductId;
 
   @override
   State<VendorDetailsPage> createState() => _VendorDetailsPageState();
@@ -60,6 +72,22 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _shareProfile(VendorModel vendor) async {
+    final url = 'https://afrahna.co/v/${vendor.id}';
+    final text = 'شاهد "${vendor.name}" على تطبيق أفراحنا:\n$url';
+    try {
+      await Share.share(text, subject: vendor.name);
+    } catch (_) {
+      // Fallback: copy the link so the user can still share it.
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم نسخ رابط المشاركة')),
+        );
+      }
+    }
   }
 
   Future<void> _toggleFavorite(VendorModel vendor) async {
@@ -251,6 +279,18 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             ),
                           ),
                         ),
+                        if (vendor.isStore) ...[
+                          const SizedBox(height: 18),
+                          StoreSection(
+                            vendor: vendor,
+                            highlightProductId: widget.highlightProductId,
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        VendorPostsFeed(
+                          vendorId: vendor.id,
+                          showHeader: true,
+                        ),
                         const SizedBox(height: 18),
                         _Section(
                           icon: Icons.design_services_outlined,
@@ -440,6 +480,11 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                       compact: true,
                       onFollowersChanged: (c) =>
                           setState(() => _followersLive = c),
+                    ),
+                    const SizedBox(width: 8),
+                    _GlassIconButton(
+                      icon: Icons.share_rounded,
+                      onTap: () => _shareProfile(vendor),
                     ),
                     const SizedBox(width: 8),
                     _GlassIconButton(

@@ -8,11 +8,14 @@ import '../../core/theme.dart';
 import '../services/create_service_page.dart';
 import '../vendors/edit_vendor_page.dart';
 import '../vendors/manage_highlights_page.dart';
+import '../vendors/manage_products_page.dart';
+import '../vendors/manage_sections_page.dart';
 import '../vendors/manage_promotions_page.dart';
 import '../vendors/manage_stories_page.dart';
-import '../vendors/vendor_followers_page.dart';
 import '../subscriptions/subscription_plans.dart';
+import 'create_vendor_post_page.dart';
 import 'reel_studio_page.dart';
+import 'vendor_posts_feed.dart';
 
 /// Vendor's content page — tabs: خدماتي / ريلز / دورات.
 /// Pass [vendorId] to view a specific vendor (read-only); omit for current vendor.
@@ -26,12 +29,34 @@ class VendorPostsPage extends StatefulWidget {
   State<VendorPostsPage> createState() => _VendorPostsPageState();
 }
 
+/// Tabs shown on a vendor's content page. "products" appears only for stores.
+enum _VendorTab { products, sections, posts, services, reels }
+
 class _VendorPostsPageState extends State<VendorPostsPage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this)
-    ..addListener(() {
-      if (mounted) setState(() {});
-    });
+    with TickerProviderStateMixin {
+  TabController? _tabs;
+  List<_VendorTab> _tabKinds = const [_VendorTab.services, _VendorTab.reels];
+
+  /// Rebuilds the tab set from the loaded vendor (adds "منتجاتي" for stores).
+  void _rebuildTabs() {
+    final kinds = <_VendorTab>[
+      if (_vendor?.isStore == true) _VendorTab.products,
+      if (_vendor?.isStore == true) _VendorTab.sections,
+      _VendorTab.posts,
+      _VendorTab.services,
+      _VendorTab.reels,
+    ];
+    if (_tabs == null || _tabs!.length != kinds.length) {
+      final oldIndex = _tabs?.index ?? 0;
+      _tabs?.dispose();
+      _tabs = TabController(length: kinds.length, vsync: this)
+        ..addListener(() {
+          if (mounted) setState(() {});
+        });
+      if (oldIndex > 0 && oldIndex < kinds.length) _tabs!.index = oldIndex;
+    }
+    _tabKinds = kinds;
+  }
 
   final _postService = PostService();
   final _serviceService = ServiceService();
@@ -45,6 +70,7 @@ class _VendorPostsPageState extends State<VendorPostsPage>
   @override
   void initState() {
     super.initState();
+    _rebuildTabs();
     _loadVendor();
   }
 
@@ -53,7 +79,12 @@ class _VendorPostsPageState extends State<VendorPostsPage>
       final v = widget.vendorId == null
           ? await _vendorService.mine()
           : await _vendorService.show(widget.vendorId!);
-      if (mounted) setState(() => _vendor = v);
+      if (mounted) {
+        setState(() {
+          _vendor = v;
+          _rebuildTabs();
+        });
+      }
     } on ApiException {
       // Header is optional; ignore load failures and keep the page usable.
     }
@@ -76,29 +107,42 @@ class _VendorPostsPageState extends State<VendorPostsPage>
 
   @override
   void dispose() {
-    _tabs.dispose();
+    _tabs?.dispose();
     super.dispose();
   }
 
   Future<void> _createForCurrentTab() async {
-    final idx = _tabs.index;
-    if (idx == 0) {
-      final ok = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CreateServicePage(vendorId: widget.vendorId),
-        ),
-      );
-      if (ok == true && mounted) setState(() => _reloadKey++);
-    } else {
-      final ok = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ReelStudioPage(vendorId: widget.vendorId),
-        ),
-      );
-      if (ok == true && mounted) setState(() => _reloadKey++);
+    final kind = _tabKinds[_tabs!.index];
+    // Sections has its own in-list add button — no FAB action.
+    if (kind == _VendorTab.sections) return;
+    final vid = widget.vendorId ?? _vendor?.id;
+    // Products/posts need a resolved vendor id.
+    if ((kind == _VendorTab.products || kind == _VendorTab.posts) &&
+        vid == null) {
+      return;
     }
+    Widget page;
+    switch (kind) {
+      case _VendorTab.products:
+        page = EditProductPage(vendorId: vid!);
+        break;
+      case _VendorTab.sections:
+        return; // handled above
+      case _VendorTab.posts:
+        page = CreateVendorPostPage(vendorId: vid!);
+        break;
+      case _VendorTab.services:
+        page = CreateServicePage(vendorId: widget.vendorId);
+        break;
+      case _VendorTab.reels:
+        page = ReelStudioPage(vendorId: widget.vendorId);
+        break;
+    }
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    if (ok == true && mounted) setState(() => _reloadKey++);
   }
 
   Future<void> _notifyFollowers(VendorModel vendor) async {
@@ -164,10 +208,6 @@ class _VendorPostsPageState extends State<VendorPostsPage>
                     Navigator.push(context, MaterialPageRoute(
                         builder: (_) => ManageStoriesPage(vendorId: vid)));
                     break;
-                  case 'followers':
-                    Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => VendorFollowersPage(vendorId: vid)));
-                    break;
                   case 'notify':
                     _notifyFollowers(_vendor!);
                     break;
@@ -211,13 +251,6 @@ class _VendorPostsPageState extends State<VendorPostsPage>
                       contentPadding: EdgeInsets.zero),
                 ),
                 const PopupMenuItem(
-                  value: 'followers',
-                  child: ListTile(
-                      leading: Icon(Icons.group_outlined),
-                      title: Text('المتابعون'),
-                      contentPadding: EdgeInsets.zero),
-                ),
-                const PopupMenuItem(
                   value: 'notify',
                   child: ListTile(
                       leading: Icon(Icons.campaign_outlined),
@@ -236,47 +269,119 @@ class _VendorPostsPageState extends State<VendorPostsPage>
             ),
         ],
       ),
-      floatingActionButton: widget.canCreate
+      floatingActionButton: (widget.canCreate &&
+              _tabs != null &&
+              _tabKinds[_tabs!.index] != _VendorTab.sections)
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.add),
-              label: Text(_tabs.index == 0 ? 'إضافة خدمة' : 'إضافة ريلز'),
+              label: Text(_fabLabel(_tabKinds[_tabs!.index])),
               onPressed: _createForCurrentTab,
             )
           : null,
       body: Column(
         children: [
           if (_vendor != null) _VendorHeader(vendor: _vendor!),
-          TabBar(
-            controller: _tabs,
-            labelColor: AppColors.primary,
-            indicatorColor: AppColors.primary,
-            tabs: const [
-              Tab(text: 'خدماتي'),
-              Tab(text: 'ريلز'),
-            ],
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabs,
+              isScrollable: _tabKinds.length > 3,
+              tabAlignment:
+                  _tabKinds.length > 3 ? TabAlignment.start : TabAlignment.fill,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textMuted,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              dividerColor: const Color(0x11000000),
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              unselectedLabelStyle:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              labelPadding:
+                  const EdgeInsetsDirectional.symmetric(horizontal: 16),
+              tabs: [for (final k in _tabKinds) Tab(text: _tabLabel(k))],
+            ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [
-                _ServicesList(
-                  key: ValueKey('svc-$_reloadKey'),
-                  loader: _loadServices,
-                  vendorId: widget.vendorId,
-                  canManage: widget.canCreate,
-                  onChanged: () => setState(() => _reloadKey++),
-                ),
-                _PostList(
-                  key: ValueKey('reel-$_reloadKey'),
-                  loader: () => _loadPosts(PostType.reel),
-                  type: PostType.reel,
-                ),
-              ],
+            child: Container(
+              color: AppColors.background,
+              child: TabBarView(
+                controller: _tabs,
+                children: [for (final k in _tabKinds) _tabBody(k)],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _tabLabel(_VendorTab k) => switch (k) {
+        _VendorTab.products => 'منتجاتي',
+        _VendorTab.sections => 'الأقسام',
+        _VendorTab.posts => 'منشورات',
+        _VendorTab.services => 'خدماتي',
+        _VendorTab.reels => 'ريلز',
+      };
+
+  String _fabLabel(_VendorTab k) => switch (k) {
+        _VendorTab.products => 'إضافة منتج',
+        _VendorTab.sections => 'إضافة قسم',
+        _VendorTab.posts => 'منشور جديد',
+        _VendorTab.services => 'إضافة خدمة',
+        _VendorTab.reels => 'إضافة ريلز',
+      };
+
+  Widget _tabBody(_VendorTab k) {
+    // Resolve the vendor id: explicit (viewing another vendor) or the loaded
+    // "mine" vendor. Null while the vendor is still loading.
+    final vid = widget.vendorId ?? _vendor?.id;
+    switch (k) {
+      case _VendorTab.products:
+        if (vid == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return StoreProductsList(
+          key: ValueKey('prod-$_reloadKey'),
+          vendorId: vid,
+          canManage: widget.canCreate,
+          refreshSignal: _reloadKey,
+        );
+      case _VendorTab.sections:
+        if (vid == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return SectionsManagerList(
+          key: ValueKey('sections-$_reloadKey'),
+          vendorId: vid,
+          refreshSignal: _reloadKey,
+        );
+      case _VendorTab.posts:
+        if (vid == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return VendorPostsFeed(
+          key: ValueKey('posts-$_reloadKey'),
+          vendorId: vid,
+          canManage: widget.canCreate,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+        );
+      case _VendorTab.services:
+        return _ServicesList(
+          key: ValueKey('svc-$_reloadKey'),
+          loader: _loadServices,
+          vendorId: widget.vendorId,
+          canManage: widget.canCreate,
+          onChanged: () => setState(() => _reloadKey++),
+        );
+      case _VendorTab.reels:
+        return _PostList(
+          key: ValueKey('reel-$_reloadKey'),
+          loader: () => _loadPosts(PostType.reel),
+          type: PostType.reel,
+        );
+    }
   }
 }
 
@@ -292,33 +397,45 @@ class _VendorHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = vendor.cover;
     final logo = vendor.logo;
+    final subscribed = vendor.isVip || vendor.isPremium;
+
     return SizedBox(
-      height: 140,
+      height: 172,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Cover image (or a solid brand-colored fallback).
+          // Cover image (or a warm brand gradient fallback).
           if (cover != null && cover.isNotEmpty)
             Image.network(
               cover,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  Container(color: AppColors.primaryLight),
+              errorBuilder: (_, _, _) => const DecoratedBox(
+                decoration:
+                    BoxDecoration(gradient: AppColors.brandDeepGradient),
+              ),
             )
           else
-            Container(color: AppColors.primaryLight),
-          // Dark gradient so the name stays readable over any image.
-          const DecoratedBox(
+            const DecoratedBox(
+              decoration:
+                  BoxDecoration(gradient: AppColors.brandDeepGradient),
+            ),
+          // Brand-tinted darkening so text pops on any image.
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black54],
+                colors: [
+                  Colors.black.withValues(alpha: 0.12),
+                  const Color(0xFF3A2415).withValues(alpha: 0.30),
+                  const Color(0xFF2A1B10).withValues(alpha: 0.82),
+                ],
+                stops: const [0, 0.45, 1],
               ),
             ),
           ),
-          // Current subscription badge (top-end).
+          // Subscription pill (gold when subscribed, glass when not).
           PositionedDirectional(
             top: 12,
             end: 12,
@@ -326,22 +443,39 @@ class _VendorHeader extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.45),
+                gradient: subscribed
+                    ? const LinearGradient(
+                        colors: [Color(0xFFF4C64B), Color(0xFFC8901E)])
+                    : null,
+                color: subscribed ? null : Colors.black.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: AppColors.primaryLight.withValues(alpha: 0.7)),
+                    color: Colors.white.withValues(alpha: 0.35)),
+                boxShadow: subscribed
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFC8901E)
+                              .withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.workspace_premium,
-                      color: Color(0xFFF3C969), size: 16),
+                  Icon(Icons.workspace_premium,
+                      color: subscribed
+                          ? Colors.white
+                          : const Color(0xFFF3C969),
+                      size: 16),
                   const SizedBox(width: 5),
                   Text(
-                    'اشتراكك: ${vendor.subscriptionLabel}',
+                    vendor.subscriptionLabel,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       fontSize: 12,
                     ),
                   ),
@@ -349,35 +483,89 @@ class _VendorHeader extends StatelessWidget {
               ),
             ),
           ),
+          // Logo + name + meta.
           Positioned(
             left: 16,
             right: 16,
-            bottom: 12,
+            bottom: 14,
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.surface,
-                  backgroundImage: (logo != null && logo.isNotEmpty)
-                      ? NetworkImage(logo)
-                      : null,
-                  child: (logo == null || logo.isEmpty)
-                      ? const Icon(Icons.storefront_outlined,
-                          color: AppColors.primary)
-                      : null,
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.primaryLight,
+                    backgroundImage: (logo != null && logo.isNotEmpty)
+                        ? NetworkImage(logo)
+                        : null,
+                    child: (logo == null || logo.isEmpty)
+                        ? const Icon(Icons.storefront_rounded,
+                            color: Colors.white)
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    vendor.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        vendor.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          shadows: [
+                            Shadow(blurRadius: 6, color: Colors.black54)
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(Icons.groups_rounded,
+                              color: Colors.white70, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${vendor.followersCount} متابع',
+                            style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          if (vendor.isStore) ...[
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text('🛍️ متجر',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800)),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],

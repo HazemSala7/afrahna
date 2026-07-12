@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'core/services/local_favorites.dart';
+import 'core/services/notification_router.dart';
 import 'core/services/push_notifications.dart';
 import 'core/state/session.dart';
 import 'core/theme.dart';
@@ -15,6 +18,8 @@ Future<void> main() async {
   await LocalFavorites.instance.load();
   await PushNotificationService.instance.init();
   runApp(const AfrahnaApp());
+  // Start listening for share/deep links after the app is running.
+  unawaited(initDeepLinks());
 }
 
 class AfrahnaApp extends StatelessWidget {
@@ -31,6 +36,7 @@ class AfrahnaApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'افراحنا',
+        navigatorKey: rootNavigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         locale: const Locale('ar'),

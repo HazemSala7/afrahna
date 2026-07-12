@@ -44,15 +44,22 @@ class _ReelCommentsSheetState extends State<ReelCommentsSheet> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await _service.create(widget.postId, text);
+      final c = await _service.create(widget.postId, text);
       if (!mounted) return;
       _input.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.primary,
-          content: Text('تم استلام تعليقك وسيظهر بعد موافقة الإدارة'),
-        ),
-      );
+      FocusScope.of(context).unfocus();
+      if (c.isApproved) {
+        // Regular posts: comment is live immediately — reload to show it.
+        setState(() => _future = _load());
+      } else {
+        // Reels/courses: still moderated.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.primary,
+            content: Text('تم استلام تعليقك وسيظهر بعد موافقة الإدارة'),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

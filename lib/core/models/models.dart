@@ -1,6 +1,8 @@
 // All data models for the Afrahna app.
 // Bilingual fields (ar/en) map to the corresponding columns in the Laravel API.
 
+import 'dart:convert';
+
 T? _readT<T>(Map<String, dynamic> json, String key) =>
     json[key] is T ? json[key] as T : null;
 
@@ -21,6 +23,24 @@ double? _toDouble(dynamic v) {
 DateTime? _toDate(dynamic v) {
   if (v == null) return null;
   return DateTime.tryParse(v.toString());
+}
+
+/// Parses a list of strings from a JSON array (or a JSON-encoded string).
+List<String> _toStringList(dynamic v) {
+  if (v == null) return const [];
+  if (v is List) {
+    return v
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+  if (v is String && v.trim().startsWith('[')) {
+    try {
+      final decoded = jsonDecode(v);
+      if (decoded is List) return _toStringList(decoded);
+    } catch (_) {}
+  }
+  return const [];
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +283,7 @@ class VendorModel {
     this.inSlider = false,
     this.isPremium = false,
     this.isActive = true,
+    this.isStore = false,
     this.delegateName,
     this.ownerId,
     this.ownerName,
@@ -319,6 +340,9 @@ class VendorModel {
 
   /// Whether the shop is active/visible. Admins can toggle this.
   final bool isActive;
+
+  /// Whether this vendor is a store (products + cart + orders enabled).
+  final bool isStore;
 
   /// Name of the delegate responsible for this shop's owner account.
   /// Only populated for admin requests (`/vendors` eager-loads it).
@@ -408,6 +432,7 @@ class VendorModel {
         isActive: json['is_active'] == null
             ? true
             : (json['is_active'] == true || json['is_active'] == 1),
+        isStore: json['is_store'] == true || json['is_store'] == 1,
         delegateName: json['user'] is Map &&
                 (json['user'] as Map)['delegate'] is Map
             ? _readT<String>(
@@ -596,6 +621,7 @@ class PromotionModel {
     this.descriptionAr,
     this.descriptionEn,
     this.image,
+    this.images = const [],
     this.discountPercent,
     this.discountType,
     this.discountValue,
@@ -614,6 +640,8 @@ class PromotionModel {
   final String? descriptionAr;
   final String? descriptionEn;
   final String? image;
+  /// Gallery of full-quality images (cover first). Falls back to [image].
+  final List<String> images;
   final double? discountPercent;
   // Server-aligned discount fields: type = 'percent' | 'fixed'.
   final String? discountType;
@@ -630,6 +658,13 @@ class PromotionModel {
   String get description =>
       (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
 
+  /// All displayable images: the gallery if present, otherwise the cover.
+  List<String> get gallery {
+    if (images.isNotEmpty) return images;
+    final c = image;
+    return (c != null && c.isNotEmpty) ? [c] : const [];
+  }
+
   /// Human label for the discount, e.g. "25%" or "50 ₪".
   String get discountLabel {
     final v = discountValue ?? discountPercent;
@@ -645,6 +680,7 @@ class PromotionModel {
         descriptionAr: _readT<String>(json, 'description_ar'),
         descriptionEn: _readT<String>(json, 'description_en'),
         image: _readT<String>(json, 'image'),
+        images: _toStringList(json['images']),
         discountPercent: _toDouble(json['discount_percent']),
         discountType: _readT<String>(json, 'discount_type'),
         discountValue: _toDouble(json['discount_value']),
@@ -1097,6 +1133,7 @@ class PostModel {
     this.body,
     this.mediaUrl,
     this.thumbnail,
+    this.images = const [],
     this.price,
     this.duration,
     this.likesCount = 0,
@@ -1116,6 +1153,14 @@ class PostModel {
   final String? body;
   final String? mediaUrl;
   final String? thumbnail;
+  final List<String> images;
+
+  /// All displayable images for a post: the gallery if present, else the media.
+  List<String> get gallery {
+    if (images.isNotEmpty) return images;
+    final m = mediaUrl;
+    return (m != null && m.isNotEmpty) ? [m] : const [];
+  }
   final double? price;
   final String? duration;
   final int likesCount;
@@ -1135,6 +1180,7 @@ class PostModel {
         body: _readT<String>(json, 'body'),
         mediaUrl: _readT<String>(json, 'media_url'),
         thumbnail: _readT<String>(json, 'thumbnail'),
+        images: _toStringList(json['images']),
         price: _toDouble(json['price']),
         duration: _readT<String>(json, 'duration'),
         likesCount: _toInt(json['likes_count']) ?? 0,
@@ -1219,5 +1265,181 @@ class CommissionsTotals {
         paidCommission: _toDouble(json['paid_commission']) ?? 0,
         unpaidCommission: _toDouble(json['unpaid_commission']) ?? 0,
         count: _toInt(json['count']) ?? 0,
+      );
+}
+
+// ---------------------------------------------------------------------------
+// STORE PRODUCT
+// ---------------------------------------------------------------------------
+
+class ProductModel {
+  ProductModel({
+    required this.id,
+    required this.vendorId,
+    this.sectionId,
+    required this.nameAr,
+    required this.nameEn,
+    this.descriptionAr,
+    this.descriptionEn,
+    this.image,
+    this.images = const [],
+    required this.price,
+    this.discountPrice,
+    this.isAvailable = true,
+    this.sort = 0,
+  });
+
+  final int id;
+  final int vendorId;
+  final int? sectionId;
+  final String nameAr;
+  final String nameEn;
+  final String? descriptionAr;
+  final String? descriptionEn;
+  final String? image;
+  final List<String> images;
+  final double price;
+  final double? discountPrice;
+  final bool isAvailable;
+  final int sort;
+
+  String get name => nameAr.isNotEmpty ? nameAr : nameEn;
+  String get description =>
+      (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+
+  /// The price a customer actually pays (discount when present).
+  double get effectivePrice =>
+      (discountPrice != null && discountPrice! > 0) ? discountPrice! : price;
+
+  bool get hasDiscount => discountPrice != null && discountPrice! > 0 && discountPrice! < price;
+
+  /// All displayable images: gallery if present, otherwise the cover.
+  List<String> get gallery {
+    if (images.isNotEmpty) return images;
+    final c = image;
+    return (c != null && c.isNotEmpty) ? [c] : const [];
+  }
+
+  factory ProductModel.fromJson(Map<String, dynamic> json) => ProductModel(
+        id: _toInt(json['id']) ?? 0,
+        vendorId: _toInt(json['vendor_id']) ?? 0,
+        sectionId: _toInt(json['section_id']),
+        nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
+        nameEn: (json['name_en'] ?? '').toString(),
+        descriptionAr: _readT<String>(json, 'description_ar'),
+        descriptionEn: _readT<String>(json, 'description_en'),
+        image: _readT<String>(json, 'image'),
+        images: _toStringList(json['images']),
+        price: _toDouble(json['price']) ?? 0,
+        discountPrice: _toDouble(json['discount_price']),
+        isAvailable: json['is_available'] == null
+            ? true
+            : (json['is_available'] == true || json['is_available'] == 1),
+        sort: _toInt(json['sort']) ?? 0,
+      );
+}
+
+// ---------------------------------------------------------------------------
+// STORE PRODUCT SECTION (internal category inside a vendor)
+// ---------------------------------------------------------------------------
+
+class ProductSectionModel {
+  ProductSectionModel({
+    required this.id,
+    required this.vendorId,
+    required this.nameAr,
+    this.nameEn,
+    this.sort = 0,
+    this.productsCount = 0,
+  });
+
+  final int id;
+  final int vendorId;
+  final String nameAr;
+  final String? nameEn;
+  final int sort;
+  final int productsCount;
+
+  String get name => nameAr.isNotEmpty ? nameAr : (nameEn ?? '');
+
+  factory ProductSectionModel.fromJson(Map<String, dynamic> json) =>
+      ProductSectionModel(
+        id: _toInt(json['id']) ?? 0,
+        vendorId: _toInt(json['vendor_id']) ?? 0,
+        nameAr: (json['name_ar'] ?? '').toString(),
+        nameEn: _readT<String>(json, 'name_en'),
+        sort: _toInt(json['sort']) ?? 0,
+        productsCount: _toInt(json['products_count']) ?? 0,
+      );
+}
+
+// ---------------------------------------------------------------------------
+// STORE ORDER (invoice)
+// ---------------------------------------------------------------------------
+
+class OrderItemModel {
+  OrderItemModel({
+    required this.productId,
+    required this.name,
+    this.image,
+    required this.price,
+    required this.quantity,
+  });
+
+  final int productId;
+  final String name;
+  final String? image;
+  final double price;
+  final int quantity;
+
+  double get subtotal => price * quantity;
+
+  factory OrderItemModel.fromJson(Map<String, dynamic> json) => OrderItemModel(
+        productId: _toInt(json['product_id']) ?? 0,
+        name: (json['name'] ?? '').toString(),
+        image: _readT<String>(json, 'image'),
+        price: _toDouble(json['price']) ?? 0,
+        quantity: _toInt(json['quantity']) ?? 1,
+      );
+}
+
+class OrderModel {
+  OrderModel({
+    required this.id,
+    required this.vendorId,
+    this.customerName,
+    this.customerPhone,
+    this.note,
+    this.items = const [],
+    required this.total,
+    this.status = 'pending',
+    this.createdAt,
+  });
+
+  final int id;
+  final int vendorId;
+  final String? customerName;
+  final String? customerPhone;
+  final String? note;
+  final List<OrderItemModel> items;
+  final double total;
+  final String status;
+  final DateTime? createdAt;
+
+  factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
+        id: _toInt(json['id']) ?? 0,
+        vendorId: _toInt(json['vendor_id']) ?? 0,
+        customerName: _readT<String>(json, 'customer_name'),
+        customerPhone: _readT<String>(json, 'customer_phone'),
+        note: _readT<String>(json, 'note'),
+        items: json['items'] is List
+            ? (json['items'] as List)
+                .whereType<Map>()
+                .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : const [],
+        total: _toDouble(json['total']) ?? 0,
+        status: (json['status'] ?? 'pending').toString(),
+        createdAt: _toDate(json['created_at']),
       );
 }

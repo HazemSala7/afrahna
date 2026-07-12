@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../api/api_client.dart';
+import 'notification_router.dart';
 
 /// Background / terminated-state message handler.
 ///
@@ -118,6 +119,10 @@ class PushNotificationService {
         android: androidInit,
         iOS: iosInit,
       ),
+      // Tapping a foreground/local notification deep-links via the payload.
+      onDidReceiveNotificationResponse: (response) {
+        NotificationRouter.handle(response.payload);
+      },
     );
 
     // Create the Android channel referenced by the manifest meta-data.
@@ -154,15 +159,19 @@ class PushNotificationService {
           presentSound: true,
         ),
       ),
-      payload: message.data.isEmpty ? null : message.data.toString(),
+      // Carry only the deep-link so a tap can route to the right screen.
+      payload: message.data['link']?.toString(),
     );
   }
 
   void _handleOpened(RemoteMessage message) {
-    // Hook for deep-linking based on message.data; navigation handled elsewhere.
     if (kDebugMode) {
       debugPrint('Notification opened: ${message.data}');
     }
+    NotificationRouter.handle(
+      message.data['link']?.toString(),
+      type: message.data['type']?.toString(),
+    );
   }
 
   /// Retrieves the FCM token and registers it with the backend. Call after a

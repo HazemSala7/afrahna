@@ -351,7 +351,7 @@ class _SignedInView extends StatelessWidget {
         if (user.isVendor)
           _MenuTile(
             icon: Icons.dynamic_feed,
-            label: 'محتواي (منشورات وريلز ودورات)',
+            label: 'محتواي (منشورات وريلز)',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const VendorPostsPage()),

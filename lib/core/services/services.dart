@@ -185,7 +185,7 @@ class CityService {
 
   Future<List<CityModel>> list() async {
     try {
-      final res = await _dio.get('/cities');
+      final res = await _dio.get('/cities', queryParameters: {'per_page': 100});
       return _unwrapList(res.data).map(CityModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1001,6 +1001,226 @@ class NotificationService {
   Future<void> markAllRead() async {
     try {
       await _dio.post('/notifications/read-all');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// STORE PRODUCTS
+// ---------------------------------------------------------------------------
+
+class ProductService {
+  final _dio = ApiClient.instance.dio;
+
+  Future<List<ProductModel>> list({
+    int? vendorId,
+    int? sectionId,
+    bool mine = false,
+    bool availableOnly = false,
+  }) async {
+    try {
+      final res = await _dio.get('/products', queryParameters: {
+        'vendor_id': ?vendorId,
+        'section_id': ?sectionId,
+        if (mine) 'mine': 1,
+        if (availableOnly) 'available_only': 1,
+        'per_page': 200,
+      });
+      return _unwrapList(res.data).map(ProductModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ProductModel> show(int id) async {
+    try {
+      final res = await _dio.get('/products/$id');
+      return ProductModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ProductModel> create({
+    required int vendorId,
+    required String nameAr,
+    String? nameEn,
+    required double price,
+    double? discountPrice,
+    String? descriptionAr,
+    String? image,
+    List<String>? images,
+    int? sectionId,
+    bool isAvailable = true,
+  }) async {
+    try {
+      final res = await _dio.post('/products', data: {
+        'vendor_id': vendorId,
+        'name_ar': nameAr,
+        'name_en': ?nameEn,
+        'price': price,
+        'discount_price': ?discountPrice,
+        'description_ar': ?descriptionAr,
+        'image': ?image,
+        'images': ?images,
+        'section_id': sectionId,
+        'is_available': isAvailable,
+      });
+      return ProductModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ProductModel> update(int id, {
+    String? nameAr,
+    String? nameEn,
+    double? price,
+    double? discountPrice,
+    String? descriptionAr,
+    String? image,
+    List<String>? images,
+    int? sectionId,
+    bool clearSection = false,
+    bool? isAvailable,
+  }) async {
+    try {
+      final res = await _dio.put('/products/$id', data: {
+        'name_ar': ?nameAr,
+        'name_en': ?nameEn,
+        'price': ?price,
+        'discount_price': ?discountPrice,
+        'description_ar': ?descriptionAr,
+        'image': ?image,
+        'images': ?images,
+        if (clearSection) 'section_id': null else 'section_id': ?sectionId,
+        'is_available': ?isAvailable,
+      });
+      return ProductModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/products/$id');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// STORE PRODUCT SECTIONS
+// ---------------------------------------------------------------------------
+
+class ProductSectionService {
+  final _dio = ApiClient.instance.dio;
+
+  Future<List<ProductSectionModel>> list({int? vendorId, bool mine = false}) async {
+    try {
+      final res = await _dio.get('/product-sections', queryParameters: {
+        'vendor_id': ?vendorId,
+        if (mine) 'mine': 1,
+        'per_page': 200,
+      });
+      return _unwrapList(res.data).map(ProductSectionModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ProductSectionModel> create({
+    required int vendorId,
+    required String nameAr,
+    int? sort,
+  }) async {
+    try {
+      final res = await _dio.post('/product-sections', data: {
+        'vendor_id': vendorId,
+        'name_ar': nameAr,
+        'sort': ?sort,
+      });
+      return ProductSectionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<ProductSectionModel> update(int id, {String? nameAr, int? sort}) async {
+    try {
+      final res = await _dio.put('/product-sections/$id', data: {
+        'name_ar': ?nameAr,
+        'sort': ?sort,
+      });
+      return ProductSectionModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await _dio.delete('/product-sections/$id');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// STORE ORDERS
+// ---------------------------------------------------------------------------
+
+class OrderService {
+  final _dio = ApiClient.instance.dio;
+
+  Future<List<OrderModel>> list({int? vendorId, String? status}) async {
+    try {
+      final res = await _dio.get('/orders', queryParameters: {
+        'vendor_id': ?vendorId,
+        'status': ?status,
+        'per_page': 50,
+      });
+      return _unwrapList(res.data).map(OrderModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Places an order (invoice) for [vendorId] with a map of productId → quantity.
+  Future<OrderModel> create({
+    required int vendorId,
+    required Map<int, int> quantities,
+    String? customerName,
+    String? customerPhone,
+    String? note,
+  }) async {
+    try {
+      final items = quantities.entries
+          .where((e) => e.value > 0)
+          .map((e) => {'product_id': e.key, 'quantity': e.value})
+          .toList();
+      final res = await _dio.post('/orders', data: {
+        'vendor_id': vendorId,
+        'items': items,
+        'customer_name': ?customerName,
+        'customer_phone': ?customerPhone,
+        'note': ?note,
+      });
+      return OrderModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<OrderModel> updateStatus(int id, String status) async {
+    try {
+      final res = await _dio.put('/orders/$id', data: {'status': status});
+      return OrderModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }

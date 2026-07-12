@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/notification_router.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
@@ -44,6 +45,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       } catch (_) {}
     }
     if (mounted) await _refresh();
+    // Deep-link to the related content (shop, reel, ...).
+    NotificationRouter.handle(n.link, type: n.type);
   }
 
   @override

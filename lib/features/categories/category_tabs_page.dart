@@ -22,6 +22,10 @@ class CategoryTabsPage extends StatefulWidget {
 
 class _CategoryTabsPageState extends State<CategoryTabsPage> {
   late Future<List<CategoryModel>> _futureChildren;
+  late Future<List<CityModel>> _futureCities;
+
+  /// City filter applied to every tab (null = all cities).
+  int? _selectedCityId;
 
   @override
   void initState() {
@@ -30,6 +34,58 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
     _futureChildren = widget.parent.children.isNotEmpty
         ? Future.value(widget.parent.children)
         : CategoryService().children(widget.parent.id);
+    _futureCities = CityService().list();
+  }
+
+  Widget _cityFilter() {
+    return FutureBuilder<List<CityModel>>(
+      future: _futureCities,
+      builder: (context, snap) {
+        final cities = snap.data ?? const <CityModel>[];
+        if (cities.isEmpty) return const SizedBox.shrink();
+        return SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              _cityChip(null, 'كل المدن'),
+              ...cities.map((c) => _cityChip(c.id, c.name)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _cityChip(int? id, String label) {
+    final selected = _selectedCityId == id;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        avatar: Icon(
+          Icons.location_on,
+          size: 16,
+          color: selected ? Colors.white : AppColors.primary,
+        ),
+        onSelected: (_) => setState(() => _selectedCityId = id),
+        selectedColor: AppColors.primary,
+        backgroundColor: Colors.white,
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : AppColors.textDark,
+          fontWeight: FontWeight.w700,
+          fontSize: 12.5,
+        ),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? AppColors.primary : AppColors.primaryLight,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -54,7 +110,19 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
 
           // If no subcategories at all, just show vendors of the parent.
           if (subs.isEmpty) {
-            return _VendorsList(categoryId: widget.parent.id);
+            return Column(
+              children: [
+                const SizedBox(height: 4),
+                _cityFilter(),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: _VendorsList(
+                    categoryId: widget.parent.id,
+                    cityId: _selectedCityId,
+                  ),
+                ),
+              ],
+            );
           }
 
           final tabs = <CategoryModel>[
@@ -71,6 +139,9 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
             length: tabs.length,
             child: Column(
               children: [
+                const SizedBox(height: 4),
+                _cityFilter(),
+                const SizedBox(height: 4),
                 Container(
                   margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
                   decoration: BoxDecoration(
@@ -113,8 +184,14 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
                     children: [
                       // First tab uses parent_category_id so vendors of the
                       // parent itself AND every child show up together.
-                      _VendorsList(parentCategoryId: widget.parent.id),
-                      ...subs.map((c) => _VendorsList(categoryId: c.id)),
+                      _VendorsList(
+                        parentCategoryId: widget.parent.id,
+                        cityId: _selectedCityId,
+                      ),
+                      ...subs.map((c) => _VendorsList(
+                            categoryId: c.id,
+                            cityId: _selectedCityId,
+                          )),
                     ],
                   ),
                 ),
@@ -128,10 +205,11 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
 }
 
 class _VendorsList extends StatefulWidget {
-  const _VendorsList({this.categoryId, this.parentCategoryId});
+  const _VendorsList({this.categoryId, this.parentCategoryId, this.cityId});
 
   final int? categoryId;
   final int? parentCategoryId;
+  final int? cityId;
 
   @override
   State<_VendorsList> createState() => _VendorsListState();
@@ -150,10 +228,17 @@ class _VendorsListState extends State<_VendorsList>
     _load();
   }
 
+  @override
+  void didUpdateWidget(_VendorsList old) {
+    super.didUpdateWidget(old);
+    if (old.cityId != widget.cityId) setState(_load);
+  }
+
   void _load() {
     _future = VendorService().list(
       categoryId: widget.categoryId,
       parentCategoryId: widget.parentCategoryId,
+      cityId: widget.cityId,
     );
   }
 
