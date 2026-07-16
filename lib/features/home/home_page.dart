@@ -2009,6 +2009,12 @@ class _AdvertiseCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scale the text relative to the screen width so it reads correctly on
+    // every device — small phones (iPhone SE) through tablets — instead of the
+    // fixed sizes that only looked right on one screen. 375 = baseline width.
+    final width = MediaQuery.of(context).size.width;
+    final scale = (width / 375).clamp(0.9, 1.25);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2044,27 +2050,29 @@ class _AdvertiseCta extends StatelessWidget {
                     color: Colors.white, size: 26),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'عندك محل أو خدمة؟ 📣',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
-                        fontSize: 14.5,
+                        fontSize: 14.5 * scale,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       'أعلن في أفراحنا ووصّل لآلاف العرسان',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white70,
-                        fontSize: 11.5,
+                        fontSize: 11.5 * scale,
                         fontWeight: FontWeight.w600,
                         height: 1.3,
                       ),
@@ -2087,9 +2095,12 @@ class _AdvertiseCta extends StatelessWidget {
                 ),
                 onPressed: _contact,
                 icon: const Icon(Icons.chat_rounded, size: 18),
-                label: const Text(
+                label: Text(
                   'تواصل معنا',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5 * scale),
                 ),
               ),
             ],

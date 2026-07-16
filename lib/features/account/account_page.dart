@@ -61,7 +61,9 @@ class _GuestView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+      // Bottom padding clears the shell's floating bottom nav bar so the
+      // login button at the end stays reachable above it.
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 110),
       children: [
         // Hero header
         Container(
@@ -256,7 +258,9 @@ class _SignedInView extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = session.user!;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      // Bottom padding clears the shell's floating bottom nav bar (the outer
+      // Scaffold uses extendBody: true), so the last items can scroll into view.
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
       children: [
         Container(
           padding: const EdgeInsets.all(18),
