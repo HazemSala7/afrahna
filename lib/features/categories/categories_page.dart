@@ -26,7 +26,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
   }
 
   void _refresh() {
-    setState(() => _future = CategoryService().list(tree: true));
+    setState(() {
+      _future = CategoryService().list(tree: true);
+    });
   }
 
   IconData _iconFor(String name) {

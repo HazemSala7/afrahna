@@ -28,7 +28,9 @@ class _MyCommissionsPageState extends State<MyCommissionsPage> {
         title: const Text('عمولاتي'),
         actions: [
           IconButton(
-            onPressed: () => setState(() => _future = _service.myCommissions()),
+            onPressed: () => setState(() {
+              _future = _service.myCommissions();
+            }),
             icon: const Icon(Icons.refresh),
           ),
         ],

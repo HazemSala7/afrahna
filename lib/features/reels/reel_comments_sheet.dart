@@ -50,7 +50,9 @@ class _ReelCommentsSheetState extends State<ReelCommentsSheet> {
       FocusScope.of(context).unfocus();
       if (c.isApproved) {
         // Regular posts: comment is live immediately — reload to show it.
-        setState(() => _future = _load());
+        setState(() {
+          _future = _load();
+        });
       } else {
         // Reels/courses: still moderated.
         ScaffoldMessenger.of(context).showSnackBar(

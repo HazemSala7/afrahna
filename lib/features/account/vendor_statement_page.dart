@@ -25,7 +25,9 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _service.list(perPage: 100));
+    setState(() {
+      _future = _service.list(perPage: 100);
+    });
     await _future;
   }
 

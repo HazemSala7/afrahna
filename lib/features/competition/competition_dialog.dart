@@ -905,6 +905,12 @@ class _MyPredictionDialog extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ---- Sponsor (same card as the vote dialog: tap the cover
+                  // or the logo/name to open the sponsor's full profile) ----
+                  if (c.sponsor != null) ...[
+                    _SponsorCard(vendor: c.sponsor!),
+                    const SizedBox(height: 14),
+                  ],
                   // ---- Their prediction ----
                   _ScoreCard(
                     label: 'توقّعك',

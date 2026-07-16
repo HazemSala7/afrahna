@@ -44,7 +44,11 @@ class VendorPostsFeedState extends State<VendorPostsFeed> {
 
   /// Public: reload from outside (e.g. after creating a post).
   void reload() {
-    if (mounted) setState(() => _future = _load());
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
   }
 
   Future<void> _delete(PostModel p) async {

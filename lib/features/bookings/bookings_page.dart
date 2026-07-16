@@ -81,7 +81,9 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ok != true) return;
     try {
       await BookingService().cancel(b.id);
-      setState(() => _future = BookingService().list());
+      setState(() {
+        _future = BookingService().list();
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -133,8 +135,9 @@ class _BookingsPageState extends State<BookingsPage> {
           if (snap.hasError) {
             return ErrorState(
               message: snap.error.toString(),
-              onRetry: () =>
-                  setState(() => _future = BookingService().list()),
+              onRetry: () => setState(() {
+                _future = BookingService().list();
+              }),
             );
           }
           final items = snap.data ?? const [];
@@ -147,7 +150,9 @@ class _BookingsPageState extends State<BookingsPage> {
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: () async {
-              setState(() => _future = BookingService().list());
+              setState(() {
+                _future = BookingService().list();
+              });
               await _future;
             },
             child: ListView.separated(

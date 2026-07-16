@@ -640,8 +640,8 @@ class _StatsBand extends StatelessWidget {
           // Users is the only tile shown abbreviated (e.g. 21.2K).
           (icon: Icons.groups_rounded, value: s.users, label: 'مستخدم',
               color: Color(0xFF7FC6C0), onTap: null, pulse: false, compact: true),
-          // "عرض خاص" is highlighted + animated + tappable → opens all offers.
-          (icon: Icons.local_fire_department_rounded, value: s.offers, label: 'عرض خاص',
+          // "عروض" is highlighted + animated + tappable → opens all offers.
+          (icon: Icons.local_fire_department_rounded, value: s.offers, label: 'عروض',
               color: Color(0xFFF6A93B),
               onTap: () => Navigator.push(
                   context, MaterialPageRoute(builder: (_) => const OffersPage())),
@@ -2304,7 +2304,9 @@ class _SearchTabState extends State<_SearchTab> {
       setState(() => _future = null);
       return;
     }
-    setState(() => _future = VendorService().list(query: query));
+    setState(() {
+      _future = VendorService().list(query: query);
+    });
   }
 
   /// Live search as the user types (debounced), keeping the keyboard open.

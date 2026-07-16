@@ -29,7 +29,9 @@ class _MyClientsPageState extends State<MyClientsPage> {
   }
 
   void _refresh() {
-    setState(() => _future = _service.myClients(search: _search));
+    setState(() {
+      _future = _service.myClients(search: _search);
+    });
   }
 
   /// Open the client's shop (vendor) for full editing. Requires the delegate

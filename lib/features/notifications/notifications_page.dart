@@ -27,7 +27,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _service.list());
+    // NOTE: a block body is required. `setState(() => _future = ...)` returns
+    // the assigned Future from the closure, which Flutter rejects.
+    setState(() {
+      _future = _service.list();
+    });
     await _future;
   }
 

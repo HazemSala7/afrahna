@@ -51,7 +51,9 @@ class _SectionsManagerListState extends State<SectionsManagerList> {
   }
 
   void _reload() {
-    setState(() => _future = _service.list(vendorId: widget.vendorId));
+    setState(() {
+      _future = _service.list(vendorId: widget.vendorId);
+    });
   }
 
   Future<void> _edit([ProductSectionModel? section]) async {
