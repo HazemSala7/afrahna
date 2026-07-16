@@ -24,50 +24,85 @@ class ReelsPage extends StatefulWidget {
 class _ReelsPageState extends State<ReelsPage> {
   final _service = PostService();
   final _controller = PageController();
-  Future<List<PostModel>>? _future;
+
+  static const _pageSize = 10;
+  final List<PostModel> _reels = [];
+  final Set<int> _ids = {};
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  bool _initialLoading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _loadInitial();
   }
 
-  Future<List<PostModel>> _load() async {
-    final all = await _service.list(type: PostType.reel, perPage: 30);
-    // Skip reels with no media at all (broken uploads).
-    final list = all
-        .where((r) =>
-            (r.mediaUrl?.isNotEmpty ?? false) ||
-            (r.thumbnail?.isNotEmpty ?? false))
-        .toList();
+  bool _hasMedia(PostModel r) =>
+      (r.mediaUrl?.isNotEmpty ?? false) || (r.thumbnail?.isNotEmpty ?? false);
 
-    // Deep link: float the requested reel to the front so the feed opens on it.
-    final target = widget.initialPostId;
-    if (target != null) {
-      final idx = list.indexWhere((r) => r.id == target);
-      if (idx > 0) {
-        final t = list.removeAt(idx);
-        list.insert(0, t);
-      } else if (idx == -1) {
-        // Not in the recent feed — fetch it directly and prepend.
+  void _addAll(Iterable<PostModel> items) {
+    for (final r in items) {
+      if (!_hasMedia(r)) continue;
+      if (_ids.add(r.id)) _reels.add(r);
+    }
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _initialLoading = true;
+      _error = null;
+    });
+    _reels.clear();
+    _ids.clear();
+    _page = 0;
+    _hasMore = true;
+    try {
+      // Deep link: open the feed on the requested reel (prepend it first).
+      final target = widget.initialPostId;
+      if (target != null) {
         try {
           final p = await _service.show(target);
-          if ((p.mediaUrl?.isNotEmpty ?? false) ||
-              (p.thumbnail?.isNotEmpty ?? false)) {
-            list.insert(0, p);
-          }
+          if (_hasMedia(p) && _ids.add(p.id)) _reels.add(p);
         } catch (_) {}
       }
+      final res = await _service.listPaged(
+          type: PostType.reel, page: 1, perPage: _pageSize);
+      _page = 1;
+      _hasMore = res.hasMore;
+      _addAll(res.items);
+      if (mounted) setState(() => _initialLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _initialLoading = false;
+        });
+      }
     }
-    return list;
   }
 
-  Future<void> _refresh() async {
-    setState(() {
-      _future = _load();
-    });
-    await _future;
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    try {
+      final res = await _service.listPaged(
+          type: PostType.reel, page: _page + 1, perPage: _pageSize);
+      _page += 1;
+      _hasMore = res.hasMore;
+      final before = _reels.length;
+      _addAll(res.items);
+      if (mounted && _reels.length != before) setState(() {});
+    } catch (_) {
+      // Ignore — it will retry on the next scroll.
+    } finally {
+      _loadingMore = false;
+    }
   }
+
+  Future<void> _refresh() => _loadInitial();
 
   @override
   void dispose() {
@@ -79,19 +114,17 @@ class _ReelsPageState extends State<ReelsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: FutureBuilder<List<PostModel>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+      body: Builder(
+        builder: (context) {
+          if (_initialLoading) {
             return const Center(
               child: CircularProgressIndicator(color: Colors.white),
             );
           }
-          if (snap.hasError) {
-            return _ErrorState(error: snap.error, onRetry: _refresh);
+          if (_error != null && _reels.isEmpty) {
+            return _ErrorState(error: _error, onRetry: _refresh);
           }
-          final reels = snap.data ?? const <PostModel>[];
-          if (reels.isEmpty) {
+          if (_reels.isEmpty) {
             return _EmptyState(onRefresh: _refresh);
           }
           return RefreshIndicator(
@@ -100,10 +133,14 @@ class _ReelsPageState extends State<ReelsPage> {
             child: PageView.builder(
               controller: _controller,
               scrollDirection: Axis.vertical,
-              itemCount: reels.length,
+              itemCount: _reels.length,
+              // Load the next page as the user nears the end.
+              onPageChanged: (i) {
+                if (i >= _reels.length - 3) _loadMore();
+              },
               itemBuilder: (context, i) => _ReelItem(
-                key: ValueKey(reels[i].id),
-                reel: reels[i],
+                key: ValueKey(_reels[i].id),
+                reel: _reels[i],
               ),
             ),
           );
@@ -253,6 +290,17 @@ class _ReelItemState extends State<_ReelItem> {
     });
   }
 
+  void _openVendor() {
+    final vendor = widget.reel.vendor;
+    if (vendor == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VendorDetailsPage(vendorId: vendor.id),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final reel = widget.reel;
@@ -278,10 +326,10 @@ class _ReelItemState extends State<_ReelItem> {
                       colors: [
                         Colors.transparent,
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.55),
-                        Colors.black.withValues(alpha: 0.85),
+                        Colors.black.withValues(alpha: 0.45),
+                        Colors.black.withValues(alpha: 0.92),
                       ],
-                      stops: const [0, 0.45, 0.8, 1],
+                      stops: const [0, 0.4, 0.72, 1],
                     ),
                   ),
                 ),
@@ -298,13 +346,15 @@ class _ReelItemState extends State<_ReelItem> {
               ),
             // Side actions (right side in RTL = leading)
             Positioned(
-              left: 12,
-              bottom: 110,
+              left: 10,
+              bottom: 104,
               child: _SideActions(
+                logo: vendor?.logo,
                 likes: _likes,
                 liked: _liked,
                 comments: reel.commentsCount,
                 views: reel.viewsCount,
+                onProfileTap: vendor == null ? null : _openVendor,
                 onLike: _toggleLike,
                 onComment: () => _openComments(context),
               ),
@@ -312,23 +362,13 @@ class _ReelItemState extends State<_ReelItem> {
             // Bottom info (vendor + caption) — kept above the bottom nav bar.
             Positioned(
               right: 16,
-              left: 80,
-              bottom: 100,
+              left: 78,
+              bottom: 104,
               child: _BottomInfo(
                 vendor: vendor,
                 title: reel.title,
                 body: reel.body,
-                onVendorTap: vendor == null
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                VendorDetailsPage(vendorId: vendor.id),
-                          ),
-                        );
-                      },
+                onVendorTap: vendor == null ? null : _openVendor,
               ),
             ),
             // Top safe-area title bar
@@ -423,18 +463,22 @@ class _ReelItemState extends State<_ReelItem> {
 
 class _SideActions extends StatelessWidget {
   const _SideActions({
+    required this.logo,
     required this.likes,
     required this.liked,
     required this.comments,
     required this.views,
+    required this.onProfileTap,
     required this.onLike,
     required this.onComment,
   });
 
+  final String? logo;
   final int likes;
   final bool liked;
   final int comments;
   final int views;
+  final VoidCallback? onProfileTap;
   final VoidCallback onLike;
   final VoidCallback onComment;
 
@@ -443,6 +487,8 @@ class _SideActions extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        _ProfileAvatar(logo: logo, onTap: onProfileTap),
+        const SizedBox(height: 22),
         _ActionButton(
           icon: liked ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
           color: liked ? Colors.red : Colors.white,
@@ -451,14 +497,14 @@ class _SideActions extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _ActionButton(
-          icon: Icons.mode_comment_outlined,
+          icon: Icons.mode_comment_rounded,
           color: Colors.white,
           label: _fmt(comments),
           onTap: onComment,
         ),
         const SizedBox(height: 18),
         _ActionButton(
-          icon: Icons.remove_red_eye_outlined,
+          icon: Icons.remove_red_eye_rounded,
           color: Colors.white,
           label: _fmt(views),
           onTap: null,
@@ -471,6 +517,75 @@ class _SideActions extends StatelessWidget {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return '$n';
+  }
+}
+
+/// Round profile avatar with a small red "+" follow badge — TikTok style.
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.logo, required this.onTap});
+
+  final String? logo;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 50,
+        height: 60,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: const [
+                  BoxShadow(blurRadius: 6, color: Colors.black45),
+                ],
+              ),
+              child: ClipOval(
+                child: (logo != null && logo!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: logo!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) =>
+                            Container(color: Colors.white24),
+                        errorWidget: (_, _, _) => Container(
+                          color: Colors.white24,
+                          child: const Icon(Icons.storefront_rounded,
+                              color: Colors.white, size: 22),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.white24,
+                        child: const Icon(Icons.storefront_rounded,
+                            color: Colors.white, size: 22),
+                      ),
+              ),
+            ),
+            Positioned(
+              bottom: -9,
+              child: Container(
+                width: 21,
+                height: 21,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -519,7 +634,7 @@ class _ActionButton extends StatelessWidget {
 // BOTTOM INFO
 // ===========================================================================
 
-class _BottomInfo extends StatelessWidget {
+class _BottomInfo extends StatefulWidget {
   const _BottomInfo({
     required this.vendor,
     required this.title,
@@ -533,33 +648,33 @@ class _BottomInfo extends StatelessWidget {
   final VoidCallback? onVendorTap;
 
   @override
+  State<_BottomInfo> createState() => _BottomInfoState();
+}
+
+class _BottomInfoState extends State<_BottomInfo> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final caption = (title?.trim().isNotEmpty ?? false)
-        ? title!
-        : (body?.trim() ?? '');
-    final logo = vendor?.logo;
-    final name = vendor?.nameAr ?? vendor?.nameEn ?? 'معلن';
+    final t = widget.title?.trim() ?? '';
+    final b = widget.body?.trim() ?? '';
+    final caption = (t.isNotEmpty && b.isNotEmpty && t != b)
+        ? '$t\n$b'
+        : (t.isNotEmpty ? t : b);
+    final name = widget.vendor?.nameAr ?? widget.vendor?.nameEn ?? 'معلن';
+    final long = caption.length > 70 || caption.contains('\n');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        InkWell(
-          onTap: onVendorTap,
+        // Shop name + follow pill — bold and prominent, like TikTok's @handle.
+        GestureDetector(
+          onTap: widget.onVendorTap,
+          behavior: HitTestBehavior.opaque,
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white24,
-                backgroundImage: (logo != null && logo.isNotEmpty)
-                    ? CachedNetworkImageProvider(logo)
-                    : null,
-                child: (logo == null || logo.isEmpty)
-                    ? const Icon(Icons.storefront_rounded,
-                        color: Colors.white, size: 18)
-                    : null,
-              ),
-              const SizedBox(width: 10),
               Flexible(
                 child: Text(
                   name,
@@ -568,17 +683,21 @@ class _BottomInfo extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+                    fontSize: 17,
+                    letterSpacing: 0.2,
+                    shadows: [
+                      Shadow(blurRadius: 6, color: Colors.black87),
+                      Shadow(blurRadius: 12, color: Colors.black54),
+                    ],
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white, width: 1.2),
+                  border: Border.all(color: Colors.white, width: 1.4),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
@@ -586,7 +705,7 @@ class _BottomInfo extends StatelessWidget {
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
@@ -594,20 +713,71 @@ class _BottomInfo extends StatelessWidget {
           ),
         ),
         if (caption.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text(
-            caption,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-              fontSize: 13.5,
-              height: 1.4,
-              shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: long ? () => setState(() => _expanded = !_expanded) : null,
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  caption,
+                  maxLines: _expanded ? 10 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14.5,
+                    height: 1.35,
+                    shadows: [
+                      Shadow(blurRadius: 6, color: Colors.black87),
+                      Shadow(blurRadius: 10, color: Colors.black54),
+                    ],
+                  ),
+                ),
+                if (long)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      _expanded ? 'إخفاء' : 'المزيد',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black87)],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
+        const SizedBox(height: 10),
+        // "Original sound" row — the signature TikTok touch.
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.music_note_rounded,
+                color: Colors.white,
+                size: 15,
+                shadows: [Shadow(blurRadius: 4, color: Colors.black87)]),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'الصوت الأصلي · $name',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  shadows: [Shadow(blurRadius: 5, color: Colors.black87)],
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

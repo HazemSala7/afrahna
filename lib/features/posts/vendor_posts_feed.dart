@@ -5,7 +5,7 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
-import '../reels/reel_comments_sheet.dart';
+import 'post_details_page.dart';
 
 /// A Facebook-style feed of a vendor's regular posts (text + images) with
 /// reactions and comments. Used on the vendor profile and the owner's tab.
@@ -188,16 +188,30 @@ class _PostFeedCardState extends State<PostFeedCard> {
     }
   }
 
-  void _openComments() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ReelCommentsSheet(postId: widget.post.id),
-    ).then((_) {
-      // refresh comment count after the sheet closes
-      if (mounted) setState(() => _comments = _comments);
-    });
+  void _openComments() => _openDetails(focusComment: true);
+
+  /// Open the post in a dedicated full page (Facebook-style), then sync any
+  /// like/comment changes back into this card.
+  Future<void> _openDetails({bool focusComment = false}) async {
+    final result = await Navigator.push<PostDetailsResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostDetailsPage(
+          post: widget.post,
+          focusComment: focusComment,
+          liked: _liked,
+          likes: _likes,
+          comments: _comments,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _liked = result.liked;
+        _likes = result.likes;
+        _comments = result.comments;
+      });
+    }
   }
 
   @override
@@ -223,6 +237,12 @@ class _PostFeedCardState extends State<PostFeedCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Tapping the post content opens the full post page (Facebook-style).
+          InkWell(
+            onTap: () => _openDetails(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
@@ -276,7 +296,10 @@ class _PostFeedCardState extends State<PostFeedCard> {
                       fontSize: 14.5, height: 1.6, color: AppColors.textDark)),
             ),
           // Images
-          if (images.isNotEmpty) _PostGallery(images: images),
+          if (images.isNotEmpty) PostGallery(images: images),
+              ],
+            ),
+          ),
           // Counts
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
@@ -368,15 +391,15 @@ class _ActionBtn extends StatelessWidget {
   }
 }
 
-class _PostGallery extends StatefulWidget {
-  const _PostGallery({required this.images});
+class PostGallery extends StatefulWidget {
+  const PostGallery({super.key, required this.images});
   final List<String> images;
 
   @override
-  State<_PostGallery> createState() => _PostGalleryState();
+  State<PostGallery> createState() => _PostGalleryState();
 }
 
-class _PostGalleryState extends State<_PostGallery> {
+class _PostGalleryState extends State<PostGallery> {
   final _controller = PageController();
   int _index = 0;
 

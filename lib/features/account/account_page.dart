@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
 import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
@@ -472,8 +472,7 @@ class _SignedInView extends StatelessWidget {
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (_) =>
-                  const Center(child: CircularProgressIndicator()),
+              builder: (_) => const CenteredLoader(),
             );
             final deleted = await session.deleteAccount();
             if (!context.mounted) return;
@@ -488,7 +487,111 @@ class _SignedInView extends StatelessWidget {
             }
           },
         ),
+        const SizedBox(height: 20),
+        const _PoweredByNeurex(),
+        const SizedBox(height: 150),
       ],
+    );
+  }
+}
+
+/// Branded footer credit — taps through to Neurex on WhatsApp.
+class _PoweredByNeurex extends StatelessWidget {
+  const _PoweredByNeurex();
+
+  static const _phone = '972595324689';
+
+  Future<void> _contact() async {
+    final msg = Uri.encodeComponent(
+        'مرحباً Neurex 👋، تواصلت معكم من تطبيق أفراحنا.');
+    await _openUri(Uri.parse('https://wa.me/$_phone?text=$msg'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // "Made with love"
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'صُنع بكل ',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text('❤️', style: TextStyle(fontSize: 12.5)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Powered by Neurex — tappable pill.
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _contact,
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6D4AFF), Color(0xFF9C6BFF)],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6D4AFF).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 15),
+                    SizedBox(width: 7),
+                    Text(
+                      'Powered by ',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Neurex',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'تواصل معنا عبر واتساب',
+            style: TextStyle(
+              color: AppColors.textMuted.withValues(alpha: 0.8),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -500,9 +603,7 @@ class _SignedInView extends StatelessWidget {
 const String _kSupportPhone = '+972595679605';
 
 Future<void> _openUri(Uri uri) async {
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  await openExternal(uri);
 }
 
 void _showLanguageDialog(BuildContext context) {

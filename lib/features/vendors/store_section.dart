@@ -226,7 +226,7 @@ class _StoreSectionState extends State<StoreSection>
             if (snap.connectionState == ConnectionState.waiting) {
               return const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+                child: CenteredLoader(size: 46),
               );
             }
             final items = snap.data ?? const [];

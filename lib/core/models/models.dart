@@ -1443,3 +1443,85 @@ class OrderModel {
         createdAt: _toDate(json['created_at']),
       );
 }
+
+// ---------------------------------------------------------------------------
+// COMPETITION (توقّع النتيجة)
+// ---------------------------------------------------------------------------
+
+class CompetitionModel {
+  CompetitionModel({
+    required this.id,
+    required this.title,
+    this.description,
+    this.sponsor,
+    required this.teamAName,
+    this.teamAFlag,
+    required this.teamBName,
+    this.teamBFlag,
+    this.pageFacebook,
+    this.pageInstagram,
+    this.pageTiktok,
+    this.resultWinner,
+    this.resultScore,
+    this.isActive = true,
+  });
+
+  final int id;
+  final String title;
+  final String? description;
+  final VendorModel? sponsor;
+  final String teamAName;
+  final String? teamAFlag;
+  final String teamBName;
+  final String? teamBFlag;
+  final String? pageFacebook;
+  final String? pageInstagram;
+  final String? pageTiktok;
+  final String? resultWinner;
+  final String? resultScore;
+  final bool isActive;
+
+  bool get hasResult => (resultWinner?.isNotEmpty ?? false);
+
+  factory CompetitionModel.fromJson(Map<String, dynamic> json) =>
+      CompetitionModel(
+        id: _toInt(json['id']) ?? 0,
+        title: (json['title'] ?? '').toString(),
+        description: _readT<String>(json, 'description'),
+        sponsor: json['sponsor'] is Map
+            ? VendorModel.fromJson(
+                Map<String, dynamic>.from(json['sponsor'] as Map))
+            : null,
+        teamAName: (json['team_a_name'] ?? '').toString(),
+        teamAFlag: _readT<String>(json, 'team_a_flag'),
+        teamBName: (json['team_b_name'] ?? '').toString(),
+        teamBFlag: _readT<String>(json, 'team_b_flag'),
+        pageFacebook: _readT<String>(json, 'page_facebook'),
+        pageInstagram: _readT<String>(json, 'page_instagram'),
+        pageTiktok: _readT<String>(json, 'page_tiktok'),
+        resultWinner: _readT<String>(json, 'result_winner'),
+        resultScore: _readT<String>(json, 'result_score'),
+        isActive: json['is_active'] == true || json['is_active'] == 1,
+      );
+}
+
+class PredictionModel {
+  PredictionModel({
+    required this.id,
+    required this.competitionId,
+    required this.winner,
+    this.score,
+  });
+
+  final int id;
+  final int competitionId;
+  final String winner;
+  final String? score;
+
+  factory PredictionModel.fromJson(Map<String, dynamic> json) => PredictionModel(
+        id: _toInt(json['id']) ?? 0,
+        competitionId: _toInt(json['competition_id']) ?? 0,
+        winner: (json['winner'] ?? '').toString(),
+        score: _readT<String>(json, 'score'),
+      );
+}

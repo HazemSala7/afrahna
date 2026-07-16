@@ -755,6 +755,33 @@ class ReviewService {
     }
   }
 
+  /// Paginated reviews for a vendor. Returns the page items plus the real
+  /// [total] count (from the server's paginator) and whether more pages exist.
+  Future<({List<ReviewModel> items, int total, bool hasMore})>
+      listPagedForVendor(int vendorId, {int page = 1, int perPage = 15}) async {
+    try {
+      final res = await _dio.get('/reviews', queryParameters: {
+        'vendor_id': vendorId,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(ReviewModel.fromJson).toList();
+      var total = items.length;
+      var hasMore = false;
+      if (body is Map) {
+        final t = body['total'];
+        if (t is num) total = t.toInt();
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num && lp is num) hasMore = cp.toInt() < lp.toInt();
+      }
+      return (items: items, total: total, hasMore: hasMore);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<ReviewModel> create({
     required int vendorId,
     required double rating,
@@ -1221,6 +1248,58 @@ class OrderService {
     try {
       final res = await _dio.put('/orders/$id', data: {'status': status});
       return OrderModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// COMPETITION (توقّع النتيجة)
+// ---------------------------------------------------------------------------
+
+class CompetitionService {
+  final _dio = ApiClient.instance.dio;
+
+  /// The active competition + the caller's prediction (by account or device).
+  Future<({CompetitionModel? competition, PredictionModel? prediction})>
+      getActive({String? deviceId}) async {
+    try {
+      final res = await _dio.get('/competition/active',
+          queryParameters: {'device_id': ?deviceId});
+      final body = res.data;
+      final map =
+          body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+      final data = map['data'];
+      final pred = map['my_prediction'];
+      return (
+        competition: data is Map
+            ? CompetitionModel.fromJson(Map<String, dynamic>.from(data))
+            : null,
+        prediction: pred is Map
+            ? PredictionModel.fromJson(Map<String, dynamic>.from(pred))
+            : null,
+      );
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Future<PredictionModel> predict(int competitionId,
+      {required String winner,
+      String? score,
+      String? deviceId,
+      String? platform,
+      String? guestName}) async {
+    try {
+      final res = await _dio.post('/competition/$competitionId/predict', data: {
+        'winner': winner,
+        'score': ?score,
+        'device_id': ?deviceId,
+        'platform': ?platform,
+        'guest_name': ?guestName,
+      });
+      return PredictionModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
