@@ -182,8 +182,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                       onPressed: () => setState(() => _obscure1 = !_obscure1),
                                     ),
-                                    validator: (v) => (v == null || v.length < 6)
-                                        ? 'كلمة المرور قصيرة (6 خانات على الأقل)'
+                                    validator: (v) => (v == null || v.length < 3)
+                                        ? 'كلمة المرور قصيرة (3 خانات على الأقل)'
                                         : null,
                                   ),
                                   const SizedBox(height: 12),

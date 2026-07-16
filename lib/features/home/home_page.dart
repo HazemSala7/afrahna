@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
 import '../../core/services/event_service.dart';
@@ -11,6 +10,7 @@ import '../../core/services/location_service.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
@@ -25,6 +25,7 @@ import '../coordinator/coordinator_page.dart';
 import '../favorites/favorites_page.dart';
 import '../invitations/invitations_page.dart';
 import '../notifications/notifications_page.dart';
+import '../competition/competition_dialog.dart';
 import '../offers/offer_details_page.dart';
 import '../offers/offers_page.dart';
 import '../reels/reels_page.dart';
@@ -91,7 +92,12 @@ class _HomePageState extends State<HomePage> {
             ),
           AppBottomNav(
             current: _currentTab,
-            onTap: (i) => setState(() => _currentTab = i),
+            onTap: (i) {
+              setState(() => _currentTab = i);
+              // Re-show the competition popup whenever the user returns to home
+              // (until they've predicted).
+              if (i == 2) maybeShowCompetition(context);
+            },
           ),
         ],
       ),
@@ -219,6 +225,10 @@ class _HomeTabState extends State<_HomeTab> {
     super.initState();
     _load(useCache: true);
     _loadLocation();
+    // Show the active prediction competition once per app launch.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowCompetition(context);
+    });
   }
 
   void _load({bool useCache = false}) {
@@ -622,21 +632,22 @@ class _StatsBand extends StatelessWidget {
         if (s == null) return const SizedBox.shrink();
         // Coordinated warm pastel palette that harmonizes with the gold band.
         final items =
-            <({IconData icon, int value, String label, Color color, VoidCallback? onTap, bool pulse})>[
+            <({IconData icon, int value, String label, Color color, VoidCallback? onTap, bool pulse, bool compact})>[
           (icon: Icons.store_mall_directory_rounded, value: s.vendors, label: 'شركة',
-              color: Color(0xFFF6B25C), onTap: null, pulse: false),
+              color: Color(0xFFF6B25C), onTap: null, pulse: false, compact: false),
           (icon: Icons.visibility_rounded, value: s.visitors, label: 'زائر',
-              color: Color(0xFFF48CA0), onTap: null, pulse: false),
+              color: Color(0xFFF48CA0), onTap: null, pulse: false, compact: false),
+          // Users is the only tile shown abbreviated (e.g. 21.2K).
           (icon: Icons.groups_rounded, value: s.users, label: 'مستخدم',
-              color: Color(0xFF7FC6C0), onTap: null, pulse: false),
+              color: Color(0xFF7FC6C0), onTap: null, pulse: false, compact: true),
           // "عرض خاص" is highlighted + animated + tappable → opens all offers.
           (icon: Icons.local_fire_department_rounded, value: s.offers, label: 'عرض خاص',
               color: Color(0xFFF6A93B),
               onTap: () => Navigator.push(
                   context, MaterialPageRoute(builder: (_) => const OffersPage())),
-              pulse: true),
+              pulse: true, compact: false),
           (icon: Icons.holiday_village_rounded, value: s.cities, label: 'مدينة',
-              color: Color(0xFFC7A9E0), onTap: null, pulse: false),
+              color: Color(0xFFC7A9E0), onTap: null, pulse: false, compact: false),
         ];
         return Container(
           width: double.infinity,
@@ -668,6 +679,7 @@ class _StatsBand extends StatelessWidget {
                     delay: i * 160,
                     onTap: items[i].onTap,
                     pulse: items[i].pulse,
+                    compact: items[i].compact,
                   ),
                 ),
                 if (i != items.length - 1)
@@ -694,6 +706,7 @@ class _StatCell extends StatelessWidget {
     this.delay = 0,
     this.onTap,
     this.pulse = false,
+    this.compact = false,
   });
   final IconData icon;
   final int value;
@@ -702,6 +715,9 @@ class _StatCell extends StatelessWidget {
   final int delay;
   final VoidCallback? onTap;
   final bool pulse;
+
+  /// Show the number abbreviated (K/M) instead of fully grouped.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -756,7 +772,7 @@ class _StatCell extends StatelessWidget {
       children: [
         circle,
         const SizedBox(height: 8),
-        _CountUp(value: value, delay: delay),
+        _CountUp(value: value, delay: delay, compact: compact),
         const SizedBox(height: 2),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -821,9 +837,12 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
 /// Animated count-up number (animates 0 → value once on first appearance,
 /// with an optional stagger [delay] so cells fire one after another).
 class _CountUp extends StatefulWidget {
-  const _CountUp({required this.value, this.delay = 0});
+  const _CountUp({required this.value, this.delay = 0, this.compact = false});
   final int value;
   final int delay;
+
+  /// Abbreviate as K/M instead of showing the full grouped number.
+  final bool compact;
 
   @override
   State<_CountUp> createState() => _CountUpState();
@@ -858,17 +877,21 @@ class _CountUpState extends State<_CountUp>
       animation: _a,
       builder: (_, _) {
         final v = (widget.value * _a.value).round();
-        return Text(
-          _formatCompact(v),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
-            height: 1.0,
-            letterSpacing: 0.2,
-            shadows: [
-              Shadow(color: Color(0x55000000), blurRadius: 6, offset: Offset(0, 2)),
-            ],
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            widget.compact ? _formatK(v) : _formatCompact(v),
+            maxLines: 1,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              height: 1.0,
+              letterSpacing: 0.2,
+              shadows: [
+                Shadow(color: Color(0x55000000), blurRadius: 6, offset: Offset(0, 2)),
+              ],
+            ),
           ),
         );
       },
@@ -933,15 +956,34 @@ class _AutoScroller {
   }
 }
 
-/// Compact number formatting for the stats band: 1234 → "1.2K", 1e6 → "1M".
+/// Full number with thousands grouping for the stats band (e.g. 21000 →
+/// "21,000") so users can watch the exact count grow — no K/M abbreviation.
 String _formatCompact(int n) {
-  if (n < 1000) return '$n';
-  if (n < 1000000) {
-    final v = n / 1000;
-    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}K';
+  final neg = n < 0;
+  final s = n.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
   }
-  final v = n / 1000000;
-  return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}M';
+  return (neg ? '-' : '') + buf.toString();
+}
+
+/// Abbreviated number for the "مستخدم" tile only (e.g. 21241 → "21.2K").
+String _formatK(int n) {
+  final neg = n < 0;
+  final a = n.abs();
+  String out;
+  if (a >= 1000000) {
+    final v = a / 1000000;
+    out = '${v.toStringAsFixed(v >= 10 ? 0 : 1)}M';
+  } else if (a >= 1000) {
+    final v = a / 1000;
+    out = '${v.toStringAsFixed(v >= 100 ? 0 : 1)}K';
+  } else {
+    out = '$a';
+  }
+  return (neg ? '-' : '') + out;
 }
 
 // ===========================================================================
@@ -1266,12 +1308,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
           return const SizedBox(
             height: 96,
             child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    color: AppColors.primary, strokeWidth: 2.5),
-              ),
+              child: AfrahnaLoader(size: 42),
             ),
           );
         }
@@ -1465,12 +1502,7 @@ class _OffersRow extends StatelessWidget {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    color: AppColors.primary, strokeWidth: 2.5),
-              ),
+              child: AfrahnaLoader(size: 42),
             );
           }
           final items = snap.data ?? const <PromotionModel>[];
@@ -1643,12 +1675,7 @@ class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    color: AppColors.primary, strokeWidth: 2.5),
-              ),
+              child: AfrahnaLoader(size: 42),
             );
           }
           if (snap.hasError) {
@@ -1867,12 +1894,7 @@ class _TopRatedRow extends StatelessWidget {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    color: AppColors.primary, strokeWidth: 2.5),
-              ),
+              child: AfrahnaLoader(size: 42),
             );
           }
           // "الأكثر تقييماً" — show only vendors with a full 5/5 rating.
@@ -2002,9 +2024,7 @@ class _AdvertiseCta extends StatelessWidget {
     final msg = Uri.encodeComponent(
         'مرحباً، عندي محل/خدمة وأرغب بالإعلان في تطبيق أفراحنا. ممكن التفاصيل؟');
     final uri = Uri.parse('https://wa.me/$digits?text=$msg');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await openExternal(uri);
   }
 
   @override

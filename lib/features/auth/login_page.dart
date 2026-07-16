@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/auth_storage.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../home/home_page.dart';
 import 'auth_shared.dart';
 import 'register_page.dart';
@@ -88,9 +88,8 @@ class _LoginPageState extends State<LoginPage> {
   static const String _supportPhone = '+972595679605';
 
   Future<void> _openUri(Uri uri) async {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
+    final ok = await openExternal(uri);
+    if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppColors.primaryDark,
@@ -276,7 +275,7 @@ class _LoginPageState extends State<LoginPage> {
                                       onPressed: () => setState(() => _obscure = !_obscure),
                                     ),
                                     validator: (v) =>
-                                        (v == null || v.length < 6) ? 'كلمة المرور قصيرة' : null,
+                                        (v == null || v.length < 3) ? 'كلمة المرور قصيرة' : null,
                                   ),
                                   const SizedBox(height: 6),
                                   Row(

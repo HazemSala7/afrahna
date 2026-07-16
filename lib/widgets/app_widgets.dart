@@ -342,27 +342,171 @@ class AppNetworkImage extends StatelessWidget {
   }
 }
 
-/// Full-screen loading state.
+/// Full-screen loading state — uses the branded [AfrahnaLoader].
 class CenteredLoader extends StatelessWidget {
-  const CenteredLoader({super.key, this.label});
+  const CenteredLoader({super.key, this.label, this.size = 62});
   final String? label;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(color: AppColors.primary),
-          if (label != null) ...[
-            const SizedBox(height: 12),
-            Text(label!,
-                style: const TextStyle(color: AppColors.textMuted)),
-          ],
-        ],
+    return Center(child: AfrahnaLoader(size: size, label: label));
+  }
+}
+
+/// Professional wedding-themed loading animation used across the whole app:
+/// two interlocking rose-gold "wedding rings" with a sweeping shimmer comet
+/// and twinkling sparkles. Pure Flutter (no packages) so it stays lightweight.
+class AfrahnaLoader extends StatefulWidget {
+  const AfrahnaLoader({super.key, this.size = 62, this.label});
+
+  final double size;
+  final String? label;
+
+  @override
+  State<AfrahnaLoader> createState() => _AfrahnaLoaderState();
+}
+
+class _AfrahnaLoaderState extends State<AfrahnaLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loader = SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) => CustomPaint(
+          painter: _AfrahnaRingsPainter(_c.value),
+        ),
       ),
     );
+    if (widget.label == null) return loader;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        loader,
+        const SizedBox(height: 14),
+        Text(
+          widget.label!,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
+}
+
+class _AfrahnaRingsPainter extends CustomPainter {
+  _AfrahnaRingsPainter(this.t);
+
+  /// Animation position, 0..1.
+  final double t;
+
+  static const _clear = Color(0x00B8835A);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final c = Offset(w / 2, size.height / 2);
+    final ringR = w * 0.23;
+    final stroke = (w * 0.075).clamp(2.0, 9.0);
+    final dx = ringR * 0.72;
+
+    // Two overlapping rings → the classic interlocked wedding-ring silhouette.
+    final left = Offset(c.dx - dx, c.dy + ringR * 0.16);
+    final right = Offset(c.dx + dx, c.dy - ringR * 0.16);
+
+    // Gentle breathing pulse.
+    final pulse = 1 + 0.035 * math.sin(t * 2 * math.pi);
+    final rr = ringR * pulse;
+
+    // Faint base rings.
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = AppColors.primaryLight.withValues(alpha: 0.6);
+    canvas.drawCircle(left, rr, base);
+    canvas.drawCircle(right, rr, base);
+
+    // Sweeping shimmer "comet" that chases around each ring.
+    void comet(Offset center, double phase) {
+      final rot = (t + phase) * 2 * math.pi;
+      final rect = Rect.fromCircle(center: center, radius: rr);
+      final shader = SweepGradient(
+        colors: const [
+          _clear,
+          _clear,
+          AppColors.accent,
+          AppColors.primary,
+          AppColors.primaryDark,
+          _clear,
+        ],
+        stops: const [0.0, 0.55, 0.72, 0.86, 0.965, 1.0],
+        transform: GradientRotation(rot),
+      ).createShader(rect);
+      final p = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..shader = shader;
+      canvas.drawArc(rect, 0, 2 * math.pi, false, p);
+    }
+
+    comet(left, 0.0);
+    comet(right, 0.5);
+
+    // Twinkling sparkles around the rings.
+    final sparkles = <Offset>[
+      Offset(c.dx, c.dy - ringR * 1.85),
+      Offset(c.dx + ringR * 2.0, c.dy + ringR * 0.95),
+      Offset(c.dx - ringR * 2.0, c.dy + ringR * 1.05),
+    ];
+    for (var i = 0; i < sparkles.length; i++) {
+      final tw = math.sin((t * 2 + i / sparkles.length) * 2 * math.pi) * .5 + .5;
+      _sparkle(
+        canvas,
+        sparkles[i],
+        (w * 0.055) * (0.45 + tw * 0.9),
+        AppColors.accent.withValues(alpha: 0.25 + tw * 0.65),
+      );
+    }
+  }
+
+  void _sparkle(Canvas canvas, Offset o, double r, Color color) {
+    final p = Paint()..color = color;
+    final path = Path()
+      ..moveTo(o.dx, o.dy - r)
+      ..quadraticBezierTo(o.dx, o.dy, o.dx + r, o.dy)
+      ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy + r)
+      ..quadraticBezierTo(o.dx, o.dy, o.dx - r, o.dy)
+      ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy - r)
+      ..close();
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AfrahnaRingsPainter old) => old.t != t;
 }
 
 /// Friendly error widget.

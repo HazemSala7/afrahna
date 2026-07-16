@@ -555,6 +555,32 @@ class PostService {
     }
   }
 
+  /// Paginated posts — returns the page items plus whether more pages exist.
+  Future<({List<PostModel> items, bool hasMore})> listPaged({
+    PostType? type,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    try {
+      final res = await _dio.get('/posts', queryParameters: {
+        if (type != null) 'type': postTypeTo(type),
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(PostModel.fromJson).toList();
+      var hasMore = false;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num && lp is num) hasMore = cp.toInt() < lp.toInt();
+      }
+      return (items: items, hasMore: hasMore);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Fetch a single post/reel by id (public).
   Future<PostModel> show(int id) async {
     try {

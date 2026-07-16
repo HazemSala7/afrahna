@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
 import '../../core/state/session.dart';
 import '../../core/services/local_favorites.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/follow_button.dart';
@@ -47,7 +48,8 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
 
   late Future<VendorModel> _vendorFuture;
   late Future<List<ServiceModel>> _servicesFuture;
-  late Future<List<ReviewModel>> _reviewsFuture;
+  late Future<({List<ReviewModel> items, int total, bool hasMore})>
+      _reviewsFuture;
   late Future<List<StoryModel>> _storiesFuture;
   late Future<List<HighlightModel>> _highlightsFuture;
   final ScrollController _scrollController = ScrollController();
@@ -63,7 +65,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
     super.initState();
     _vendorFuture = VendorService().show(widget.vendorId);
     _servicesFuture = ServiceService().list(vendorId: widget.vendorId);
-    _reviewsFuture = ReviewService().listForVendor(widget.vendorId);
+    _reviewsFuture = ReviewService().listPagedForVendor(widget.vendorId);
     _storiesFuture = StoryService().listForVendor(widget.vendorId);
     _highlightsFuture = HighlightService().listForVendor(widget.vendorId);
   }
@@ -113,9 +115,8 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   }
 
   Future<void> _launch(Uri uri) async {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
+    final ok = await openExternal(uri);
+    if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذّر فتح: $uri')),
       );
@@ -152,7 +153,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
     );
     if (submitted == true && mounted) {
       setState(() {
-        _reviewsFuture = ReviewService().listForVendor(widget.vendorId);
+        _reviewsFuture = ReviewService().listPagedForVendor(widget.vendorId);
         _vendorFuture = VendorService().show(widget.vendorId);
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -161,6 +162,16 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
         ),
       );
     }
+  }
+
+  /// Open the full, paginated list of reviewers in a bottom-sheet dialog.
+  Future<void> _openAllReviews(VendorModel vendor, int total) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AllReviewsSheet(vendorId: vendor.id, total: total),
+    );
   }
 
   static String _firstChar(String name) {
@@ -218,9 +229,11 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             _StatsStrip(
                               vendor: vendor,
                               servicesFuture: _servicesFuture,
+                              reviewsFuture: _reviewsFuture,
                               followers: _followersLive ?? vendor.followersCount,
                             ),
                             const SizedBox(height: 18),
+                            const _DiscountBanner(),
                             _HighlightsSection(
                               vendor: vendor,
                               future: _highlightsFuture,
@@ -291,99 +304,130 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                           vendorId: vendor.id,
                           showHeader: true,
                         ),
-                        const SizedBox(height: 18),
-                        _Section(
-                          icon: Icons.design_services_outlined,
-                          title: 'الخدمات المقدّمة',
-                          child: FutureBuilder<List<ServiceModel>>(
-                            future: _servicesFuture,
-                            builder: (context, sSnap) {
-                              if (sSnap.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: CenteredLoader(),
-                                );
-                              }
-                              final services = sSnap.data ?? const [];
-                              if (services.isEmpty) {
-                                return const _EmptyBox(
-                                  icon: Icons.inventory_2_outlined,
-                                  text: 'لا توجد خدمات معروضة بعد',
-                                );
-                              }
-                              return Column(
-                                children: [
-                                  for (final s in services)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 10),
-                                      child: _ServiceTile(
-                                        service: s,
-                                        vendor: vendor,
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
+                        // Services section — hidden entirely when the vendor
+                        // has no services (no empty placeholder shown).
+                        FutureBuilder<List<ServiceModel>>(
+                          future: _servicesFuture,
+                          builder: (context, sSnap) {
+                            final services = sSnap.data ?? const <ServiceModel>[];
+                            if (services.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 18),
+                                _Section(
+                                  icon: Icons.design_services_outlined,
+                                  title: 'الخدمات المقدّمة',
+                                  child: Column(
+                                    children: [
+                                      for (final s in services)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              bottom: 10),
+                                          child: _ServiceTile(
+                                            service: s,
+                                            vendor: vendor,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 18),
-                        _Section(
-                          icon: Icons.reviews_outlined,
-                          title: 'التقييمات',
-                          trailing: vendor.rating != null
-                              ? _RatingChip(
-                                  rating: vendor.rating!,
-                                  count: vendor.reviewsCount ?? 0,
-                                )
-                              : null,
-                          child: FutureBuilder<List<ReviewModel>>(
-                            future: _reviewsFuture,
-                            builder: (context, rSnap) {
-                              if (rSnap.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(8),
-                                  child: CenteredLoader(),
-                                );
-                              }
-                              final reviews = rSnap.data ?? const [];
-                              return Column(
-                                children: [
-                                  if (reviews.isEmpty)
-                                    const _EmptyBox(
-                                      icon: Icons.rate_review_outlined,
-                                      text: 'كن أول من يقيّم هذا المزوّد ✨',
+                        FutureBuilder<
+                            ({
+                              List<ReviewModel> items,
+                              int total,
+                              bool hasMore
+                            })>(
+                          future: _reviewsFuture,
+                          builder: (context, rSnap) {
+                            final data = rSnap.data;
+                            final reviews = data?.items ?? const <ReviewModel>[];
+                            // Real reviewer count from the server paginator.
+                            final total = data?.total ??
+                                (vendor.reviewsCount ?? reviews.length);
+                            return _Section(
+                              icon: Icons.reviews_outlined,
+                              title: 'التقييمات',
+                              trailing: vendor.rating != null
+                                  ? _RatingChip(
+                                      rating: vendor.rating!,
+                                      count: total,
                                     )
-                                  else
-                                    for (final r in reviews.take(5))
-                                      _ReviewCard(review: r),
-                                  const SizedBox(height: 12),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: AppColors.primary,
-                                        side: const BorderSide(
-                                            color: AppColors.primary),
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
+                                  : null,
+                              child: Builder(builder: (context) {
+                                if (rSnap.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CenteredLoader(),
+                                  );
+                                }
+                                return Column(
+                                  children: [
+                                    if (reviews.isEmpty)
+                                      const _EmptyBox(
+                                        icon: Icons.rate_review_outlined,
+                                        text: 'كن أول من يقيّم هذا المزوّد ✨',
+                                      )
+                                    else
+                                      for (final r in reviews.take(5))
+                                        _ReviewCard(review: r),
+                                    // More than the preview → open the full,
+                                    // paginated list in a dialog sheet.
+                                    if (total > 5) ...[
+                                      const SizedBox(height: 4),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton.icon(
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: AppColors.primary,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 10),
+                                          ),
+                                          icon: const Icon(
+                                              Icons.expand_more_rounded,
+                                              size: 20),
+                                          label: Text(
+                                              'عرض كل التقييمات ($total)'),
+                                          onPressed: () => _openAllReviews(
+                                              vendor, total),
                                         ),
                                       ),
-                                      icon: const Icon(
-                                          Icons.star_rounded, size: 20),
-                                      label: const Text('أضف تقييمك'),
-                                      onPressed: () => _openRatingSheet(vendor),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.primary,
+                                          side: const BorderSide(
+                                              color: AppColors.primary),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                            Icons.star_rounded, size: 20),
+                                        label: const Text('أضف تقييمك'),
+                                        onPressed: () =>
+                                            _openRatingSheet(vendor),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
+                                  ],
+                                );
+                              }),
+                            );
+                          },
                         ),
                         const SizedBox(height: 110),
                       ],
@@ -603,6 +647,128 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
 }
 
 // ============================================================
+// DISCOUNT NUDGE — "tell them you're from Afrahna"
+// ============================================================
+
+/// Friendly banner on every vendor profile inviting the user to mention the
+/// app when they visit, so they get the shop's Afrahna discount.
+class _DiscountBanner extends StatelessWidget {
+  const _DiscountBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFFFFF6E6), Color(0xFFF6E3CC)],
+        ),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.28),
+          width: 1.2,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Gift/discount badge
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.accent, AppColors.primaryDark],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryDark.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.card_giftcard_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'خصمك بانتظارك ',
+                      style: TextStyle(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    Text(
+                      '🎁',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        shadows: [
+                          Shadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                      color: AppColors.textDark,
+                      fontSize: 12.5,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    children: [
+                      TextSpan(text: 'عند زيارتك لهم، أخبِرهم أنك من تطبيق '),
+                      TextSpan(
+                        text: 'أفراحنا',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      TextSpan(text: ' لتستفيد من الخصومات 💛'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
 // HEADER (centered logo + title + chips) — premium look
 // ============================================================
 
@@ -685,7 +851,7 @@ class _IdentityHeader extends StatelessWidget {
 
 /// Floating gradient-ringed logo positioned over the hero/sheet boundary.
 /// Tapping it opens the Instagram-style story viewer when stories exist.
-class _FloatingLogo extends StatelessWidget {
+class _FloatingLogo extends StatefulWidget {
   const _FloatingLogo({
     required this.vendor,
     this.stories = const <StoryModel>[],
@@ -693,14 +859,50 @@ class _FloatingLogo extends StatelessWidget {
   final VendorModel vendor;
   final List<StoryModel> stories;
 
+  @override
+  State<_FloatingLogo> createState() => _FloatingLogoState();
+}
+
+class _FloatingLogoState extends State<_FloatingLogo>
+    with SingleTickerProviderStateMixin {
+  /// Only spins while the shop actually has stories to show.
+  AnimationController? _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSpin();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FloatingLogo old) {
+    super.didUpdateWidget(old);
+    _syncSpin();
+  }
+
+  void _syncSpin() {
+    if (widget.stories.isNotEmpty) {
+      _spin ??= AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 6),
+      )..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin?.dispose();
+    super.dispose();
+  }
+
   void _openStories(BuildContext context) {
-    if (stories.isEmpty) return;
+    if (widget.stories.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => StoryViewerPage(
-          vendor: vendor,
-          stories: stories,
+          vendor: widget.vendor,
+          stories: widget.stories,
         ),
       ),
     );
@@ -709,6 +911,8 @@ class _FloatingLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = 116.0;
+    final vendor = widget.vendor;
+    final stories = widget.stories;
     final hasLogo = (vendor.logo ?? '').isNotEmpty;
     final hasStories = stories.isNotEmpty;
 
@@ -739,43 +943,69 @@ class _FloatingLogo extends StatelessWidget {
               ],
             ),
           ),
-          // Metallic gradient ring
+          // Gradient ring. When the shop has stories it slowly rotates and
+          // switches to a vivid "story" gradient, so it's obvious from the
+          // outside that there's something to tap.
+          Builder(builder: (_) {
+            final ring = Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  startAngle: 0,
+                  endAngle: 6.2832,
+                  colors: hasStories
+                      ? const [
+                          Color(0xFFF4C64B),
+                          Color(0xFFE1306C),
+                          Color(0xFFC13584),
+                          Color(0xFFF4C64B),
+                          Color(0xFFFF7A45),
+                          Color(0xFFF4C64B),
+                        ]
+                      : const [
+                          Color(0xFFE6B450),
+                          AppColors.primary,
+                          Color(0xFFF3D9B1),
+                          AppColors.primaryDark,
+                          Color(0xFFE6B450),
+                          AppColors.accent,
+                          Color(0xFFE6B450),
+                        ],
+                  stops: hasStories
+                      ? const [0.0, 0.22, 0.42, 0.62, 0.82, 1.0]
+                      : const [0.0, 0.18, 0.35, 0.55, 0.72, 0.88, 1.0],
+                ),
+              ),
+            );
+            if (!hasStories || _spin == null) return ring;
+            return AnimatedBuilder(
+              animation: _spin!,
+              builder: (_, child) => Transform.rotate(
+                angle: _spin!.value * 6.2832,
+                child: child,
+              ),
+              child: ring,
+            );
+          }),
+          // Thin white separator for a "premium pearl" feel. Sits on top of the
+          // ring so the logo never rotates with it.
           Container(
-            width: size,
-            height: size,
-            padding: const EdgeInsets.all(3.5),
+            width: size - 7,
+            height: size - 7,
+            padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: SweepGradient(
-                startAngle: 0,
-                endAngle: 6.2832,
-                colors: [
-                  Color(0xFFE6B450),
-                  AppColors.primary,
-                  Color(0xFFF3D9B1),
-                  AppColors.primaryDark,
-                  Color(0xFFE6B450),
-                  AppColors.accent,
-                  Color(0xFFE6B450),
-                ],
-                stops: [0.0, 0.18, 0.35, 0.55, 0.72, 0.88, 1.0],
-              ),
+              color: Colors.white,
             ),
-            // Thin white separator for a "premium pearl" feel
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-              ),
-              child: ClipOval(
-                child: hasLogo
-                    ? AppNetworkImage(
-                        url: vendor.logo,
-                        fallbackIcon: Icons.storefront_rounded,
-                      )
-                    : _LogoFallback(name: vendor.name),
-              ),
+            child: ClipOval(
+              child: hasLogo
+                  ? AppNetworkImage(
+                      url: vendor.logo,
+                      fallbackIcon: Icons.storefront_rounded,
+                    )
+                  : _LogoFallback(name: vendor.name),
             ),
           ),
           // Subtle inner top highlight
@@ -797,18 +1027,17 @@ class _FloatingLogo extends StatelessWidget {
               ),
             ),
           ),
-          // Stories badge: small "play" dot indicating tappable stories
+          // Stories pill: makes it unmistakable that there are stories to tap.
           if (hasStories)
             Positioned(
-              bottom: 4,
-              right: 4,
+              bottom: -4,
               child: Container(
-                width: 30,
-                height: 30,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primaryDark,
-                  border: Border.all(color: Colors.white, width: 2.5),
+                  color: const Color(0xFFE1306C),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.25),
@@ -817,14 +1046,21 @@ class _FloatingLogo extends StatelessWidget {
                     ),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  '${stories.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 13),
+                    const SizedBox(width: 2),
+                    Text(
+                      'قصص ${stories.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1017,6 +1253,166 @@ class _GoldStars extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================
+// ALL REVIEWS SHEET (paginated list of every reviewer)
+// ============================================================
+class _AllReviewsSheet extends StatefulWidget {
+  const _AllReviewsSheet({required this.vendorId, required this.total});
+  final int vendorId;
+  final int total;
+
+  @override
+  State<_AllReviewsSheet> createState() => _AllReviewsSheetState();
+}
+
+class _AllReviewsSheetState extends State<_AllReviewsSheet> {
+  final _service = ReviewService();
+  final _scroll = ScrollController();
+  final List<ReviewModel> _reviews = [];
+  final Set<int> _ids = {};
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loading = false;
+  bool _initialLoading = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    _loadMore();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scroll.position.pixels >=
+        _scroll.position.maxScrollExtent - 240) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || !_hasMore) return;
+    setState(() => _loading = true);
+    try {
+      final res = await _service.listPagedForVendor(
+          widget.vendorId, page: _page + 1, perPage: 15);
+      _page += 1;
+      _hasMore = res.hasMore;
+      for (final r in res.items) {
+        if (_ids.add(r.id)) _reviews.add(r);
+      }
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _initialLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _loading = false;
+          _initialLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, sheetScroll) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Grab handle
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 6, 10, 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.reviews_outlined,
+                        color: AppColors.primary, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'التقييمات (${widget.total})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      color: AppColors.textMuted,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0x22B8835A)),
+              Expanded(
+                child: _initialLoading
+                    ? const Center(child: CenteredLoader())
+                    : (_error != null && _reviews.isEmpty)
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                '$_error'
+                                    .replaceFirst('Exception: ', ''),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: AppColors.textMuted),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scroll,
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                            itemCount: _reviews.length + (_hasMore ? 1 : 0),
+                            itemBuilder: (context, i) {
+                              if (i >= _reviews.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: CenteredLoader(),
+                                );
+                              }
+                              return _ReviewCard(review: _reviews[i]);
+                            },
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1265,10 +1661,13 @@ class _StatsStrip extends StatelessWidget {
   const _StatsStrip({
     required this.vendor,
     required this.servicesFuture,
+    required this.reviewsFuture,
     required this.followers,
   });
   final VendorModel vendor;
   final Future<List<ServiceModel>> servicesFuture;
+  final Future<({List<ReviewModel> items, int total, bool hasMore})>
+      reviewsFuture;
   final int followers;
 
   @override
@@ -1306,10 +1705,14 @@ class _StatsStrip extends StatelessWidget {
             const VerticalDivider(
                 color: Color(0x22B8835A), thickness: 1, width: 1),
             Expanded(
-              child: _Stat(
-                value: '${vendor.reviewsCount ?? 0}',
-                label: 'مراجعة',
-                icon: Icons.chat_bubble_outline_rounded,
+              child: FutureBuilder<
+                  ({List<ReviewModel> items, int total, bool hasMore})>(
+                future: reviewsFuture,
+                builder: (_, snap) => _Stat(
+                  value: '${snap.data?.total ?? vendor.reviewsCount ?? 0}',
+                  label: 'مراجعة',
+                  icon: Icons.chat_bubble_outline_rounded,
+                ),
               ),
             ),
             const VerticalDivider(
@@ -1526,7 +1929,7 @@ class _SocialRow extends StatelessWidget {
       final uri = _whatsappUri(wa);
       if (uri != null) {
         items.add(_SocialItem(
-          icon: Icons.chat_rounded,
+          icon: FontAwesomeIcons.whatsapp,
           label: 'واتساب',
           gradient: const LinearGradient(
             colors: [Color(0xFF25D366), Color(0xFF128C7E)],
@@ -1544,7 +1947,7 @@ class _SocialRow extends StatelessWidget {
       final uri = _instagramUri(ig);
       if (uri != null) {
         items.add(_SocialItem(
-          icon: Icons.camera_alt_rounded,
+          icon: FontAwesomeIcons.instagram,
           label: 'إنستغرام',
           gradient: const LinearGradient(
             colors: [
@@ -1567,7 +1970,7 @@ class _SocialRow extends StatelessWidget {
       final uri = _tiktokUri(tt);
       if (uri != null) {
         items.add(_SocialItem(
-          icon: Icons.music_note_rounded,
+          icon: FontAwesomeIcons.tiktok,
           label: 'تيك توك',
           gradient: const LinearGradient(
             colors: [Color(0xFF010101), Color(0xFF222222)],
@@ -1585,7 +1988,7 @@ class _SocialRow extends StatelessWidget {
       final uri = _snapchatUri(sc);
       if (uri != null) {
         items.add(_SocialItem(
-          icon: Icons.chat_bubble_rounded,
+          icon: FontAwesomeIcons.snapchat,
           label: 'سناب شات',
           gradient: const LinearGradient(
             colors: [Color(0xFFFFFC00), Color(0xFFFFE600)],
@@ -1604,7 +2007,7 @@ class _SocialRow extends StatelessWidget {
       final uri = _facebookUri(fb);
       if (uri != null) {
         items.add(_SocialItem(
-          icon: Icons.facebook_rounded,
+          icon: FontAwesomeIcons.facebookF,
           label: 'فيسبوك',
           gradient: const LinearGradient(
             colors: [Color(0xFF1877F2), Color(0xFF0A5BCB)],

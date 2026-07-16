@@ -2,9 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 
 /// Read-only in-app map showing a vendor's location with a marker.
 /// Always stays inside the app (OpenStreetMap, no external app needed).
@@ -96,9 +96,8 @@ class _VendorMapPageState extends State<VendorMapPage> {
             '${loc.latitude},${loc.longitude}')
         : Uri.parse('https://www.google.com/maps/search/?api=1&query='
             '${Uri.encodeComponent(widget.query ?? widget.address ?? widget.title)}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
+    final ok = await openExternal(uri);
+    if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذّر فتح تطبيق الخرائط')),
       );
