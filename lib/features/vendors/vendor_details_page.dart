@@ -747,7 +747,7 @@ class _DiscountBanner extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                     children: [
-                      TextSpan(text: 'عند زيارتك لهم، أخبِرهم أنك من تطبيق '),
+                      TextSpan(text: 'عند زيارتك لنا، أخبرنا أنك من تطبيق '),
                       TextSpan(
                         text: 'أفراحنا',
                         style: TextStyle(
@@ -1878,8 +1878,6 @@ class _SocialRow extends StatelessWidget {
   final VendorModel vendor;
   final void Function(Uri uri) onOpen;
 
-  static String _digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
-
   static String _handle(String v) {
     var s = v.trim();
     if (s.startsWith('@')) s = s.substring(1);
@@ -1914,11 +1912,9 @@ class _SocialRow extends StatelessWidget {
     return Uri.parse('https://www.facebook.com/${_handle(s)}');
   }
 
-  Uri? _whatsappUri(String v) {
-    final d = _digits(v);
-    if (d.isEmpty) return null;
-    return Uri.parse('https://wa.me/$d');
-  }
+  // Opens the chat with a prefilled message so the vendor knows the enquiry
+  // came from the app.
+  Uri? _whatsappUri(String v) => vendorWhatsappUri(v);
 
   @override
   Widget build(BuildContext context) {

@@ -212,6 +212,18 @@ class _StoryTile extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.visibility_outlined,
+                      color: Colors.white, size: 12),
+                  const SizedBox(width: 3),
+                  Text(
+                    '${story.viewsCount}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),

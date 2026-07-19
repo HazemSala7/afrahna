@@ -48,7 +48,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     _ensureFuture(favs.ids);
 
     return AppScaffold(
-      appBar: const PinkAppBar(title: 'المفضلة', showBack: false),
+      appBar: const PinkAppBar(title: 'المفضلة', showBack: true),
       body: favs.ids.isEmpty
           ? const EmptyState(
               message: 'لا توجد مفضلة بعد\nأضف ما يعجبك ليظهر هنا',

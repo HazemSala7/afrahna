@@ -714,6 +714,7 @@ class StoryModel {
     this.createdAt,
     this.expiresAt,
     this.isApproved = true,
+    this.viewsCount = 0,
   });
 
   final int id;
@@ -724,6 +725,7 @@ class StoryModel {
   final VendorModel? vendor;
   final DateTime? createdAt;
   final DateTime? expiresAt;
+  final int viewsCount;
 
   /// Whether an admin has approved this story. Vendor-submitted stories start
   /// pending and only appear publicly once approved. Defaults to true for
@@ -748,6 +750,7 @@ class StoryModel {
         isApproved: json['is_approved'] == null
             ? true
             : (json['is_approved'] == true || json['is_approved'] == 1),
+        viewsCount: _toInt(json['views_count']) ?? 0,
       );
 }
 

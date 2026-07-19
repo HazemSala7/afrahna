@@ -121,8 +121,11 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                 itemBuilder: (_, i) => Stack(
                   fit: StackFit.expand,
                   children: [
+                    // Show the full uploaded image without cropping
+                    // (letterboxed on the black background).
                     AppNetworkImage(
                       url: stories[i].image,
+                      fit: BoxFit.contain,
                       fallbackIcon: Icons.image_outlined,
                     ),
                     const DecoratedBox(

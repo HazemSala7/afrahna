@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
@@ -17,19 +18,16 @@ import '../../widgets/app_widgets.dart';
 import '../account/account_page.dart';
 import '../assistant/assistant_page.dart';
 import '../auth/login_page.dart';
-import '../calendar/calendar_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
 import 'home_feed_cache.dart';
-import '../coordinator/coordinator_page.dart';
 import '../favorites/favorites_page.dart';
-import '../invitations/invitations_page.dart';
+import '../planning/planning_hub_page.dart';
 import '../notifications/notifications_page.dart';
 import '../competition/competition_dialog.dart';
 import '../offers/offer_details_page.dart';
 import '../offers/offers_page.dart';
 import '../reels/reels_page.dart';
-import '../tasks/tasks_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
 
@@ -58,7 +56,7 @@ class _HomePageState extends State<HomePage> {
     // Children order (start→end / right→left): حسابي، المفضلة، الرئيسية، ريلز، بحث.
     final pages = <Widget>[
       const AccountPage(),          // 0 - حسابي (rightmost)
-      const FavoritesPage(),        // 1 - المفضلة
+      const PlanningHubPage(),      // 1 - خطّطي (planning tools hub)
       const _HomeTab(),             // 2 - الرئيسية (centre)
       const ReelsPage(),            // 3 - ريلز
       const _SearchTab(),           // 4 - بحث (leftmost)
@@ -68,7 +66,9 @@ class _HomePageState extends State<HomePage> {
       extendBody: true,
       backgroundColor: AppColors.background,
       body: IndexedStack(index: _currentTab, children: pages),
-      floatingActionButton: _currentTab == 2
+      // AI companion floats on its own when logged in; for guests it sits
+      // inline next to the "join" banner (below) so the space is used nicely.
+      floatingActionButton: (_currentTab == 2 && !showGuestBanner)
           ? AiCompanionFab(
               onTap: () {
                 Navigator.push(
@@ -84,10 +84,27 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showGuestBanner)
-            _GuestPromoBanner(
-              onLogin: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Row(
+                children: [
+                  // AI companion beside the join banner — fills the space nicely.
+                  AiCompanionFab(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AssistantPage()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _GuestPromoBanner(
+                      onLogin: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           AppBottomNav(
@@ -105,6 +122,10 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// Approximate rendered height of [_GuestPromoBanner] including its margins.
+/// Used to reserve scroll padding under the extend-body home list.
+const double _kGuestBannerHeight = 96;
+
 /// Pinned bottom banner encouraging guests to create an account / log in.
 class _GuestPromoBanner extends StatelessWidget {
   const _GuestPromoBanner({required this.onLogin});
@@ -115,7 +136,7 @@ class _GuestPromoBanner extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        margin: EdgeInsets.zero,
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -289,6 +310,15 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    // The shell uses `extendBody: true`, so this list scrolls *behind* the
+    // bottom nav (and, for guests, the "join" banner). Reserve exactly their
+    // combined height so the last sections are never hidden underneath them.
+    final isGuest = !context.watch<SessionController>().isSignedIn;
+    final bottomReserve = AppBottomNav.contentHeight +
+        MediaQuery.of(context).padding.bottom +
+        (isGuest ? _kGuestBannerHeight : 0) +
+        16;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -297,7 +327,7 @@ class _HomeTabState extends State<_HomeTab> {
           color: AppColors.primary,
           onRefresh: _refresh,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(0, 8, 0, 130),
+            padding: EdgeInsets.fromLTRB(0, 8, 0, bottomReserve),
             children: [
               _hpad(const _TopBar()),
               const SizedBox(height: 16),
@@ -317,22 +347,10 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               )),
-              const SizedBox(height: 15),
-              // Stats band with side margins.
+              const SizedBox(height: 20),
+              // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
-                delay: const Duration(milliseconds: 340),
-                child: _StatsBand(future: _statsFuture),
-              )),
-              const SizedBox(height: 15),
-              // "Advertise with us" call-to-action aimed at business owners:
-              // placed right after the reach stats so the numbers prime them.
-              _hpad(FadeSlideIn(
-                delay: const Duration(milliseconds: 360),
-                child: const _AdvertiseCta(),
-              )),
-              const SizedBox(height: 15),
-              _hpad(FadeSlideIn(
-                delay: const Duration(milliseconds: 380),
+                delay: const Duration(milliseconds: 320),
                 child: _SectionHeader(
                   title: 'الشركات المميّزة',
                   emoji: '🏆',
@@ -348,9 +366,8 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               )),
               const SizedBox(height: 12),
-              // Full-width auto-scrolling featured row.
               FadeSlideIn(
-                delay: const Duration(milliseconds: 440),
+                delay: const Duration(milliseconds: 360),
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture, userPos: _userPos),
               ),
@@ -365,7 +382,7 @@ class _HomeTabState extends State<_HomeTab> {
                   return _hpad(Padding(
                     padding: const EdgeInsets.only(top: 22),
                     child: FadeSlideIn(
-                      delay: const Duration(milliseconds: 460),
+                      delay: const Duration(milliseconds: 380),
                       child: CountdownCard(
                         title: event.title,
                         target: event.startsAt,
@@ -374,6 +391,33 @@ class _HomeTabState extends State<_HomeTab> {
                   ));
                 },
               ),
+              const SizedBox(height: 22),
+              // Planning tools: prominent coordinator banner + a row of 3 tools.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 320),
+                child: Column(
+                  children: const [
+                    _SectionHeader(title: 'خطّطي فرحك', emoji: '✨'),
+                    SizedBox(height: 12),
+                    PlanningCoordinatorBanner(),
+                    SizedBox(height: 12),
+                    PlanningToolsRow(),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 20),
+              // Stats band with side margins.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 340),
+                child: _StatsBand(future: _statsFuture),
+              )),
+              const SizedBox(height: 15),
+              // "Advertise with us" call-to-action aimed at business owners:
+              // placed right after the reach stats so the numbers prime them.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 360),
+                child: const _AdvertiseCta(),
+              )),
               const SizedBox(height: 22),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 480),
@@ -410,10 +454,21 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 580),
                 child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 28),
+              // Wedding-planning tips (full-width horizontal cards).
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 620),
+                child: const _TipsSection(),
+              ),
+              const SizedBox(height: 26),
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 640),
+                child: const _WhyAfrahnaSection(),
+              )),
+              const SizedBox(height: 26),
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 660),
-                child: const _QuickActionsRow(),
+                child: const _AppFooter(),
               )),
             ],
           ),
@@ -434,8 +489,14 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // start (right in RTL) → invisible spacer to keep logo centered
-        const SizedBox(width: 40, height: 40),
+        // start (right in RTL) → favorites shortcut (moved here from the nav).
+        _CircleIconButton(
+          icon: Icons.favorite_border_rounded,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FavoritesPage()),
+          ),
+        ),
         const Spacer(),
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -1274,6 +1335,19 @@ IconData _iconForCategory(String name) {
   return Icons.category_rounded;
 }
 
+/// Harmonious warm tints rotated across category tiles so the row feels lively
+/// and distinctive instead of a repeating block of monochrome brown. All hues
+/// sit in the same warm/earthy family as the app theme.
+const List<Color> _categoryTints = [
+  Color(0xFFDD8A6A), // terracotta
+  Color(0xFFCB9A3E), // warm gold
+  Color(0xFF8FA97E), // sage
+  Color(0xFFD98CA0), // blush rose
+  Color(0xFFAF8FC4), // soft mauve
+  Color(0xFF5FA9A0), // dusty teal
+  Color(0xFFC58256), // caramel
+];
+
 class _CategoriesGrid extends StatefulWidget {
   const _CategoriesGrid({required this.future});
   final Future<List<CategoryModel>> future;
@@ -1321,10 +1395,11 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
             showMore ? all.take(showMoreThreshold - 1).toList() : all;
 
         final items = <Widget>[
-          for (final c in visible)
+          for (final (i, c) in visible.indexed)
             _CategoryTile(
               label: c.name,
               icon: _iconForCategory(c.name),
+              tint: _categoryTints[i % _categoryTints.length],
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1338,6 +1413,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
             _CategoryTile(
               label: 'المزيد',
               icon: Icons.apps_rounded,
+              tint: AppColors.primary,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const CategoriesPage()),
@@ -1345,11 +1421,12 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
             ),
         ];
 
-        const tileSize = 84.0;
-        const spacing = 10.0;
+        const tileWidth = 78.0;
+        const tileHeight = 96.0;
+        const spacing = 8.0;
 
         return SizedBox(
-          height: tileSize,
+          height: tileHeight,
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
               if (n is UserScrollNotification) _auto.pause();
@@ -1363,8 +1440,8 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
               itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(width: spacing),
               itemBuilder: (_, i) => SizedBox(
-                width: tileSize,
-                height: tileSize,
+                width: tileWidth,
+                height: tileHeight,
                 child: items[i],
               ),
             ),
@@ -1379,51 +1456,82 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.label,
     required this.icon,
+    required this.tint,
     required this.onTap,
   });
   final String label;
   final IconData icon;
+  final Color tint;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return BouncyTap(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AppColors.primary, size: 24),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                  height: 1.1,
-                ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Soft gradient "squircle" badge with a tinted glow — gives each
+          // category its own colour so the row reads lively, not repetitive.
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.alphaBlend(tint.withValues(alpha: 0.20), Colors.white),
+                  Color.alphaBlend(tint.withValues(alpha: 0.42), Colors.white),
+                ],
               ),
+              borderRadius: BorderRadius.circular(21),
+              border: Border.all(
+                color: tint.withValues(alpha: 0.30),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: tint.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ],
-        ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Subtle glossy highlight in the top corner.
+                Positioned(
+                  top: 8,
+                  right: 10,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+                Icon(icon, color: tint, size: 27),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
+              height: 1.15,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2132,109 +2240,391 @@ class _AdvertiseCta extends StatelessWidget {
 }
 
 // ===========================================================================
-// QUICK ACTIONS
+// TIPS SECTION
 // ===========================================================================
 
-class _QuickActionsRow extends StatelessWidget {
-  const _QuickActionsRow();
+/// Horizontal row of bite-sized wedding-planning tips.
+class _TipsSection extends StatelessWidget {
+  const _TipsSection();
+
+  static const _tips =
+      <({IconData icon, String title, String body, Color tint})>[
+    (
+      icon: Icons.savings_rounded,
+      title: 'حدّدي ميزانيتك',
+      body: 'ابدئي التخطيط بميزانية واضحة قبل أي حجز.',
+      tint: Color(0xFFCB9A3E),
+    ),
+    (
+      icon: Icons.event_available_rounded,
+      title: 'احجزي مبكراً',
+      body: 'القاعات والمصوّرون المميّزون بينحجزوا بسرعة.',
+      tint: Color(0xFFDD8A6A),
+    ),
+    (
+      icon: Icons.checklist_rtl_rounded,
+      title: 'نظّمي مهامك',
+      body: 'استخدمي قائمة المهام حتى لا تفوتك أي تفصيلة.',
+      tint: Color(0xFF8FA97E),
+    ),
+    (
+      icon: Icons.reviews_rounded,
+      title: 'قارني وقيّمي',
+      body: 'اقرئي تقييمات العملاء قبل أن تقرّري.',
+      tint: Color(0xFFAF8FC4),
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final items = <_QuickAction>[
-      _QuickAction(
-        icon: Icons.checklist_rtl_rounded,
-        label: 'قائمة المهام',
-        builder: (_) => const TasksPage(),
-      ),
-      _QuickAction(
-        icon: Icons.calendar_month,
-        label: 'التقويم الذكي',
-        builder: (_) => const CalendarPage(),
-      ),
-      _QuickAction(
-        icon: Icons.assignment_rounded,
-        label: 'منسق المناسبة',
-        builder: (_) => const CoordinatorPage(),
-      ),
-      _QuickAction(
-        icon: Icons.mail_rounded,
-        label: 'دعوات إلكترونية',
-        builder: (_) => const InvitationsPage(),
-      ),
-    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _SectionHeader(title: 'نصائح لتخطيط فرحك', emoji: '💡'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 138,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+            itemCount: _tips.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              final t = _tips[i];
+              return Container(
+                width: 212,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: t.tint.withValues(alpha: 0.25)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: t.tint.withValues(alpha: 0.16),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(t.icon, color: t.tint, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            t.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Text(
+                        t.body,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.textMuted,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ===========================================================================
+// WHY AFRAHNA (trust highlights)
+// ===========================================================================
+
+class _WhyAfrahnaSection extends StatelessWidget {
+  const _WhyAfrahnaSection();
+
+  static const _features = <({IconData icon, String label, Color tint})>[
+    (
+      icon: Icons.verified_rounded,
+      label: 'شركات موثّقة',
+      tint: Color(0xFF5FA9A0),
+    ),
+    (
+      icon: Icons.groups_rounded,
+      label: 'آلاف العرسان',
+      tint: Color(0xFFDD8A6A),
+    ),
+    (
+      icon: Icons.celebration_rounded,
+      label: 'كل مناسباتك بمكان',
+      tint: Color(0xFFAF8FC4),
+    ),
+    (
+      icon: Icons.support_agent_rounded,
+      label: 'دعم دائم',
+      tint: Color(0xFFCB9A3E),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       decoration: BoxDecoration(
-        color: AppColors.primaryLight.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.primaryLight),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          for (final a in items) _QuickActionTile(action: a),
+          const Text(
+            'ليش أفراحنا؟',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'كل اللي بتحتاجيه لفرحك بمكان واحد',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final f in _features)
+                Expanded(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: f.tint.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(f.icon, color: f.tint, size: 24),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        f.label,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _QuickAction {
-  _QuickAction({required this.icon, required this.label, this.builder});
-  final IconData icon;
-  final String label;
-  final WidgetBuilder? builder;
+// ===========================================================================
+// FOOTER
+// ===========================================================================
+
+/// WhatsApp fallback used when no number is configured from the admin panel.
+const String _kFooterSupportWhatsapp = '+972595679605';
+
+class _AppFooter extends StatefulWidget {
+  const _AppFooter();
+
+  @override
+  State<_AppFooter> createState() => _AppFooterState();
 }
 
-class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({required this.action});
-  final _QuickAction action;
+class _AppFooterState extends State<_AppFooter> {
+  // Social links are configured from the admin panel (settings → social).
+  late final Future<SocialLinks> _future = SettingsService().social();
+
+  Future<void> _openUrl(String url) => openExternal(Uri.parse(url));
+
+  Future<void> _openWhatsapp(String? value) {
+    final raw = (value == null || value.isEmpty) ? _kFooterSupportWhatsapp : value;
+    if (raw.startsWith('http')) return openExternal(Uri.parse(raw));
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    return openExternal(Uri.parse('https://wa.me/$digits'));
+  }
+
+  void _soon() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('قريباً ✨'),
+      backgroundColor: AppColors.primary,
+    ));
+  }
+
+  void _tap(String? link) {
+    if (link != null && link.isNotEmpty) {
+      _openUrl(link);
+    } else {
+      _soon();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          if (action.builder != null) {
-            Navigator.of(context).push(MaterialPageRoute(builder: action.builder!));
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('قريباً ✨'),
-              backgroundColor: AppColors.primary,
-            ));
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: Column(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Icon(action.icon,
-                    color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                action.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
         ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              AppAssets.logo,
+              width: 46,
+              height: 46,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'أفراحنا',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'كل مناسباتك في مكان واحد',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 18),
+          FutureBuilder<SocialLinks>(
+            future: _future,
+            builder: (context, snap) {
+              final s = snap.data ?? const SocialLinks();
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _FooterSocial(
+                    icon: FontAwesomeIcons.instagram,
+                    onTap: () => _tap(s.instagram),
+                  ),
+                  const SizedBox(width: 12),
+                  _FooterSocial(
+                    icon: FontAwesomeIcons.facebookF,
+                    onTap: () => _tap(s.facebook),
+                  ),
+                  const SizedBox(width: 12),
+                  _FooterSocial(
+                    icon: FontAwesomeIcons.tiktok,
+                    onTap: () => _tap(s.tiktok),
+                  ),
+                  const SizedBox(width: 12),
+                  _FooterSocial(
+                    icon: FontAwesomeIcons.whatsapp,
+                    onTap: () => _openWhatsapp(s.whatsapp),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '© 2026 أفراحنا — صُنع بحب 💛',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FooterSocial extends StatelessWidget {
+  const _FooterSocial({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        child: FaIcon(icon, color: Colors.white, size: 18),
       ),
     );
   }

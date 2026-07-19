@@ -1,5 +1,32 @@
 import 'package:url_launcher/url_launcher.dart';
 
+/// Message pre-filled in WhatsApp when a user contacts a vendor from their
+/// profile, so the vendor immediately knows where the enquiry came from.
+const String kVendorWhatsappMessage =
+    'رأيت إعلانك في تطبيق أفراحنا. هل يمكننا التواصل؟';
+
+/// Builds a WhatsApp deep link for [raw] — either a phone number or an already
+/// complete wa.me/api.whatsapp link — with [message] pre-filled in the chat.
+///
+/// Returns null when [raw] holds no usable number/link.
+Uri? vendorWhatsappUri(String raw, {String message = kVendorWhatsappMessage}) {
+  final v = raw.trim();
+  if (v.isEmpty) return null;
+
+  // Already a full link: keep it, just add/override the prefilled text.
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    final parsed = Uri.tryParse(v);
+    if (parsed == null) return null;
+    return parsed.replace(
+      queryParameters: {...parsed.queryParameters, 'text': message},
+    );
+  }
+
+  final digits = v.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return null;
+  return Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(message)}');
+}
+
 /// Opens [uri] outside the app and reports whether it worked.
 ///
 /// Deliberately does NOT gate on `canLaunchUrl()`. On Android 11+ that call

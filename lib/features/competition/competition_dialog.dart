@@ -65,10 +65,13 @@ Future<void> _openLink(String? raw, {String? kind}) async {
   if (raw == null || raw.trim().isEmpty) return;
   final v = raw.trim();
   Uri uri;
-  if (v.startsWith('http')) {
+  // WhatsApp first (even for full links) so the prefilled message is kept.
+  if (kind == 'whatsapp') {
+    final wa = vendorWhatsappUri(v);
+    if (wa == null) return;
+    uri = wa;
+  } else if (v.startsWith('http')) {
     uri = Uri.parse(v);
-  } else if (kind == 'whatsapp') {
-    uri = Uri.parse('https://wa.me/${v.replaceAll(RegExp(r'\D'), '')}');
   } else if (kind == 'instagram') {
     uri = Uri.parse('https://instagram.com/${v.replaceAll('@', '')}');
   } else if (kind == 'facebook') {

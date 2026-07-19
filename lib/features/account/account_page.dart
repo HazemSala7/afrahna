@@ -6,6 +6,7 @@ import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
+import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
@@ -254,244 +255,217 @@ class _SignedInView extends StatelessWidget {
   const _SignedInView({required this.session});
   final SessionController session;
 
+  Future<void> _confirmLogout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('هل تريد الخروج من حسابك؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await session.logout();
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف الحساب'),
+        content: const Text(
+          'سيتم حذف حسابك وجميع بياناتك نهائيًا ولا يمكن التراجع عن هذا الإجراء. هل أنت متأكد؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const CenteredLoader(),
+    );
+    final deleted = await session.deleteAccount();
+    if (!context.mounted) return;
+    Navigator.pop(context); // dismiss the loading dialog
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(session.error ?? 'تعذّر حذف الحساب'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = session.user!;
+
+    void go(Widget page) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => page),
+        );
+
+    // Role-specific management shortcuts (only shown when relevant).
+    final manage = <_MenuItem>[
+      if (user.isAdmin)
+        _MenuItem(
+          icon: Icons.admin_panel_settings_rounded,
+          label: 'لوحة الإدارة',
+          tint: _kTintTeal,
+          onTap: () => go(const AdminDashboardPage()),
+        ),
+      if (user.isDelegate)
+        _MenuItem(
+          icon: Icons.badge_rounded,
+          label: 'لوحة المندوب',
+          tint: _kTintGold,
+          onTap: () => go(const DelegateDashboardPage()),
+        ),
+      if (user.isVendor)
+        _MenuItem(
+          icon: Icons.dynamic_feed_rounded,
+          label: 'محتواي (منشورات وريلز)',
+          tint: _kTintTerracotta,
+          onTap: () => go(const VendorPostsPage()),
+        ),
+      if (user.isVendor)
+        _MenuItem(
+          icon: Icons.receipt_long_rounded,
+          label: 'كشف حساب (الاشتراكات والدفعات)',
+          tint: _kTintSage,
+          onTap: () => go(const VendorStatementPage()),
+        ),
+    ];
+
+    final account = <_MenuItem>[
+      _MenuItem(
+        icon: Icons.calendar_month_rounded,
+        label: 'مناسباتي',
+        tint: _kTintMauve,
+        onTap: () => go(const BookingsPage()),
+      ),
+      _MenuItem(
+        icon: Icons.favorite_rounded,
+        label: 'المفضلة',
+        tint: _kTintRose,
+        onTap: () => go(const FavoritesPage()),
+      ),
+      _MenuItem(
+        icon: Icons.notifications_rounded,
+        label: 'الإشعارات',
+        tint: _kTintGold,
+        onTap: () => go(const NotificationsPage()),
+      ),
+    ];
+
+    final prefs = <_MenuItem>[
+      _MenuItem(
+        icon: Icons.lock_rounded,
+        label: 'تغيير كلمة المرور',
+        tint: _kTintTeal,
+        onTap: () => _showChangePasswordSheet(context),
+      ),
+      _MenuItem(
+        icon: Icons.language_rounded,
+        label: 'اللغة',
+        tint: _kTintTerracotta,
+        onTap: () => _showLanguageDialog(context),
+      ),
+    ];
+
+    final support = <_MenuItem>[
+      _MenuItem(
+        icon: Icons.help_rounded,
+        label: 'المساعدة والدعم',
+        tint: _kTintSage,
+        onTap: () => _showSupportSheet(context),
+      ),
+      _MenuItem(
+        icon: Icons.info_rounded,
+        label: 'حول التطبيق',
+        tint: _kTintMauve,
+        onTap: () => _showAboutSheet(context),
+      ),
+    ];
+
+    final danger = <_MenuItem>[
+      _MenuItem(
+        icon: Icons.logout_rounded,
+        label: 'تسجيل الخروج',
+        tint: AppColors.discount,
+        isDestructive: true,
+        onTap: () => _confirmLogout(context),
+      ),
+      _MenuItem(
+        icon: Icons.delete_forever_rounded,
+        label: 'حذف الحساب',
+        tint: AppColors.discount,
+        isDestructive: true,
+        onTap: () => _confirmDelete(context),
+      ),
+    ];
+
+    // Each block slides in slightly after the previous one.
+    var step = 0;
+    Duration next() => Duration(milliseconds: 70 * step++);
+
     return ListView(
       // Bottom padding clears the shell's floating bottom nav bar (the outer
       // Scaffold uses extendBody: true), so the last items can scroll into view.
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFE6EF), Color(0xFFFFD6E3)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: Colors.white,
-                child: Text(
-                  user.name.isNotEmpty ? user.name.characters.first : '؟',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(user.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 18)),
-                    const SizedBox(height: 2),
-                    Text(
-                      user.phone.isNotEmpty ? user.phone : (user.email ?? ''),
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 13),
-                      textDirection: TextDirection.ltr,
-                    ),
-                    if (user.role != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            user.role!,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+        FadeSlideIn(
+          delay: next(),
+          child: _ProfileHeader(
+            name: user.name,
+            subtitle: user.phone.isNotEmpty ? user.phone : (user.email ?? ''),
+            role: user.role,
           ),
         ),
-        const SizedBox(height: 20),
-        if (user.isAdmin)
-          _MenuTile(
-            icon: Icons.admin_panel_settings,
-            label: 'لوحة الإدارة',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
-            ),
-          ),
-        if (user.isDelegate)
-          _MenuTile(
-            icon: Icons.badge,
-            label: 'لوحة المندوب',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DelegateDashboardPage()),
-            ),
-          ),
-        if (user.isVendor)
-          _MenuTile(
-            icon: Icons.dynamic_feed,
-            label: 'محتواي (منشورات وريلز)',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const VendorPostsPage()),
-            ),
-          ),
-        if (user.isVendor)
-          _MenuTile(
-            icon: Icons.receipt_long_outlined,
-            label: 'كشف حساب (الاشتراكات والدفعات)',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const VendorStatementPage()),
-            ),
-          ),
-        _MenuTile(
-          icon: Icons.calendar_month,
-          label: 'مناسباتي',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const BookingsPage()),
-          ),
-        ),
-        _MenuTile(
-          icon: Icons.favorite_border,
-          label: 'المفضلة',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const FavoritesPage()),
-          ),
-        ),
-        _MenuTile(
-          icon: Icons.notifications_none,
-          label: 'الإشعارات',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const NotificationsPage()),
-          ),
-        ),
-        _MenuTile(
-          icon: Icons.lock_outline,
-          label: 'تغيير كلمة المرور',
-          onTap: () => _showChangePasswordSheet(context),
-        ),
-        _MenuTile(
-          icon: Icons.language,
-          label: 'اللغة',
-          onTap: () => _showLanguageDialog(context),
-        ),
-        _MenuTile(
-          icon: Icons.help_outline,
-          label: 'المساعدة والدعم',
-          onTap: () => _showSupportSheet(context),
-        ),
-        _MenuTile(
-          icon: Icons.info_outline,
-          label: 'حول التطبيق',
-          onTap: () => _showAboutSheet(context),
-        ),
-        const SizedBox(height: 16),
-        _MenuTile(
-          icon: Icons.logout,
-          label: 'تسجيل الخروج',
-          isDestructive: true,
-          onTap: () async {
-            final ok = await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('تسجيل الخروج'),
-                content: const Text('هل تريد الخروج من حسابك؟'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('إلغاء'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red),
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('خروج'),
-                  ),
-                ],
-              ),
-            );
-            if (ok == true) {
-              await session.logout();
-            }
-          },
-        ),
-        _MenuTile(
-          icon: Icons.delete_forever,
-          label: 'حذف الحساب',
-          isDestructive: true,
-          onTap: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('حذف الحساب'),
-                content: const Text(
-                  'سيتم حذف حسابك وجميع بياناتك نهائيًا ولا يمكن التراجع عن هذا الإجراء. هل أنت متأكد؟',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('إلغاء'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red),
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('حذف نهائي'),
-                  ),
-                ],
-              ),
-            );
-            if (confirm != true) return;
-            if (!context.mounted) return;
-
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => const CenteredLoader(),
-            );
-            final deleted = await session.deleteAccount();
-            if (!context.mounted) return;
-            Navigator.pop(context); // dismiss the loading dialog
-            if (!deleted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(session.error ?? 'تعذّر حذف الحساب'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-        ),
-        const SizedBox(height: 20),
+        if (manage.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          FadeSlideIn(delay: next(), child: const _SectionLabel('الإدارة')),
+          const SizedBox(height: 10),
+          FadeSlideIn(delay: next(), child: _MenuGroup(items: manage)),
+        ],
+        const SizedBox(height: 22),
+        FadeSlideIn(delay: next(), child: const _SectionLabel('حسابي')),
+        const SizedBox(height: 10),
+        FadeSlideIn(delay: next(), child: _MenuGroup(items: account)),
+        const SizedBox(height: 22),
+        FadeSlideIn(delay: next(), child: const _SectionLabel('الإعدادات')),
+        const SizedBox(height: 10),
+        FadeSlideIn(delay: next(), child: _MenuGroup(items: prefs)),
+        const SizedBox(height: 22),
+        FadeSlideIn(delay: next(), child: const _SectionLabel('الدعم')),
+        const SizedBox(height: 10),
+        FadeSlideIn(delay: next(), child: _MenuGroup(items: support)),
+        const SizedBox(height: 22),
+        FadeSlideIn(delay: next(), child: _MenuGroup(items: danger)),
+        const SizedBox(height: 22),
         const _PoweredByNeurex(),
         const SizedBox(height: 150),
       ],
@@ -831,54 +805,299 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   }
 }
 
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({
+// ===========================================================================
+// ACCOUNT MENU — grouped, tinted rows
+// ===========================================================================
+
+// Warm accent tints so each row reads distinctly instead of one flat brown.
+const Color _kTintTeal = Color(0xFF5FA9A0);
+const Color _kTintGold = Color(0xFFCB9A3E);
+const Color _kTintTerracotta = Color(0xFFDD8A6A);
+const Color _kTintSage = Color(0xFF8FA97E);
+const Color _kTintMauve = Color(0xFFAF8FC4);
+const Color _kTintRose = Color(0xFFD98CA0);
+
+/// One row in the account menu.
+class _MenuItem {
+  const _MenuItem({
     required this.icon,
     required this.label,
+    required this.tint,
     this.onTap,
     this.isDestructive = false,
   });
 
   final IconData icon;
   final String label;
+  final Color tint;
   final VoidCallback? onTap;
   final bool isDestructive;
+}
+
+/// Small muted heading above each menu group.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red : AppColors.primary;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+          color: AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+}
+
+/// A rounded card holding related rows, separated by hairline dividers.
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({required this.items});
+  final List<_MenuItem> items;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 66, end: 14),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: AppColors.primaryLight.withValues(alpha: 0.55),
+                ),
+              ),
+            _MenuTile(item: items[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({required this.item});
+  final _MenuItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.tint;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(item.icon, color: color, size: 21),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: item.isDestructive ? color : AppColors.textDark,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_left_rounded,
+                color: item.isDestructive
+                    ? color.withValues(alpha: 0.7)
+                    : AppColors.textMuted,
+                size: 22,
+              ),
+            ],
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, color: color, size: 22),
         ),
-        title: Text(label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: isDestructive ? Colors.red : AppColors.textDark,
-            )),
-        trailing:
-            const Icon(Icons.chevron_left, color: AppColors.textMuted),
-        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Gradient profile card at the top of the account page.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.name,
+    required this.subtitle,
+    this.role,
+  });
+
+  final String name;
+  final String subtitle;
+  final String? role;
+
+  static String _roleLabel(String r) {
+    switch (r.toLowerCase()) {
+      case 'vendor':
+        return 'مزوّد خدمة';
+      case 'admin':
+        return 'مدير';
+      case 'delegate':
+        return 'مندوب';
+      case 'customer':
+      case 'user':
+        return 'عميل';
+      default:
+        return r;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name.characters.first : '؟';
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.accent, AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: -24,
+            bottom: -34,
+            child: Icon(
+              Icons.celebration_rounded,
+              size: 130,
+              color: Colors.white.withValues(alpha: 0.10),
+            ),
+          ),
+          Positioned(
+            top: 14,
+            left: 26,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 15,
+              color: Colors.white.withValues(alpha: 0.45),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                  child: CircleAvatar(
+                    radius: 33,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 19,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          textDirection: TextDirection.ltr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      if (role != null && role!.isNotEmpty) ...[
+                        const SizedBox(height: 9),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 11, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.24),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            _roleLabel(role!),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -739,6 +739,53 @@ class StatsService {
 }
 
 // ---------------------------------------------------------------------------
+// SETTINGS / SOCIAL LINKS
+// ---------------------------------------------------------------------------
+
+/// Social-media links configured from the admin panel, shown in the app footer.
+class SocialLinks {
+  const SocialLinks({this.instagram, this.facebook, this.tiktok, this.whatsapp});
+
+  final String? instagram;
+  final String? facebook;
+  final String? tiktok;
+  final String? whatsapp;
+
+  static String? _clean(dynamic v) {
+    final s = v?.toString().trim();
+    return (s == null || s.isEmpty) ? null : s;
+  }
+
+  factory SocialLinks.fromJson(Map<String, dynamic> json) => SocialLinks(
+        instagram: _clean(json['instagram']),
+        facebook: _clean(json['facebook']),
+        tiktok: _clean(json['tiktok']),
+        whatsapp: _clean(json['whatsapp']),
+      );
+
+  bool get isEmpty =>
+      instagram == null && facebook == null && tiktok == null && whatsapp == null;
+}
+
+class SettingsService {
+  final _dio = ApiClient.instance.dio;
+
+  /// Public: social-media links for the footer. Returns empty links on failure
+  /// so the footer degrades gracefully.
+  Future<SocialLinks> social() async {
+    try {
+      final res = await _dio.get('/social-links');
+      final m = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
+      return SocialLinks.fromJson(m);
+    } catch (_) {
+      return const SocialLinks();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // REVIEWS
 // ---------------------------------------------------------------------------
 

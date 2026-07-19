@@ -85,7 +85,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   /// رقم الدعم لاستعادة كلمة المرور.
-  static const String _supportPhone = '+972595679605';
+  static const String _supportPhone = '+972599252493';
 
   Future<void> _openUri(Uri uri) async {
     final ok = await openExternal(uri);

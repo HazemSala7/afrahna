@@ -347,7 +347,9 @@ class _ReelItemState extends State<_ReelItem> {
             // Side actions (right side in RTL = leading)
             Positioned(
               left: 10,
-              bottom: 104,
+              // Lift above the bottom nav bar + the device's gesture/safe area
+              // so nothing is hidden on phones with a taller bottom inset.
+              bottom: 124 + MediaQuery.of(context).viewPadding.bottom,
               child: _SideActions(
                 logo: vendor?.logo,
                 likes: _likes,
@@ -363,7 +365,7 @@ class _ReelItemState extends State<_ReelItem> {
             Positioned(
               right: 16,
               left: 78,
-              bottom: 104,
+              bottom: 124 + MediaQuery.of(context).viewPadding.bottom,
               child: _BottomInfo(
                 vendor: vendor,
                 title: reel.title,
