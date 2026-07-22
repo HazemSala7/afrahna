@@ -10,7 +10,7 @@ import '../core/theme.dart';
 /// circle that floats above the bar.
 ///
 /// In an RTL Row the first child renders at the visual RIGHT, so the visual
-/// order left→right is: بحث | ريلز | الرئيسية | المفضلة | حسابي.
+/// order left→right is: قصص | ريلز | الرئيسية | خطّطي | حسابي.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({super.key, required this.current, required this.onTap});
 
@@ -25,28 +25,30 @@ class AppBottomNav extends StatelessWidget {
     AppNavItem('الرئيسية', Icons.home_rounded, Icons.home_rounded),
     AppNavItem('ريلز', Icons.movie_filter_outlined,
         Icons.movie_filter_rounded),
-    AppNavItem('بحث', Icons.search_rounded, Icons.search_rounded),
+    AppNavItem('القصص', Icons.auto_awesome_motion_outlined,
+        Icons.auto_awesome_motion_rounded),
   ];
 
-  // Index of the centre tab that floats above the bar.
+  // Index of the highlighted centre tab.
   static const int _centerIndex = 2;
 
-  static const double _fabSize = 64;
-  // Slightly smaller than the fab's outer radius so the button fully covers
-  // the cut-out — no page content peeks through the ring.
-  static const double _notchRadius = 35;
   static const double _barHeight = 66;
 
-  /// Vertical space the bar occupies above the system gesture inset (the bar
-  /// itself plus the floating button's overhang). Pages that use
-  /// `extendBody: true` must reserve at least this much bottom padding (plus
-  /// `MediaQuery.padding.bottom`) so scrolling content isn't hidden behind it.
-  static const double contentHeight = _barHeight + _fabSize / 2;
+  /// How far the home button rises above the bar's top edge. Kept small so the
+  /// raised button reads as a deliberate accent — NOT the full half-button
+  /// strip the old design reserved, which showed as an empty band.
+  static const double _poke = 16;
+
+  /// Diameter of the raised centre button.
+  static const double _fabSize = 54;
+
+  /// Vertical space the bar occupies above the system gesture inset. Pages that
+  /// use `extendBody: true` reserve this much bottom padding so content clears
+  /// the bar (and the raised button).
+  static const double contentHeight = _barHeight + _poke;
 
   @override
   Widget build(BuildContext context) {
-    // How far the floating circle pokes above the bar's top edge.
-    const poke = _fabSize / 2;
     // The bar itself extends under the system gesture inset for a clean edge.
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -55,78 +57,78 @@ class AppBottomNav extends StatelessWidget {
       // large system font scale.
       maxScaleFactor: 1.15,
       child: SizedBox(
-      height: _barHeight + poke + bottomInset,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // ---- The notched bar, anchored full-width to the bottom --------
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: PhysicalShape(
-              clipper: const _NotchedBarClipper(
-                notchRadius: _notchRadius,
-                topRadius: 26,
-              ),
-              color: Colors.white,
-              elevation: 14,
-              shadowColor: AppColors.primaryDark.withValues(alpha: 0.20),
-              child: SizedBox(
+        height: _barHeight + _poke + bottomInset,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // ---- White bar, flush to the bottom, full width ----
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
                 height: _barHeight + bottomInset,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomInset),
-                  child: Row(
-                    children: [
-                      // RTL: first child = visual right.
-                      _side(0),
-                      _side(1),
-                      const SizedBox(width: _notchRadius * 2),
-                      _side(3),
-                      _side(4),
-                    ],
-                  ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(26)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryDark.withValues(alpha: 0.20),
+                      blurRadius: 14,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: Row(
+                  children: [
+                    // RTL: first child = visual right.
+                    _side(0),
+                    _side(1),
+                    // Centre slot: just the label — the button floats above it.
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            items[_centerIndex].label,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: current == _centerIndex
+                                  ? AppColors.primary
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _side(3),
+                    _side(4),
+                  ],
                 ),
               ),
             ),
-          ),
-
-          // ---- Centre label, tucked below the notch ----------------------
-          Positioned(
-            bottom: bottomInset + 8,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                items[_centerIndex].label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: current == _centerIndex
-                      ? AppColors.primary
-                      : AppColors.textMuted,
+            // ---- Raised home button, poking above only in the centre ----
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _CenterFab(
+                  item: items[_centerIndex],
+                  active: current == _centerIndex,
+                  size: _fabSize,
+                  onTap: () => onTap(_centerIndex),
                 ),
               ),
             ),
-          ),
-
-          // ---- Centre floating "home" button, poking above the bar -------
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: _CenterFab(
-                item: items[_centerIndex],
-                active: current == _centerIndex,
-                size: _fabSize,
-                onTap: () => onTap(_centerIndex),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _side(int i) => Expanded(
@@ -223,6 +225,8 @@ class _SideNavButton extends StatelessWidget {
 // CENTRE FLOATING BUTTON
 // ===========================================================================
 
+/// The raised centre "home" button that floats a little above the bar. A white
+/// ring separates it from the page behind so it reads as a deliberate accent.
 class _CenterFab extends StatelessWidget {
   const _CenterFab({
     required this.item,
@@ -253,60 +257,22 @@ class _CenterFab extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          // Ring in the page background colour so the notch reads as a clean cut.
+          // Ring in the page background colour so the raised button separates
+          // cleanly from whatever content sits behind it.
           border: Border.all(color: AppColors.background, width: 4),
           boxShadow: [
             BoxShadow(
               color: AppColors.primary.withValues(alpha: active ? 0.5 : 0.35),
-              blurRadius: active ? 18 : 13,
+              blurRadius: active ? 16 : 11,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Icon(
-          item.activeIcon,
-          color: Colors.white,
-          size: 30,
-        ),
+        child: Icon(item.activeIcon, color: Colors.white, size: 26),
       ),
     );
   }
 }
 
-// ===========================================================================
-// NOTCHED BAR SHAPE
-// ===========================================================================
-
 /// Clips the bar into a rounded rectangle with a circular notch carved out of
 /// the centre of the top edge (where the floating button nests).
-class _NotchedBarClipper extends CustomClipper<Path> {
-  const _NotchedBarClipper({
-    required this.notchRadius,
-    required this.topRadius,
-  });
-
-  final double notchRadius;
-  final double topRadius;
-
-  @override
-  Path getClip(Size size) {
-    final host = Offset.zero & size;
-    final guest = Rect.fromCircle(
-      center: Offset(size.width / 2, 0),
-      radius: notchRadius,
-    );
-    final notched = const CircularNotchedRectangle().getOuterPath(host, guest);
-    final rounded = Path()
-      ..addRRect(RRect.fromRectAndCorners(
-        host,
-        topLeft: Radius.circular(topRadius),
-        topRight: Radius.circular(topRadius),
-      ));
-    return Path.combine(PathOperation.intersect, notched, rounded);
-  }
-
-  @override
-  bool shouldReclip(_NotchedBarClipper oldClipper) =>
-      oldClipper.notchRadius != notchRadius ||
-      oldClipper.topRadius != topRadius;
-}

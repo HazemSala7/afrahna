@@ -57,7 +57,7 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_forward_rounded),
+                  icon: const Icon(Icons.arrow_back_rounded),
                   onPressed: () => Navigator.pop(context),
                 ),
                 flexibleSpace: FlexibleSpaceBar(

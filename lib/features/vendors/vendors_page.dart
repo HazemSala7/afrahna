@@ -30,25 +30,94 @@ class VendorsPage extends StatefulWidget {
 }
 
 class _VendorsPageState extends State<VendorsPage> {
-  late Future<List<VendorModel>> _future;
+  static const _pageSize = 20;
+  final _service = VendorService();
   final _search = TextEditingController();
+  final _scroll = ScrollController();
   String _query = '';
   Timer? _debounce;
+
+  final List<VendorModel> _items = [];
+  final Set<int> _ids = {};
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  bool _initialLoading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
     _query = widget.initialQuery?.trim() ?? '';
     _search.text = _query;
-    _load();
+    _scroll.addListener(_onScroll);
+    _loadInitial();
   }
 
-  void _load() {
-    _future = VendorService().list(
-      categoryId: widget.category?.id,
-      query: _query.isEmpty ? null : _query,
-      featured: widget.featuredOnly ? true : null,
-    );
+  void _onScroll() {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 320) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _initialLoading = true;
+      _error = null;
+      _items.clear();
+      _ids.clear();
+      _page = 0;
+      _hasMore = true;
+    });
+    try {
+      final res = await _service.listPaged(
+        categoryId: widget.category?.id,
+        query: _query.isEmpty ? null : _query,
+        featured: widget.featuredOnly ? true : null,
+        page: 1,
+        perPage: _pageSize,
+      );
+      _page = 1;
+      _hasMore = res.hasMore;
+      _addAll(res.items);
+      if (mounted) setState(() => _initialLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _initialLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _initialLoading) return;
+    _loadingMore = true;
+    setState(() {});
+    try {
+      final res = await _service.listPaged(
+        categoryId: widget.category?.id,
+        query: _query.isEmpty ? null : _query,
+        featured: widget.featuredOnly ? true : null,
+        page: _page + 1,
+        perPage: _pageSize,
+      );
+      _page += 1;
+      _hasMore = res.hasMore;
+      _addAll(res.items);
+    } catch (_) {
+      // keep what we have; a later scroll retries
+    } finally {
+      _loadingMore = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _addAll(Iterable<VendorModel> vs) {
+    for (final v in vs) {
+      if (_ids.add(v.id)) _items.add(v);
+    }
   }
 
   /// Live search: re-query shortly after the user stops typing so every
@@ -58,10 +127,8 @@ class _VendorsPageState extends State<VendorsPage> {
     _debounce = Timer(const Duration(milliseconds: 350), () {
       final q = value.trim();
       if (q == _query) return;
-      setState(() {
-        _query = q;
-        _load();
-      });
+      _query = q;
+      _loadInitial();
     });
   }
 
@@ -69,6 +136,7 @@ class _VendorsPageState extends State<VendorsPage> {
   void dispose() {
     _debounce?.cancel();
     _search.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -98,10 +166,8 @@ class _VendorsPageState extends State<VendorsPage> {
                 onChanged: _onSearchChanged,
                 onSubmitted: (v) {
                   _debounce?.cancel();
-                  setState(() {
-                    _query = v.trim();
-                    _load();
-                  });
+                  _query = v.trim();
+                  _loadInitial();
                 },
                 decoration: const InputDecoration(
                   hintText: 'ابحث بالاسم...',
@@ -112,31 +178,36 @@ class _VendorsPageState extends State<VendorsPage> {
             ),
           ),
           Expanded(
-            child: FutureBuilder<List<VendorModel>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const CenteredLoader();
-                }
-                if (snap.hasError) {
+            child: Builder(
+              builder: (context) {
+                if (_initialLoading) return const CenteredLoader();
+                if (_error != null && _items.isEmpty) {
                   return ErrorState(
-                    message: snap.error.toString(),
-                    onRetry: () => setState(_load),
+                    message: _error.toString(),
+                    onRetry: _loadInitial,
                   );
                 }
-                final items = snap.data ?? const [];
-                if (items.isEmpty) {
+                if (_items.isEmpty) {
                   return const EmptyState(
                       message: 'لا يوجد مزوّدون مطابقون');
                 }
-                return ListView.separated(
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: 12),
-                  itemBuilder: (_, i) =>
-                      _VendorTile(vendor: items[i]),
+                return RefreshIndicator(
+                  onRefresh: _loadInitial,
+                  child: ListView.separated(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    itemCount: _items.length + (_hasMore ? 1 : 0),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) {
+                      if (i >= _items.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: AfrahnaLoader(size: 38)),
+                        );
+                      }
+                      return _VendorTile(vendor: _items[i]);
+                    },
+                  ),
                 );
               },
             ),

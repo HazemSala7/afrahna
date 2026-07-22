@@ -184,6 +184,10 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Let content scroll *behind* the floating nav bar (same as the home
+      // shell). Without this the Scaffold also reserves the bar's height, which
+      // left an empty band around the floating card at the bottom of the page.
+      extendBody: true,
       body: FutureBuilder<VendorModel>(
         future: _vendorFuture,
         builder: (context, snap) {
@@ -429,7 +433,13 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             );
                           },
                         ),
-                        const SizedBox(height: 110),
+                        // Clear the floating nav bar (and the system gesture
+                        // inset) so the last section is never hidden under it.
+                        SizedBox(
+                          height: AppBottomNav.contentHeight +
+                              MediaQuery.of(context).padding.bottom +
+                              16,
+                        ),
                       ],
                     ),
                   ),
@@ -513,7 +523,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                 child: Row(
                   children: [
                     _GlassIconButton(
-                      icon: Icons.arrow_forward_rounded,
+                      icon: Icons.arrow_back_rounded,
                       onTap: () => Navigator.pop(context),
                     ),
                     const Spacer(),

@@ -634,6 +634,26 @@ class PostService {
     }
   }
 
+  /// Edit a post/reel — the vendor may change its caption (title/body) and
+  /// publish state. The video itself stays as-is.
+  Future<PostModel> update(
+    int id, {
+    String? title,
+    String? body,
+    bool? isPublished,
+  }) async {
+    try {
+      final res = await _dio.put('/posts/$id', data: {
+        'title': ?title,
+        'body': ?body,
+        'is_published': ?isPublished,
+      });
+      return PostModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<void> delete(int id) async {
     try {
       await _dio.delete('/posts/$id');

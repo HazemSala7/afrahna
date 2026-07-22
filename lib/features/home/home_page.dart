@@ -6,11 +6,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/accounts_services.dart';
 import '../../core/services/event_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/category_icon.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -20,6 +22,8 @@ import '../assistant/assistant_page.dart';
 import '../auth/login_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
+import '../coordinator/coordinator_page.dart';
+import '../invitation/invitation_designer_page.dart';
 import 'home_feed_cache.dart';
 import '../favorites/favorites_page.dart';
 import '../planning/planning_hub_page.dart';
@@ -27,7 +31,9 @@ import '../notifications/notifications_page.dart';
 import '../competition/competition_dialog.dart';
 import '../offers/offer_details_page.dart';
 import '../offers/offers_page.dart';
+import '../posts/post_details_page.dart';
 import '../reels/reels_page.dart';
+import '../stories/all_stories_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
 
@@ -52,14 +58,14 @@ class _HomePageState extends State<HomePage> {
     final showGuestBanner = isGuest && _currentTab == 2;
     // In an RTL Row, the first child is rendered at the start (visual RIGHT).
     // For natural Arabic UX we want: حسابي (account) on the RIGHT
-    // and بحث (search) on the LEFT, with الرئيسية in the centre.
-    // Children order (start→end / right→left): حسابي، المفضلة، الرئيسية، ريلز، بحث.
+    // and القصص (stories) on the LEFT, with الرئيسية in the centre.
+    // Children order (start→end / right→left): حسابي، خطّطي، الرئيسية، ريلز، القصص.
     final pages = <Widget>[
       const AccountPage(),          // 0 - حسابي (rightmost)
       const PlanningHubPage(),      // 1 - خطّطي (planning tools hub)
       const _HomeTab(),             // 2 - الرئيسية (centre)
       const ReelsPage(),            // 3 - ريلز
-      const _SearchTab(),           // 4 - بحث (leftmost)
+      const AllStoriesPage(),       // 4 - القصص (leftmost)
     ];
 
     return Scaffold(
@@ -236,6 +242,7 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<VendorModel>> _topVendorsFuture;
   late Future<List<VendorModel>> _featuredVendorsFuture;
   late Future<List<SliderModel>> _slidersFuture;
+  late Future<List<PostModel>> _latestPostsFuture;
   late Future<HomeStats> _statsFuture;
   Future<EventModel?> _mainEventFuture = Future.value(null);
 
@@ -276,6 +283,8 @@ class _HomeTabState extends State<_HomeTab> {
       _slidersFuture = HomeFeedCache.loadSliders();
       _statsFuture = StatsService().get();
     }
+    // Latest posts (newest first) for the home "آخر المنشورات" row.
+    _latestPostsFuture = PostService().list(type: PostType.post, perPage: 15);
     _mainEventFuture = _loadMainEvent();
   }
 
@@ -396,12 +405,56 @@ class _HomeTabState extends State<_HomeTab> {
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 320),
                 child: Column(
-                  children: const [
-                    _SectionHeader(title: 'خطّطي فرحك', emoji: '✨'),
-                    SizedBox(height: 12),
-                    PlanningCoordinatorBanner(),
-                    SizedBox(height: 12),
-                    PlanningToolsRow(),
+                  children: [
+                    const _SectionHeader(title: 'خطّطي فرحك', emoji: '✨'),
+                    const SizedBox(height: 12),
+                    // Coordinator + card designer side by side.
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _PlanCompactCard(
+                              colors: const [
+                                Color(0xFF57B3A8),
+                                Color(0xFF4FA69C),
+                                Color(0xFF2F7C74),
+                              ],
+                              icon: Icons.assignment_rounded,
+                              title: 'منسق المناسبة',
+                              subtitle: 'خطّطي تفاصيل يومك خطوة بخطوة',
+                              badge: 'مميّز',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const CoordinatorPage()),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _PlanCompactCard(
+                              colors: const [
+                                Color(0xFF8B5A3C),
+                                Color(0xFFB8835A),
+                                Color(0xFFD4A373),
+                              ],
+                              icon: Icons.card_giftcard_rounded,
+                              title: 'صمّم كرت فرحك',
+                              subtitle: 'اختر قالبك واطلبه من أفراحنا',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const InvitationDesignerPage()),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const PlanningToolsRow(),
                   ],
                 ),
               )),
@@ -453,6 +506,20 @@ class _HomeTabState extends State<_HomeTab> {
               FadeSlideIn(
                 delay: const Duration(milliseconds: 580),
                 child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
+              ),
+              const SizedBox(height: 26),
+              // Latest posts — horizontal scroll of the newest vendor posts.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 600),
+                child: const _SectionHeader(
+                  title: 'آخر المنشورات',
+                  emoji: '📝',
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 640),
+                child: _LatestPostsRow(future: _latestPostsFuture),
               ),
               const SizedBox(height: 28),
               // Wedding-planning tips (full-width horizontal cards).
@@ -1133,24 +1200,36 @@ class _HeroBannerState extends State<_HeroBanner> {
                     start: 0,
                     end: 0,
                     bottom: 10,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(_slides.length, (i) {
-                        final active = i == _index;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: active ? 18 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: active
-                                ? AppColors.primary
-                                : Colors.white.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        );
-                      }),
-                    ),
+                    child: Builder(builder: (_) {
+                      // Never render more than 10 dots — with many VIP slides a
+                      // full row becomes a cramped, unreadable line. Slides past
+                      // the 10th keep the last dot active so there's always an
+                      // indicator lit.
+                      const maxDots = 10;
+                      final dotCount = _slides.length > maxDots
+                          ? maxDots
+                          : _slides.length;
+                      final activeDot =
+                          _index >= dotCount ? dotCount - 1 : _index;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(dotCount, (i) {
+                          final active = i == activeDot;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: active ? 18 : 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? AppColors.primary
+                                  : Colors.white.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      );
+                    }),
                   ),
               ],
             ),
@@ -1294,46 +1373,6 @@ class _HeroSlideView extends StatelessWidget {
 // CATEGORIES GRID (2 rows × 5 columns)
 // ===========================================================================
 
-IconData _iconForCategory(String name) {
-  final n = name.toLowerCase();
-  if (n.contains('سيار') || n.contains('car')) {
-    return Icons.directions_car_filled_rounded;
-  }
-  if (n.contains('فستان') || n.contains('بدل') || n.contains('dress')) {
-    return Icons.checkroom_rounded;
-  }
-  if (n.contains('dj') || n.contains('موسيق') || n.contains('زف')) {
-    return Icons.music_note_rounded;
-  }
-  if (n.contains('صور') || n.contains('استوديو') || n.contains('photo')) {
-    return Icons.photo_camera_rounded;
-  }
-  if (n.contains('قاع') || n.contains('صال') || n.contains('hall')) {
-    return Icons.holiday_village_rounded;
-  }
-  if (n.contains('حلوي') || n.contains('كيك') || n.contains('cake')) {
-    return Icons.cake_rounded;
-  }
-  if (n.contains('ورد') || n.contains('زهور') || n.contains('flower')) {
-    return Icons.local_florist_rounded;
-  }
-  if (n.contains('فندق') || n.contains('شقة') || n.contains('hotel')) {
-    return Icons.hotel_rounded;
-  }
-  if (n.contains('مطعم') ||
-      n.contains('قهوة') ||
-      n.contains('طعام') ||
-      n.contains('cater')) {
-    return Icons.local_cafe_rounded;
-  }
-  if (n.contains('مكياج') || n.contains('makeup')) {
-    return Icons.face_retouching_natural;
-  }
-  if (n.contains('دعو') || n.contains('invit')) {
-    return Icons.mail_rounded;
-  }
-  return Icons.category_rounded;
-}
 
 /// Harmonious warm tints rotated across category tiles so the row feels lively
 /// and distinctive instead of a repeating block of monochrome brown. All hues
@@ -1398,7 +1437,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
           for (final (i, c) in visible.indexed)
             _CategoryTile(
               label: c.name,
-              icon: _iconForCategory(c.name),
+              icon: categoryIcon(c.name),
               tint: _categoryTints[i % _categoryTints.length],
               onTap: () => Navigator.push(
                 context,
@@ -1916,14 +1955,16 @@ class _FeaturedVendorCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                // Sits just inside the gold ring so it doesn't break the
+                // circle's outline.
                 PositionedDirectional(
-                  bottom: -2,
-                  end: -2,
+                  bottom: 2,
+                  end: 2,
                   child: TierBadge(
                     vip: vendor.isVip,
                     featured: vendor.isPremium ||
                         vendor.activePlan == 'featured',
-                    size: 26,
+                    size: 19,
                   ),
                 ),
               ],
@@ -2023,6 +2064,281 @@ class _TopRatedRow extends StatelessWidget {
             itemBuilder: (_, i) => _TopRatedCard(vendor: top[i]),
           );
         },
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// COMPACT PLANNING CARD — coordinator / card-designer, side by side
+// ===========================================================================
+
+class _PlanCompactCard extends StatelessWidget {
+  const _PlanCompactCard({
+    required this.colors,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.badge,
+  });
+
+  final List<Color> colors; // [light, base, dark]
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Color.alphaBlend(
+        Colors.black.withValues(alpha: 0.35), colors[1]);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: colors[1].withValues(alpha: 0.42),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 1.2),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 23),
+                ),
+                const Spacer(),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(badge!,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 9.5)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15)),
+            const SizedBox(height: 5),
+            Text(subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.35)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('ابدأ الآن',
+                      style: TextStyle(
+                          color: dark,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11.5)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_back_rounded, color: dark, size: 15),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// LATEST POSTS ROW
+// ===========================================================================
+
+class _LatestPostsRow extends StatelessWidget {
+  const _LatestPostsRow({required this.future});
+  final Future<List<PostModel>> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 234,
+      child: FutureBuilder<List<PostModel>>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: AfrahnaLoader(size: 42));
+          }
+          final items = (snap.data ?? const <PostModel>[])
+              .where((p) =>
+                  p.gallery.isNotEmpty ||
+                  (p.mediaUrl?.isNotEmpty ?? false) ||
+                  ((p.body ?? '').trim().isNotEmpty) ||
+                  ((p.title ?? '').trim().isNotEmpty))
+              .take(12)
+              .toList();
+          if (items.isEmpty) {
+            return _EmptyMini(text: 'لا توجد منشورات بعد');
+          }
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _LatestPostCard(post: items[i]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LatestPostCard extends StatelessWidget {
+  const _LatestPostCard({required this.post});
+  final PostModel post;
+
+  @override
+  Widget build(BuildContext context) {
+    final img = post.gallery.isNotEmpty ? post.gallery.first : post.mediaUrl;
+    final vendor = post.vendor;
+    final logo = vendor?.logo;
+    final text = (post.title?.trim().isNotEmpty ?? false)
+        ? post.title!.trim()
+        : (post.body?.trim() ?? '');
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PostDetailsPage(post: post)),
+      ),
+      child: Container(
+        width: 172,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 118,
+              width: double.infinity,
+              child: (img != null && img.isNotEmpty)
+                  ? AppNetworkImage(
+                      url: img,
+                      fit: BoxFit.cover,
+                      fallbackIcon: Icons.image_outlined,
+                    )
+                  : Container(
+                      color: AppColors.primaryLight,
+                      child: const Center(
+                        child: Icon(Icons.article_rounded,
+                            color: AppColors.primary, size: 34),
+                      ),
+                    ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 11,
+                          backgroundColor: AppColors.primaryLight,
+                          backgroundImage: (logo != null && logo.isNotEmpty)
+                              ? NetworkImage(logo)
+                              : null,
+                          child: (logo == null || logo.isEmpty)
+                              ? const Icon(Icons.storefront_rounded,
+                                  size: 12, color: AppColors.primaryDark)
+                              : null,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            vendor?.name ?? 'معلن',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: Text(
+                        text.isNotEmpty ? text : 'منشور جديد',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          height: 1.4,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

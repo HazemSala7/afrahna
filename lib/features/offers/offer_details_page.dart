@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 import '../../core/models/models.dart';
 import '../../core/theme.dart';
@@ -15,105 +16,343 @@ class OfferDetailsPage extends StatelessWidget {
       ? '—'
       : '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  /// True while the offer's date window includes today.
+  bool get _isActive {
+    final now = DateTime.now();
+    final okStart = promo.startDate == null || !now.isBefore(promo.startDate!);
+    final okEnd = promo.endDate == null ||
+        !now.isAfter(promo.endDate!.add(const Duration(days: 1)));
+    return okStart && okEnd;
+  }
+
   @override
   Widget build(BuildContext context) {
     final images = promo.gallery;
     final vendor = promo.vendor;
+    final topInset = MediaQuery.of(context).padding.top;
+    // Hero extends up under the status bar; give it room + the visible height.
+    final heroHeight = topInset + 250;
 
-    return AppScaffold(
-      appBar: const PinkAppBar(title: 'تفاصيل العرض'),
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // ---- Gallery ----
-          Stack(
-            children: [
-              _OfferGallery(images: images),
-              if (promo.discountLabel.isNotEmpty)
-                PositionedDirectional(
-                  top: 14,
-                  start: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF5A5F), Color(0xFFE0353B)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE0353B).withValues(alpha: 0.45),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Stack(
+          children: [
+            ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                // ---- Full-bleed hero (edge-to-edge, under the status bar) ----
+                Stack(
+                  children: [
+                    _OfferGallery(images: images, height: heroHeight),
+                    // Top scrim so the back button + status bar icons stay legible.
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: topInset + 60,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.35),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
                         ),
+                      ),
+                    ),
+                    // Bottom scrim for a soft blend into the sheet.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 90,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.25),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Discount badge (below the status bar).
+                    if (promo.discountLabel.isNotEmpty)
+                      PositionedDirectional(
+                        top: topInset + 10,
+                        end: 14,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 13, vertical: 7),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF5A5F), Color(0xFFE0353B)],
+                            ),
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE0353B)
+                                    .withValues(alpha: 0.5),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.local_offer_rounded,
+                                  color: Colors.white, size: 14),
+                              const SizedBox(width: 5),
+                              Text('خصم ${promo.discountLabel}',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                // ---- Content sheet overlapping the hero ----
+                Transform.translate(
+                  offset: const Offset(0, -24),
+                  child: Container(
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(26)),
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title + status
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFF6A93B), AppColors.primary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.local_fire_department_rounded,
+                            color: Colors.white, size: 23),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(promo.title,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                    height: 1.25,
+                                    color: AppColors.textDark)),
+                            const SizedBox(height: 4),
+                            _StatusChip(active: _isActive),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (promo.startDate != null || promo.endDate != null) ...[
+                    const SizedBox(height: 16),
+                    _InfoTile(
+                      icon: Icons.event_available_rounded,
+                      label: 'مدة العرض',
+                      value:
+                          'من ${_fmt(promo.startDate)} إلى ${_fmt(promo.endDate)}',
+                    ),
+                  ],
+
+                  if (promo.description.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      children: const [
+                        Icon(Icons.info_outline_rounded,
+                            size: 18, color: AppColors.primary),
+                        SizedBox(width: 6),
+                        Text('تفاصيل العرض',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15.5,
+                                color: AppColors.textDark)),
                       ],
                     ),
-                    child: Text('خصم ${promo.discountLabel}',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13)),
-                  ),
-                ),
-            ],
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.cardShadow,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Text(promo.description,
+                          style: const TextStyle(
+                              color: AppColors.textDark,
+                              height: 1.85,
+                              fontSize: 14)),
+                    ),
+                  ],
+
+                  if (vendor != null) ...[
+                    const SizedBox(height: 20),
+                    _VendorRow(vendor: vendor),
+                  ] else if (promo.vendorId != null) ...[
+                    const SizedBox(height: 20),
+                    _VisitShopButton(vendorId: promo.vendorId!),
+                  ],
+                ],
+              ),
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              ],
+            ),
+            // Floating glass back button — RTL: start = the right side.
+            PositionedDirectional(
+              top: topInset + 6,
+              start: 8,
+              child: _GlassBackButton(onTap: () => Navigator.pop(context)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A round translucent back button placed over the hero image.
+class _GlassBackButton extends StatelessWidget {
+  const _GlassBackButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.28),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+/// "ساري / منتهي" status pill.
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = active ? const Color(0xFF2E9E5B) : AppColors.textMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(active ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              size: 13, color: c),
+          const SizedBox(width: 4),
+          Text(active ? 'ساري الآن' : 'منتهي',
+              style: TextStyle(
+                  color: c, fontWeight: FontWeight.w800, fontSize: 11.5)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A soft info row (icon badge + label + value).
+class _InfoTile extends StatelessWidget {
+  const _InfoTile(
+      {required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 19, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(promo.title,
+                Text(label,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
-                        color: AppColors.textDark)),
-                if (promo.startDate != null || promo.endDate != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.event,
-                            size: 16, color: AppColors.primary),
-                        const SizedBox(width: 6),
-                        Text('ساري من ${_fmt(promo.startDate)} إلى ${_fmt(promo.endDate)}',
-                            style: const TextStyle(
-                                color: AppColors.textDark,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ],
-                if (promo.description.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text('تفاصيل العرض',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: AppColors.textDark)),
-                  const SizedBox(height: 6),
-                  Text(promo.description,
-                      style: const TextStyle(
-                          color: AppColors.textDark,
-                          height: 1.7,
-                          fontSize: 14)),
-                ],
-                if (vendor != null) ...[
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _VendorRow(vendor: vendor),
-                ] else if (promo.vendorId != null) ...[
-                  const SizedBox(height: 20),
-                  _VisitShopButton(vendorId: promo.vendorId!),
-                ],
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        color: AppColors.textDark,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -217,8 +456,9 @@ class _VisitShopButton extends StatelessWidget {
 
 /// Full-width swipeable gallery header for the offer.
 class _OfferGallery extends StatefulWidget {
-  const _OfferGallery({required this.images});
+  const _OfferGallery({required this.images, this.height = 280});
   final List<String> images;
+  final double height;
 
   @override
   State<_OfferGallery> createState() => _OfferGalleryState();
@@ -238,7 +478,7 @@ class _OfferGalleryState extends State<_OfferGallery> {
   Widget build(BuildContext context) {
     final imgs = widget.images;
     return SizedBox(
-      height: 280,
+      height: widget.height,
       width: double.infinity,
       child: imgs.length <= 1
           ? AppNetworkImage(
@@ -261,8 +501,8 @@ class _OfferGalleryState extends State<_OfferGallery> {
                   ),
                 ),
                 PositionedDirectional(
-                  top: 14,
-                  end: 14,
+                  bottom: 36,
+                  end: 12,
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -280,7 +520,7 @@ class _OfferGalleryState extends State<_OfferGallery> {
                 PositionedDirectional(
                   start: 0,
                   end: 0,
-                  bottom: 12,
+                  bottom: 36,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(imgs.length, (i) {

@@ -31,16 +31,20 @@ class PostDetailsPage extends StatefulWidget {
     super.key,
     required this.post,
     this.focusComment = false,
-    this.liked = false,
-    this.likes = 0,
-    this.comments = 0,
+    this.liked,
+    this.likes,
+    this.comments,
   });
 
   final PostModel post;
   final bool focusComment;
-  final bool liked;
-  final int likes;
-  final int comments;
+
+  /// Live like/comment state from the caller (e.g. the feed card). When null,
+  /// the page falls back to the post's own counts — this is what the home
+  /// "latest posts" row relies on, otherwise every post showed 0/0.
+  final bool? liked;
+  final int? likes;
+  final int? comments;
 
   @override
   State<PostDetailsPage> createState() => _PostDetailsPageState();
@@ -62,14 +66,34 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _liked = widget.liked;
-    _likes = widget.likes;
-    _comments = widget.comments;
+    _liked = widget.liked ?? widget.post.isLiked;
+    _likes = widget.likes ?? widget.post.likesCount;
+    _comments = widget.comments ?? widget.post.commentsCount;
     _future = _commentService.list(widget.post.id);
+    // The caller may hand us a stale, cached post (e.g. the home "latest posts"
+    // row). Pull the live counts + like state from the server so a like made
+    // earlier is reflected when the post is reopened.
+    _refreshPost();
     if (widget.focusComment) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _inputFocus.requestFocus();
       });
+    }
+  }
+
+  /// Reconcile like/comment state with the server (skipped while a like toggle
+  /// is in flight so we never clobber the user's optimistic tap).
+  Future<void> _refreshPost() async {
+    try {
+      final fresh = await _service.show(widget.post.id);
+      if (!mounted || _liking) return;
+      setState(() {
+        _liked = fresh.isLiked;
+        _likes = fresh.likesCount;
+        _comments = fresh.commentsCount;
+      });
+    } catch (_) {
+      // Keep the values we already have.
     }
   }
 

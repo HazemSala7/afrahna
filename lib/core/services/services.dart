@@ -263,6 +263,51 @@ class VendorService {
     }
   }
 
+  /// Paginated vendor list — returns the page items plus whether more pages
+  /// exist, so lists can load-more on scroll instead of showing only page 1.
+  Future<({List<VendorModel> items, bool hasMore})> listPaged({
+    int? categoryId,
+    int? parentCategoryId,
+    int? cityId,
+    String? query,
+    bool? featured,
+    bool? verified,
+    bool? vip,
+    int? userId,
+    int? delegateId,
+    bool? activeOnly,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    try {
+      final res = await _dio.get('/vendors', queryParameters: {
+        'category_id': ?categoryId,
+        'parent_category_id': ?parentCategoryId,
+        'city_id': ?cityId,
+        if (query != null && query.isNotEmpty) 'q': query,
+        if (featured == true) 'featured': 1,
+        if (verified == true) 'verified': 1,
+        if (vip == true) 'vip': 1,
+        'user_id': ?userId,
+        'delegate_id': ?delegateId,
+        if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(VendorModel.fromJson).toList();
+      var hasMore = false;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num && lp is num) hasMore = cp.toInt() < lp.toInt();
+      }
+      return (items: items, hasMore: hasMore);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<VendorModel> show(int id) async {
     try {
       final res = await _dio.get('/vendors/$id');
@@ -859,6 +904,19 @@ class StoryService {
       final res = await _dio.get('/stories', queryParameters: {
         'vendor_id': vendorId,
         'per_page': 30,
+      });
+      return _unwrapList(res.data).map(StoryModel.fromJson).toList();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// All active/approved stories across every vendor (each carries its vendor),
+  /// newest first — used by the app-wide stories screen.
+  Future<List<StoryModel>> listAll({int perPage = 200}) async {
+    try {
+      final res = await _dio.get('/stories', queryParameters: {
+        'per_page': perPage,
       });
       return _unwrapList(res.data).map(StoryModel.fromJson).toList();
     } catch (e) {

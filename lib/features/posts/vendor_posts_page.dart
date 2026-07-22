@@ -5,6 +5,7 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../widgets/app_widgets.dart';
 import '../services/create_service_page.dart';
 import '../vendors/edit_vendor_page.dart';
 import '../vendors/manage_highlights_page.dart';
@@ -629,7 +630,9 @@ class _ServicesListState extends State<_ServicesList>
     try {
       await _service.delete(s.id);
       if (!mounted) return;
-      setState(() => _f = widget.loader());
+      setState(() {
+        _f = widget.loader();
+      });
       widget.onChanged();
     } on ApiException catch (e) {
       if (mounted) {
@@ -646,7 +649,9 @@ class _ServicesListState extends State<_ServicesList>
       ),
     );
     if (ok == true && mounted) {
-      setState(() => _f = widget.loader());
+      setState(() {
+        _f = widget.loader();
+      });
       widget.onChanged();
     }
   }
@@ -655,7 +660,9 @@ class _ServicesListState extends State<_ServicesList>
   Widget build(BuildContext context) {
     super.build(context);
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _f = widget.loader()),
+      onRefresh: () async => setState(() {
+        _f = widget.loader();
+      }),
       child: FutureBuilder<List<ServiceModel>>(
         future: _f,
         builder: (context, snap) {
@@ -842,6 +849,7 @@ class _PostList extends StatefulWidget {
 
 class _PostListState extends State<_PostList>
     with AutomaticKeepAliveClientMixin {
+  final _service = PostService();
   late Future<List<PostModel>> _f;
 
   @override
@@ -853,16 +861,111 @@ class _PostListState extends State<_PostList>
   @override
   bool get wantKeepAlive => true;
 
+  void _reload() {
+    // Block body required: `setState(() => _f = ...)` returns the assigned
+    // Future, which Flutter rejects.
+    setState(() {
+      _f = widget.loader();
+    });
+  }
+
+  Future<void> _delete(PostModel p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف'),
+        content: const Text('هل تريد حذف هذا العنصر نهائيًا؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.delete(p.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('تم الحذف')));
+        _reload();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('تعذّر الحذف: $e')));
+      }
+    }
+  }
+
+  Future<void> _edit(PostModel p) async {
+    final titleCtrl = TextEditingController(text: p.title ?? '');
+    final bodyCtrl = TextEditingController(text: p.body ?? '');
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تعديل'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'العنوان'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: bodyCtrl,
+              maxLines: 4,
+              minLines: 1,
+              decoration: const InputDecoration(labelText: 'الوصف'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    titleCtrl.dispose();
+    bodyCtrl.dispose();
+    if (saved != true) return;
+    try {
+      await _service.update(p.id,
+          title: titleCtrl.text.trim(), body: bodyCtrl.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('تم الحفظ')));
+        _reload();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _f = widget.loader()),
+      onRefresh: () async => _reload(),
       child: FutureBuilder<List<PostModel>>(
         future: _f,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AfrahnaLoader(size: 46));
           }
           if (snap.hasError) {
             final e = snap.error;
@@ -874,14 +977,21 @@ class _PostListState extends State<_PostList>
           final items = snap.data ?? const [];
           if (items.isEmpty) {
             return ListView(children: const [
-              SizedBox(height: 80),
+              SizedBox(height: 100),
+              Icon(Icons.movie_filter_outlined,
+                  size: 56, color: AppColors.primaryLight),
+              SizedBox(height: 12),
               Center(child: Text('لا يوجد محتوى بعد')),
             ]);
           }
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: items.length,
-            itemBuilder: (_, i) => _PostCard(post: items[i]),
+            itemBuilder: (_, i) => _PostCard(
+              post: items[i],
+              onEdit: () => _edit(items[i]),
+              onDelete: () => _delete(items[i]),
+            ),
           );
         },
       ),
@@ -890,58 +1000,131 @@ class _PostListState extends State<_PostList>
 }
 
 class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post});
+  const _PostCard({required this.post, this.onEdit, this.onDelete});
   final PostModel post;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  bool get _isReel => post.type == PostType.reel;
+
+  Widget _thumb() {
+    // Reels are videos — never try to render the video URL as an image.
+    final url = post.thumbnail ?? (_isReel ? null : post.mediaUrl);
+    Widget placeholder() => Container(
+          color: Colors.black87,
+          child: Center(
+            child: Icon(
+              _isReel ? Icons.play_circle_fill_rounded : Icons.image_outlined,
+              color: Colors.white70,
+              size: 30,
+            ),
+          ),
+        );
+    if (url == null || url.isEmpty) return placeholder();
+    return Image.network(url,
+        fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder());
+  }
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (post.thumbnail != null || post.mediaUrl != null)
-            AspectRatio(
-              aspectRatio: post.type == PostType.reel ? 9 / 16 : 16 / 9,
-              child: Image.network(
-                post.thumbnail ?? post.mediaUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    Container(color: Colors.black12, child: const Icon(Icons.broken_image)),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (post.title != null && post.title!.isNotEmpty)
-                  Text(post.title!,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                if (post.body != null && post.body!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(post.body!, maxLines: 4, overflow: TextOverflow.ellipsis),
-                ],
-                const SizedBox(height: 8),
-                Row(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Compact portrait thumbnail (reel) / landscape (course).
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: _isReel ? 82 : 112,
+                height: _isReel ? 116 : 82,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    if (post.type == PostType.course && post.price != null)
-                      Chip(label: Text('السعر: ${post.price}')),
-                    const Spacer(),
-                    Icon(Icons.remove_red_eye, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text('${post.viewsCount}'),
-                    const SizedBox(width: 12),
-                    Icon(Icons.favorite, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text('${post.likesCount}'),
+                    _thumb(),
+                    if (_isReel)
+                      const Center(
+                        child: Icon(Icons.play_circle_fill_rounded,
+                            color: Colors.white, size: 30),
+                      ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (post.title?.trim().isNotEmpty ?? false)
+                        ? post.title!.trim()
+                        : (post.body?.trim().isNotEmpty ?? false)
+                            ? post.body!.trim()
+                            : (_isReel ? 'ريلز' : 'منشور'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.remove_red_eye,
+                          size: 15, color: Colors.grey[600]),
+                      const SizedBox(width: 3),
+                      Text('${post.viewsCount}',
+                          style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 12),
+                      Icon(Icons.favorite, size: 15, color: Colors.grey[600]),
+                      const SizedBox(width: 3),
+                      Text('${post.likesCount}',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onEdit,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primaryDark,
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.edit_rounded, size: 16),
+                          label: const Text('تعديل',
+                              style: TextStyle(fontSize: 12.5)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: onDelete,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Icon(Icons.delete_outline, size: 18),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
