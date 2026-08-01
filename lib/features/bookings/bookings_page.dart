@@ -6,6 +6,7 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
 import '../auth/login_page.dart';
 
@@ -57,6 +58,92 @@ class _BookingsPageState extends State<BookingsPage> {
       default:
         return 'قيد المراجعة';
     }
+  }
+
+  /// Contact panel for the person who made the booking. Shown only to the
+  /// vendor/admin viewing an incoming booking (never to the customer looking at
+  /// their own list — there `customer.id` equals the signed-in user's id).
+  Widget _customerBlock(BookingModel b) {
+    final c = b.customer!;
+    final phone = c.phone.trim();
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: .06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: .15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person, size: 18, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  c.name.isEmpty ? 'صاحب الحجز' : c.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (phone.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.phone, size: 15, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    phone,
+                    style: const TextStyle(color: AppColors.textMuted),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => openExternal(Uri.parse('tel:$phone')),
+                    icon: const Icon(Icons.call, size: 18),
+                    label: const Text('اتصال'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final uri = vendorWhatsappUri(
+                        phone,
+                        message:
+                            'مرحباً ${c.name.isEmpty ? '' : c.name}، بخصوص حجزك عبر تطبيق أفراحنا.',
+                      );
+                      if (uri != null) openExternal(uri);
+                    },
+                    icon: const Icon(Icons.chat, size: 18),
+                    label: const Text('واتساب'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _cancel(BookingModel b) async {
@@ -233,6 +320,21 @@ class _BookingsPageState extends State<BookingsPage> {
                             ],
                           ),
                         ),
+                      if (b.guestsCount != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.groups,
+                                  size: 16, color: AppColors.textMuted),
+                              const SizedBox(width: 4),
+                              Text('${b.guestsCount} مدعو'),
+                            ],
+                          ),
+                        ),
+                      if (b.customer != null &&
+                          b.customer!.id != session.user?.id)
+                        _customerBlock(b),
                       if (b.totalPrice != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),

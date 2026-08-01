@@ -107,9 +107,17 @@ class _BudgetTabState extends State<_BudgetTab> {
   void _reload() => setState(() { _future = _load(); });
 
   void _applyLocalItems(List<BudgetItemModel> items) {
+    // Amount owed for an item = its real (actual) cost once known, otherwise
+    // fall back to the estimate — so "مدفوع/متبقّي" still compute when only a
+    // تقديري amount was entered.
+    double owed(BudgetItemModel x) =>
+        x.actualAmount > 0 ? x.actualAmount : x.estimatedAmount;
+
     final est = items.fold<double>(0, (s, x) => s + x.estimatedAmount);
     final act = items.fold<double>(0, (s, x) => s + x.actualAmount);
-    final paid = items.where((x) => x.paid).fold<double>(0, (s, x) => s + x.actualAmount);
+    final totalOwed = items.fold<double>(0, (s, x) => s + owed(x));
+    final paid =
+        items.where((x) => x.paid).fold<double>(0, (s, x) => s + owed(x));
     setState(() => _last = _BudgetData(
           items: items,
           summary: BudgetSummary(
@@ -117,7 +125,7 @@ class _BudgetTabState extends State<_BudgetTab> {
             estimated: est,
             actual: act,
             paid: paid,
-            remaining: act - paid,
+            remaining: totalOwed - paid,
           ),
         ));
   }
@@ -243,7 +251,12 @@ class _BudgetSummaryCard extends StatelessWidget {
   final BudgetSummary summary;
   @override
   Widget build(BuildContext context) {
-    final pct = summary.actual == 0 ? 0.0 : (summary.paid / summary.actual).clamp(0, 1).toDouble();
+    // Progress = paid / total owed (paid + remaining), so it fills even when
+    // only estimated amounts were entered.
+    final totalOwed = summary.paid + summary.remaining;
+    final pct = totalOwed <= 0
+        ? 0.0
+        : (summary.paid / totalOwed).clamp(0, 1).toDouble();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

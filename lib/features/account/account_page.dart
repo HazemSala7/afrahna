@@ -15,6 +15,7 @@ import '../bookings/bookings_page.dart';
 import '../delegate/delegate_dashboard_page.dart';
 import '../favorites/favorites_page.dart';
 import '../notifications/notifications_page.dart';
+import '../points/points_page.dart';
 import '../posts/vendor_posts_page.dart';
 import 'vendor_statement_page.dart';
 
@@ -361,6 +362,12 @@ class _SignedInView extends StatelessWidget {
     ];
 
     final account = <_MenuItem>[
+      _MenuItem(
+        icon: Icons.stars_rounded,
+        label: 'نقاطي ومكافآتي',
+        tint: _kTintGold,
+        onTap: () => go(const PointsPage()),
+      ),
       _MenuItem(
         icon: Icons.calendar_month_rounded,
         label: 'مناسباتي',

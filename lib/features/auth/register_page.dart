@@ -21,6 +21,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _referral = TextEditingController();
   bool _loading = false;
   bool _obscure1 = true;
   bool _obscure2 = true;
@@ -33,6 +34,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _phone.dispose();
     _password.dispose();
     _confirm.dispose();
+    _referral.dispose();
     super.dispose();
   }
 
@@ -53,6 +55,7 @@ class _RegisterPageState extends State<RegisterPage> {
       phone: _phone.text.trim(),
       password: _password.text,
       email: _email.text.trim().isEmpty ? null : _email.text.trim(),
+      referralCode: _referral.text.trim().isEmpty ? null : _referral.text.trim(),
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -165,6 +168,13 @@ class _RegisterPageState extends State<RegisterPage> {
                                       if (!s.contains('@')) return 'بريد غير صحيح';
                                       return null;
                                     },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  AuthField(
+                                    controller: _referral,
+                                    label: 'كود دعوة صديق (اختياري)',
+                                    icon: Icons.group_add_rounded,
+                                    textDirection: TextDirection.ltr,
                                   ),
                                   const SizedBox(height: 12),
                                   AuthField(

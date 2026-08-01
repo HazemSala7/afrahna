@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
@@ -31,6 +33,7 @@ import '../notifications/notifications_page.dart';
 import '../competition/competition_dialog.dart';
 import '../offers/offer_details_page.dart';
 import '../offers/offers_page.dart';
+import '../points/points_page.dart';
 import '../posts/post_details_page.dart';
 import '../reels/reels_page.dart';
 import '../stories/all_stories_page.dart';
@@ -357,6 +360,12 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _HeroBanner(future: _slidersFuture),
               )),
               const SizedBox(height: 20),
+              // Points / rewards — your balance (signed in) or a sign-in CTA.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 310),
+                child: const _PointsHomeCard(),
+              )),
+              const SizedBox(height: 20),
               // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 320),
@@ -457,6 +466,12 @@ class _HomeTabState extends State<_HomeTab> {
                     const PlanningToolsRow(),
                   ],
                 ),
+              )),
+              const SizedBox(height: 22),
+              // Invite-a-friend rewards card.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 330),
+                child: const _InviteFriendsCard(),
               )),
               const SizedBox(height: 20),
               // Stats band with side margins.
@@ -1030,6 +1045,411 @@ class _CountUpState extends State<_CountUp>
 /// Wraps a widget with the standard horizontal page padding (16). Used so the
 /// home list can be edge-to-edge for full-width sections (slider, categories,
 /// featured) while normal sections keep their side margins.
+/// Home-page "invite a friend" rewards card. Signed-in users see their share
+/// code with copy + share actions; guests get a gentle sign-in prompt. The
+/// design leans festive (rose-gold gradient + sparkles) to stand out from the
+/// warm brown/teal sections above it.
+class _InviteFriendsCard extends StatelessWidget {
+  const _InviteFriendsCard();
+
+  static const _gradient = LinearGradient(
+    colors: [Color(0xFF8E3B60), Color(0xFFB65A80), Color(0xFFD98BA6)],
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+  );
+
+  void _copy(BuildContext context, String code) {
+    Clipboard.setData(ClipboardData(text: code));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ كود الدعوة')),
+    );
+  }
+
+  void _share(String code) {
+    Share.share(
+      'انضم إلى تطبيق أفراحنا 🎉\nاستخدم كود الدعوة الخاص بي عند التسجيل: $code',
+      subject: 'دعوة أفراحنا',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionController>();
+    final code = session.user?.referralCode ?? '';
+    final signedIn = session.isSignedIn && code.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: _gradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8E3B60).withValues(alpha: .35),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Decorative sparkles in the corners.
+          Positioned(
+            top: -4,
+            left: -2,
+            child: Icon(Icons.auto_awesome,
+                color: Colors.white.withValues(alpha: .25), size: 22),
+          ),
+          Positioned(
+            bottom: -6,
+            left: 40,
+            child: Icon(Icons.celebration_rounded,
+                color: Colors.white.withValues(alpha: .18), size: 30),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .18),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: .35), width: 1.2),
+                    ),
+                    child: const Icon(Icons.card_giftcard_rounded,
+                        color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ادعُ أصدقاءك 🎁',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          signedIn
+                              ? 'شارك كودك واكسب نقاط أفراحنا مع كل صديق ينضمّ'
+                              : 'سجّل الدخول لتحصل على كود دعوة وتكسب النقاط',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: .9),
+                            fontSize: 12.5,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (signedIn)
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _copy(context, code),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .18),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: .4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                code,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.copy_rounded,
+                                  color: Colors.white, size: 18),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      onPressed: () => _share(code),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text('مشاركة'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF8E3B60),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    ),
+                    icon: const Icon(Icons.login_rounded, size: 18),
+                    label: const Text('سجّل الدخول وابدأ الدعوة'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF8E3B60),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              if (signedIn) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PointsPage()),
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.stars_rounded,
+                          color: Colors.white, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'كل 10 دعوات = نقطة · اعرض نقاطي',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .95),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.chevron_left_rounded,
+                          color: Colors.white, size: 18),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Home-page rewards card: a signed-in user sees their points balance in a
+/// premium gold card (tap → full points screen); a guest sees an enticing
+/// sign-in call-to-action ("earn points"). Distinct gold theme so it reads as
+/// the "rewards" moment, separate from the rose invite card below.
+class _PointsHomeCard extends StatelessWidget {
+  const _PointsHomeCard();
+
+  static const _gradient = LinearGradient(
+    colors: [Color(0xFFE3AC44), Color(0xFFC4882F), Color(0xFF95611E)],
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionController>();
+    final signedIn = session.isSignedIn;
+    final points = session.user?.pointsBalance ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: _gradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFC4882F).withValues(alpha: .38),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => signedIn ? const PointsPage() : const LoginPage(),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: signedIn ? _signedIn(context, points) : _guest(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _badge(IconData icon) => Container(
+        width: 54,
+        height: 54,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .18),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: .4), width: 1.2),
+        ),
+        child: Icon(icon, color: Colors.white, size: 28),
+      );
+
+  Widget _signedIn(BuildContext context, int points) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _badge(Icons.stars_rounded),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'نقاطك في أفراحنا',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '$points',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('نقطة',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              children: const [
+                Icon(Icons.chevron_left_rounded, color: Colors.white, size: 26),
+                Text('التفاصيل',
+                    style: TextStyle(color: Colors.white, fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'اكسب نقاطاً مع كل لايك · تعليق · تقييم · دعوة صديق',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _guest(BuildContext context) {
+    return Row(
+      children: [
+        _badge(Icons.card_giftcard_rounded),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'اكسب نقاط أفراحنا 🎁',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'سجّل الدخول واجمع نقاطاً مع كل تفاعل، واستبدلها بخصومات لدى المعلنين.',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 12.5, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.login_rounded,
+                        color: Color(0xFF95611E), size: 18),
+                    SizedBox(width: 6),
+                    Text('تسجيل الدخول',
+                        style: TextStyle(
+                            color: Color(0xFF95611E),
+                            fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 Widget _hpad(Widget child) =>
     Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: child);
 
