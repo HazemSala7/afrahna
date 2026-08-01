@@ -578,7 +578,7 @@ class _PoweredByNeurex extends StatelessWidget {
 // Settings actions (Language / Support / About)
 // ---------------------------------------------------------------------------
 
-const String _kSupportPhone = '+972595679605';
+const String _kSupportPhone = '+972599252493';
 
 Future<void> _openUri(Uri uri) async {
   await openExternal(uri);

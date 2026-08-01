@@ -168,7 +168,9 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                         children: [
                           if (hasLeading)
                             _AppBarGlassButton(
-                              icon: Icons.arrow_forward_rounded,
+                              // Directional "back": auto-mirrors to point right
+                              // (→) in the app's RTL layout.
+                              icon: Icons.arrow_back_rounded,
                               onTap: onBack ?? () => Navigator.pop(context),
                             )
                           else

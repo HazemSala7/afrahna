@@ -47,10 +47,13 @@ class HomeFeedCache {
     List<SliderModel> sliders = const [];
     List<VendorModel> vips = const [];
     try {
-      sliders = await SliderService().list();
+      // Show every admin-created slide, not just the first 10.
+      sliders = await SliderService().list(limit: 60);
     } catch (_) {}
     try {
-      vips = await VendorService().list(vip: true, perPage: 10);
+      // Every VIP vendor belongs in the hero slider — a low page size silently
+      // hid the rest (e.g. 16 VIPs on the server but only 10 reaching the app).
+      vips = await VendorService().list(vip: true, perPage: 60);
     } catch (_) {}
     final vipSlides = vips
         .where((v) => (v.cover ?? v.logo ?? '').isNotEmpty)

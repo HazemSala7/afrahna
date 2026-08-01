@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../core/utils/category_icon.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/vendors_page.dart';
 import 'category_tabs_page.dart';
@@ -29,20 +30,6 @@ class _CategoriesPageState extends State<CategoriesPage> {
     setState(() {
       _future = CategoryService().list(tree: true);
     });
-  }
-
-  IconData _iconFor(String name) {
-    final n = name.toLowerCase();
-    if (n.contains('قاع') || n.contains('hall')) return Icons.holiday_village_rounded;
-    if (n.contains('صور') || n.contains('photo')) return Icons.photo_camera_rounded;
-    if (n.contains('dj') || n.contains('موسيق') || n.contains('music')) return Icons.music_note_rounded;
-    if (n.contains('فستان') || n.contains('dress')) return Icons.checkroom_rounded;
-    if (n.contains('سيار') || n.contains('car')) return Icons.directions_car_rounded;
-    if (n.contains('طعام') || n.contains('cater') || n.contains('caterer')) return Icons.restaurant_rounded;
-    if (n.contains('زهور') || n.contains('flower') || n.contains('florist')) return Icons.local_florist_rounded;
-    if (n.contains('مكياج') || n.contains('makeup')) return Icons.face_retouching_natural;
-    if (n.contains('دعو') || n.contains('invit')) return Icons.mail_rounded;
-    return Icons.category_rounded;
   }
 
   @override
@@ -107,7 +94,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
-                        child: Icon(_iconFor(c.name),
+                        child: Icon(categoryIcon(c.name),
                             color: AppColors.primary, size: 28),
                       ),
                       const SizedBox(height: 10),

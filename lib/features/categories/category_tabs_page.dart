@@ -217,7 +217,17 @@ class _VendorsList extends StatefulWidget {
 
 class _VendorsListState extends State<_VendorsList>
     with AutomaticKeepAliveClientMixin {
-  late Future<List<VendorModel>> _future;
+  static const _pageSize = 20;
+  final _service = VendorService();
+  final _scroll = ScrollController();
+
+  final List<VendorModel> _items = [];
+  final Set<int> _ids = {};
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  bool _initialLoading = true;
+  Object? _error;
 
   @override
   bool get wantKeepAlive => true;
@@ -225,52 +235,116 @@ class _VendorsListState extends State<_VendorsList>
   @override
   void initState() {
     super.initState();
-    _load();
+    _scroll.addListener(_onScroll);
+    _loadInitial();
   }
 
   @override
   void didUpdateWidget(_VendorsList old) {
     super.didUpdateWidget(old);
-    if (old.cityId != widget.cityId) setState(_load);
+    if (old.cityId != widget.cityId) _loadInitial();
   }
 
-  void _load() {
-    _future = VendorService().list(
-      categoryId: widget.categoryId,
-      parentCategoryId: widget.parentCategoryId,
-      cityId: widget.cityId,
-    );
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scroll.position.pixels >=
+        _scroll.position.maxScrollExtent - 320) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _initialLoading = true;
+      _error = null;
+      _items.clear();
+      _ids.clear();
+      _page = 0;
+      _hasMore = true;
+    });
+    try {
+      final res = await _service.listPaged(
+        categoryId: widget.categoryId,
+        parentCategoryId: widget.parentCategoryId,
+        cityId: widget.cityId,
+        page: 1,
+        perPage: _pageSize,
+      );
+      _page = 1;
+      _hasMore = res.hasMore;
+      _addAll(res.items);
+      if (mounted) setState(() => _initialLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _initialLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _initialLoading) return;
+    _loadingMore = true;
+    setState(() {});
+    try {
+      final res = await _service.listPaged(
+        categoryId: widget.categoryId,
+        parentCategoryId: widget.parentCategoryId,
+        cityId: widget.cityId,
+        page: _page + 1,
+        perPage: _pageSize,
+      );
+      _page += 1;
+      _hasMore = res.hasMore;
+      _addAll(res.items);
+    } catch (_) {
+      // keep what we have; a later scroll retries
+    } finally {
+      _loadingMore = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _addAll(Iterable<VendorModel> vs) {
+    for (final v in vs) {
+      if (_ids.add(v.id)) _items.add(v);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return FutureBuilder<List<VendorModel>>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const CenteredLoader();
-        }
-        if (snap.hasError) {
-          return ErrorState(
-            message: snap.error.toString(),
-            onRetry: () => setState(_load),
-          );
-        }
-        final items = snap.data ?? const <VendorModel>[];
-        if (items.isEmpty) {
-          return const EmptyState(message: 'لا يوجد مزوّدون في هذه الفئة بعد');
-        }
-        return RefreshIndicator(
-          onRefresh: () async => setState(_load),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (_, i) => _VendorTile(vendor: items[i]),
-          ),
-        );
-      },
+    if (_initialLoading) return const CenteredLoader();
+    if (_error != null && _items.isEmpty) {
+      return ErrorState(message: _error.toString(), onRetry: _loadInitial);
+    }
+    if (_items.isEmpty) {
+      return const EmptyState(message: 'لا يوجد مزوّدون في هذه الفئة بعد');
+    }
+    return RefreshIndicator(
+      onRefresh: _loadInitial,
+      child: ListView.separated(
+        controller: _scroll,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        itemCount: _items.length + (_hasMore ? 1 : 0),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (_, i) {
+          if (i >= _items.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: AfrahnaLoader(size: 38)),
+            );
+          }
+          return _VendorTile(vendor: _items[i]);
+        },
+      ),
     );
   }
 }
