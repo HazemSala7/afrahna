@@ -65,6 +65,8 @@ class UserModel {
     this.vendorLogo,
     this.activePlan,
     this.notificationsEnabled = true,
+    this.pointsBalance = 0,
+    this.referralCode,
   });
 
   final int id;
@@ -96,6 +98,12 @@ class UserModel {
   /// Whether the user receives notifications (offer alerts, etc.). Can be
   /// toggled off from the app. Defaults to true.
   final bool notificationsEnabled;
+
+  /// Rewards points balance available to spend.
+  final int pointsBalance;
+
+  /// The user's own invite/referral code (share it to earn invite points).
+  final String? referralCode;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -129,6 +137,8 @@ class UserModel {
             ? true
             : (json['notifications_enabled'] == true ||
                 json['notifications_enabled'] == 1),
+        pointsBalance: _toInt(json['points_balance']) ?? 0,
+        referralCode: _readT<String>(json, 'referral_code'),
       );
 
   Map<String, dynamic> toJson() => {
@@ -145,6 +155,8 @@ class UserModel {
         'commission_per_subscription': commissionPerSubscription,
         'permissions': permissions,
         'notifications_enabled': notificationsEnabled,
+        'points_balance': pointsBalance,
+        'referral_code': referralCode,
       };
 
   UserModel copyWith({bool? notificationsEnabled}) => UserModel(
@@ -164,6 +176,8 @@ class UserModel {
         vendorLogo: vendorLogo,
         activePlan: activePlan,
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+        pointsBalance: pointsBalance,
+        referralCode: referralCode,
       );
 
   bool get isVendor   => role == 'vendor';
@@ -288,6 +302,8 @@ class VendorModel {
     this.ownerId,
     this.ownerName,
     this.ownerPhone,
+    this.pointsBalance = 0,
+    this.beneficiariesCount = 0,
   });
 
   final int id;
@@ -354,6 +370,14 @@ class VendorModel {
   final int? ownerId;
   final String? ownerName;
   final String? ownerPhone;
+
+  /// Points transferred to this vendor by users redeeming rewards.
+  /// 1000 points = one subscription month.
+  final int pointsBalance;
+
+  /// Permanent count of users who redeemed points at this vendor
+  /// (does not reset when an admin zeroes the points balance).
+  final int beneficiariesCount;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
@@ -451,6 +475,8 @@ class VendorModel {
             ? _readT<String>(
                 Map<String, dynamic>.from(json['user'] as Map), 'phone')
             : null,
+        pointsBalance: _toInt(json['points_balance']) ?? 0,
+        beneficiariesCount: _toInt(json['beneficiaries_count']) ?? 0,
       );
 }
 
@@ -534,6 +560,9 @@ class BookingModel {
     this.vendorId,
     this.service,
     this.vendor,
+    this.customer,
+    this.eventTime,
+    this.guestsCount,
   });
 
   final int id;
@@ -545,6 +574,12 @@ class BookingModel {
   final int? vendorId;
   final ServiceModel? service;
   final VendorModel? vendor;
+
+  /// The customer who made the booking. Present when a vendor/admin views their
+  /// bookings (the API eager-loads the user). Null for a customer's own list.
+  final UserModel? customer;
+  final String? eventTime;
+  final int? guestsCount;
 
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
         id: _toInt(json['id']) ?? 0,
@@ -563,6 +598,12 @@ class BookingModel {
             ? VendorModel.fromJson(
                 Map<String, dynamic>.from(json['vendor'] as Map))
             : null,
+        customer: json['user'] is Map
+            ? UserModel.fromJson(
+                Map<String, dynamic>.from(json['user'] as Map))
+            : null,
+        eventTime: _readT<String>(json, 'event_time'),
+        guestsCount: _toInt(json['guests_count']),
       );
 }
 
@@ -1527,4 +1568,125 @@ class PredictionModel {
         winner: (json['winner'] ?? '').toString(),
         score: _readT<String>(json, 'score'),
       );
+}
+
+// ---------------------------------------------------------------------------
+// POINTS / REWARDS
+// ---------------------------------------------------------------------------
+
+/// A single "points spent at a vendor" record for the user's history.
+class PointRedemptionModel {
+  PointRedemptionModel({
+    required this.id,
+    required this.points,
+    required this.vendorId,
+    this.vendorName,
+    this.vendorLogo,
+    this.createdAt,
+  });
+
+  final int id;
+  final int points;
+  final int vendorId;
+  final String? vendorName;
+  final String? vendorLogo;
+  final DateTime? createdAt;
+
+  factory PointRedemptionModel.fromJson(Map<String, dynamic> json) {
+    final v = json['vendor'] is Map
+        ? Map<String, dynamic>.from(json['vendor'] as Map)
+        : const <String, dynamic>{};
+    return PointRedemptionModel(
+      id: _toInt(json['id']) ?? 0,
+      points: _toInt(json['points']) ?? 0,
+      vendorId: _toInt(json['vendor_id']) ?? _toInt(v['id']) ?? 0,
+      vendorName: (v['name_ar']?.toString().isNotEmpty ?? false)
+          ? v['name_ar'].toString()
+          : _readT<String>(v, 'name_en'),
+      vendorLogo: _readT<String>(v, 'logo'),
+      createdAt: _toDate(json['created_at']),
+    );
+  }
+}
+
+/// Full points summary shown on the rewards screen: balance, where the points
+/// came from (breakdown), progress toward the next point in each category,
+/// spend history, and the user's invite code.
+class PointsSummary {
+  PointsSummary({
+    required this.balance,
+    required this.breakdown,
+    required this.progress,
+    required this.redemptions,
+    this.referralCode,
+    this.invitesCount = 0,
+    this.threshold = 10,
+    this.redeemCost = 50,
+    this.redeemDiscount = 10,
+  });
+
+  final int balance;
+
+  /// category => points earned so far (e.g. {'signup':5,'reel_like':4}).
+  final Map<String, int> breakdown;
+
+  /// category => actions counted toward the next point (0..threshold-1).
+  final Map<String, int> progress;
+
+  final List<PointRedemptionModel> redemptions;
+  final String? referralCode;
+  final int invitesCount;
+  final int threshold;
+  final int redeemCost;
+  final int redeemDiscount;
+
+  static Map<String, int> _intMap(dynamic v) {
+    final out = <String, int>{};
+    if (v is Map) {
+      v.forEach((k, val) {
+        out[k.toString()] = _toInt(val) ?? 0;
+      });
+    }
+    return out;
+  }
+
+  factory PointsSummary.fromJson(Map<String, dynamic> json) => PointsSummary(
+        balance: _toInt(json['balance']) ?? 0,
+        breakdown: _intMap(json['breakdown']),
+        progress: _intMap(json['progress']),
+        redemptions: (json['redemptions'] is List)
+            ? (json['redemptions'] as List)
+                .whereType<Map>()
+                .map((e) =>
+                    PointRedemptionModel.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : const [],
+        referralCode: _readT<String>(json, 'referral_code'),
+        invitesCount: _toInt(json['invites_count']) ?? 0,
+        threshold: _toInt(json['threshold']) ?? 10,
+        redeemCost: _toInt(json['redeem_cost']) ?? 50,
+        redeemDiscount: _toInt(json['redeem_discount']) ?? 10,
+      );
+
+  /// Arabic label for each earning category, for the breakdown UI.
+  static String categoryLabel(String key) {
+    switch (key) {
+      case 'signup':
+        return 'إنشاء حساب';
+      case 'invite':
+        return 'دعوة أصدقاء';
+      case 'reel_like':
+        return 'إعجابات على الريلز';
+      case 'reel_comment':
+        return 'تعليقات على الريلز';
+      case 'post_like':
+        return 'إعجابات على المنشورات';
+      case 'post_comment':
+        return 'تعليقات على المنشورات';
+      case 'review':
+        return 'تقييم الصفحات';
+      default:
+        return key;
+    }
+  }
 }

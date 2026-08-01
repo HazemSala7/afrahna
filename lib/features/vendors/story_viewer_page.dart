@@ -297,8 +297,13 @@ class StoriesRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (stories.isEmpty) return const SizedBox.shrink();
+    // Portrait 9:16 cards (like Instagram/WhatsApp status previews) so the
+    // story image shows almost in full instead of being crammed into a tiny
+    // circle that crops most of it away.
+    const cardW = 92.0;
+    const cardH = 164.0; // ≈ 9:16 so portrait stories fill without cropping
     return SizedBox(
-      height: 96,
+      height: cardH + 26,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -318,14 +323,15 @@ class StoriesRing extends StatelessWidget {
               ),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 70,
-                  height: 70,
+                  width: cardW,
+                  height: cardH,
                   padding: const EdgeInsets.all(2.5),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: const SweepGradient(
                       colors: [
                         AppColors.primary,
                         AppColors.accent,
@@ -334,16 +340,21 @@ class StoriesRing extends StatelessWidget {
                         AppColors.primary,
                       ],
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                    child: ClipOval(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Container(
+                      color: Colors.black,
                       child: AppNetworkImage(
                         url: s.image,
+                        fit: BoxFit.cover,
                         fallbackIcon: Icons.image_outlined,
                       ),
                     ),
@@ -351,11 +362,9 @@ class StoriesRing extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
-                  width: 72,
+                  width: cardW,
                   child: Text(
-                    s.caption.isNotEmpty
-                        ? s.caption
-                        : 'قصّة ${i + 1}',
+                    s.caption.isNotEmpty ? s.caption : 'قصّة ${i + 1}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,

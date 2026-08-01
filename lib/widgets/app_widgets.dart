@@ -314,12 +314,18 @@ class AppNetworkImage extends StatelessWidget {
     this.fallbackIcon = Icons.image_outlined,
     this.fit = BoxFit.cover,
     this.fallbackColor,
+    this.maxDecodeWidth = 1440,
   });
 
   final String? url;
   final IconData fallbackIcon;
   final BoxFit fit;
   final Color? fallbackColor;
+
+  /// Hard ceiling (in device pixels) for how wide the image is decoded into
+  /// memory. Even a full-screen image never needs more than this, so an
+  /// oversized (e.g. 4K) source can't blow the image cache and OOM the app.
+  final int maxDecodeWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -331,15 +337,31 @@ class AppNetworkImage extends StatelessWidget {
         child: Icon(fallbackIcon, color: AppColors.primary, size: 36),
       );
     }
-    return CachedNetworkImage(
-      imageUrl: url!,
-      fit: fit,
-      placeholder: (_, _) => Container(color: color.withValues(alpha: .4)),
-      errorWidget: (_, _, _) => Container(
-        color: color,
-        alignment: Alignment.center,
-        child: Icon(fallbackIcon, color: AppColors.primary, size: 36),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Decode at (roughly) the on-screen size rather than the image's full
+        // native resolution — a 2160×3840 photo otherwise needs ~33 MB of RAM
+        // just to draw, which OOMs low-memory devices.
+        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final logicalW = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width;
+        var memWidth = (logicalW * dpr).round();
+        if (memWidth > maxDecodeWidth) memWidth = maxDecodeWidth;
+        if (memWidth < 1) memWidth = maxDecodeWidth;
+
+        return CachedNetworkImage(
+          imageUrl: url!,
+          fit: fit,
+          memCacheWidth: memWidth,
+          placeholder: (_, _) => Container(color: color.withValues(alpha: .4)),
+          errorWidget: (_, _, _) => Container(
+            color: color,
+            alignment: Alignment.center,
+            child: Icon(fallbackIcon, color: AppColors.primary, size: 36),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -34,6 +35,140 @@ class _ReelsPageState extends State<ReelsPage> {
   bool _initialLoading = true;
   Object? _error;
 
+  /// Per-session shuffle seed so the random tail of the feed stays stable
+  /// across paginated requests (a new seed on each pull-to-refresh).
+  int? _seed;
+
+  /// Pool of video controllers keyed by reel id. We keep only a small window
+  /// (current ± 1) alive and PRELOAD the neighbours so swiping feels instant.
+  final Map<int, VideoPlayerController> _controllers = {};
+
+  /// Ids whose controller is mid-creation (async cache lookup) — prevents
+  /// double-creating the same controller.
+  final Set<int> _initializing = {};
+
+  /// Disk cache dedicated to reel videos, so an already-seen (or PREFETCHED)
+  /// reel plays instantly from a local file instead of re-streaming.
+  static final _videoCache = CacheManager(
+    Config(
+      'afrahna_reels_v1',
+      stalePeriod: const Duration(days: 7),
+      maxNrOfCacheObjects: 60,
+    ),
+  );
+
+  static bool _isVideoUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final l = url.toLowerCase();
+    return l.endsWith('.mp4') ||
+        l.endsWith('.mov') ||
+        l.endsWith('.m4v') ||
+        l.endsWith('.webm') ||
+        l.contains('video');
+  }
+
+  // ---- Rolling look-ahead prefetch --------------------------------------
+  // Warm upcoming reels to the disk cache so scrolling is instant. On open we
+  // warm the first 10; as the user advances we keep ~6 reels warmed ahead of
+  // the current one. Downloads run STRICTLY ONE-AT-A-TIME (nearest first) so
+  // they never saturate the connection and steal bandwidth from the reel that
+  // is actually playing.
+  int _warmDone = 0; // next index still to warm
+  int _warmTarget = 0; // warm indices [_warmDone, _warmTarget)
+  bool _warmRunning = false;
+
+  /// Extend the warm window to at least [target] and make sure the warmer runs.
+  void _bumpWarm(int target) {
+    if (target > _warmTarget) _warmTarget = target;
+    _runWarm();
+  }
+
+  Future<void> _runWarm() async {
+    if (_warmRunning) return;
+    _warmRunning = true;
+    try {
+      while (mounted &&
+          _warmDone < _warmTarget &&
+          _warmDone < _reels.length) {
+        final i = _warmDone;
+        _warmDone++;
+        final url = _reels[i].mediaUrl;
+        if (_isVideoUrl(url)) {
+          try {
+            await _videoCache.getSingleFile(url!);
+          } catch (_) {
+            // Ignore a single failed prefetch; keep warming the rest.
+          }
+        }
+      }
+    } finally {
+      _warmRunning = false;
+      // The target may have grown (or more reels loaded) while we were busy.
+      if (mounted && _warmDone < _warmTarget && _warmDone < _reels.length) {
+        _runWarm();
+      }
+    }
+  }
+
+  /// Create (once) the controller for a reel — from the CACHED local file when
+  /// available (instant), otherwise stream from network while caching it in the
+  /// background for next time.
+  Future<void> _ensureController(PostModel reel) async {
+    final url = reel.mediaUrl;
+    if (!_isVideoUrl(url)) return;
+    final id = reel.id;
+    if (_controllers.containsKey(id) || _initializing.contains(id)) return;
+    _initializing.add(id);
+    try {
+      VideoPlayerController c;
+      final cached = await _videoCache.getFileFromCache(url!);
+      if (cached != null) {
+        c = VideoPlayerController.file(cached.file);
+      } else {
+        c = VideoPlayerController.networkUrl(Uri.parse(url));
+        // Cache in the background so a replay / next session is instant.
+        _videoCache.getSingleFile(url).ignore();
+      }
+      if (!mounted) {
+        c.dispose();
+        return;
+      }
+      _controllers[id] = c;
+      c.setLooping(true);
+      await c.initialize();
+      if (!mounted) {
+        _controllers.remove(id)?.dispose();
+        return;
+      }
+      setState(() {}); // let the visible item pick it up + play
+    } catch (_) {
+      _controllers.remove(id)?.dispose();
+    } finally {
+      _initializing.remove(id);
+    }
+  }
+
+  /// Keep controllers for [index-1 .. index+1] alive (preloading the neighbours),
+  /// prefetch a few more to disk, and dispose the rest.
+  void _syncWindow(int index) {
+    final keep = <int>{};
+    for (final j in [index - 1, index, index + 1]) {
+      if (j >= 0 && j < _reels.length) {
+        keep.add(_reels[j].id);
+        _ensureController(_reels[j]);
+      }
+    }
+    // Keep ~6 reels warmed ahead of the current one (the first sync at index 0
+    // therefore warms the first 7; the initial load bumps that to 10).
+    _bumpWarm(index + 7);
+    _controllers.removeWhere((id, c) {
+      if (keep.contains(id)) return false;
+      c.dispose();
+      return true;
+    });
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +194,14 @@ class _ReelsPageState extends State<ReelsPage> {
     _ids.clear();
     _page = 0;
     _hasMore = true;
+    // Fresh shuffle each time the feed (re)loads.
+    _seed = DateTime.now().microsecondsSinceEpoch & 0x7fffffff;
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    _controllers.clear();
+    _warmDone = 0;
+    _warmTarget = 0;
     try {
       // Deep link: open the feed on the requested reel (prepend it first).
       final target = widget.initialPostId;
@@ -69,11 +212,15 @@ class _ReelsPageState extends State<ReelsPage> {
         } catch (_) {}
       }
       final res = await _service.listPaged(
-          type: PostType.reel, page: 1, perPage: _pageSize);
+          type: PostType.reel, page: 1, perPage: _pageSize, seed: _seed);
       _page = 1;
       _hasMore = res.hasMore;
       _addAll(res.items);
-      if (mounted) setState(() => _initialLoading = false);
+      if (mounted) {
+        setState(() => _initialLoading = false);
+        _syncWindow(0); // build the first controllers
+        _bumpWarm(10); // preload the first 10 reels on open
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -89,7 +236,7 @@ class _ReelsPageState extends State<ReelsPage> {
     _loadingMore = true;
     try {
       final res = await _service.listPaged(
-          type: PostType.reel, page: _page + 1, perPage: _pageSize);
+          type: PostType.reel, page: _page + 1, perPage: _pageSize, seed: _seed);
       _page += 1;
       _hasMore = res.hasMore;
       final before = _reels.length;
@@ -106,6 +253,10 @@ class _ReelsPageState extends State<ReelsPage> {
 
   @override
   void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    _controllers.clear();
     _controller.dispose();
     super.dispose();
   }
@@ -136,11 +287,14 @@ class _ReelsPageState extends State<ReelsPage> {
               itemCount: _reels.length,
               // Load the next page as the user nears the end.
               onPageChanged: (i) {
+                _syncWindow(i); // preload neighbours, free the rest
                 if (i >= _reels.length - 3) _loadMore();
               },
               itemBuilder: (context, i) => _ReelItem(
                 key: ValueKey(_reels[i].id),
                 reel: _reels[i],
+                controller: _controllers[_reels[i].id],
+                isVideo: _isVideoUrl(_reels[i].mediaUrl),
               ),
             ),
           );
@@ -155,76 +309,66 @@ class _ReelsPageState extends State<ReelsPage> {
 // ===========================================================================
 
 class _ReelItem extends StatefulWidget {
-  const _ReelItem({super.key, required this.reel});
+  const _ReelItem({
+    super.key,
+    required this.reel,
+    required this.controller,
+    required this.isVideo,
+  });
 
   final PostModel reel;
+
+  /// Video controller owned & preloaded by the parent (null for image reels
+  /// or before the parent has created it).
+  final VideoPlayerController? controller;
+  final bool isVideo;
 
   @override
   State<_ReelItem> createState() => _ReelItemState();
 }
 
 class _ReelItemState extends State<_ReelItem> {
-  VideoPlayerController? _video;
-  bool _isVideo = false;
-  bool _initFailed = false;
   bool _isPaused = false;
   bool _liked = false;
   bool _viewSent = false;
   late int _likes;
   double _lastVisible = 0;
 
+  VideoPlayerController? get _video => widget.controller;
+
   @override
   void initState() {
     super.initState();
     _likes = widget.reel.likesCount;
     _liked = widget.reel.isLiked;
-    _maybeInitVideo();
-  }
-
-  void _maybeInitVideo() {
-    final url = widget.reel.mediaUrl;
-    if (url == null || url.isEmpty) return;
-    final lower = url.toLowerCase();
-    if (lower.endsWith('.mp4') ||
-        lower.endsWith('.mov') ||
-        lower.endsWith('.m4v') ||
-        lower.endsWith('.webm') ||
-        lower.contains('video')) {
-      _isVideo = true;
-      final c = VideoPlayerController.networkUrl(Uri.parse(url));
-      _video = c;
-      c.setLooping(true);
-      c.initialize().then((_) {
-        if (!mounted) return;
-        setState(() {});
-        // Autoplay if this reel is already visible when init completes.
-        if (_lastVisible > 0.6 && !_isPaused) {
-          c.play();
-        }
-      }).catchError((_) {
-        if (!mounted) return;
-        setState(() => _initFailed = true);
-      });
-    }
   }
 
   @override
-  void dispose() {
-    _video?.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant _ReelItem old) {
+    super.didUpdateWidget(old);
+    // The parent rebuilds us when our controller finishes initializing — make
+    // sure playback matches the current visibility once it's ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPlayback());
   }
+
+  /// The parent owns/disposes the controller, so nothing to dispose here.
 
   void _onVisibility(VisibilityInfo info) {
     _lastVisible = info.visibleFraction;
-    final v = _video;
     // Count one view the first time this reel becomes meaningfully visible.
     if (!_viewSent && info.visibleFraction > 0.6) {
       _viewSent = true;
       PostService().markViewed(widget.reel.id);
     }
-    if (v == null) return;
-    if (info.visibleFraction > 0.6) {
-      if (!_isPaused && !v.value.isPlaying && v.value.isInitialized) v.play();
+    _syncPlayback();
+  }
+
+  /// Play when this reel is on-screen and ready; pause otherwise.
+  void _syncPlayback() {
+    final v = _video;
+    if (v == null || !v.value.isInitialized) return;
+    if (_lastVisible > 0.6 && !_isPaused) {
+      if (!v.value.isPlaying) v.play();
     } else {
       if (v.value.isPlaying) v.pause();
     }
@@ -336,7 +480,7 @@ class _ReelItemState extends State<_ReelItem> {
               ),
             ),
             // Pause indicator
-            if (_isPaused && _isVideo)
+            if (_isPaused && widget.isVideo)
               const Center(
                 child: Icon(
                   Icons.play_arrow_rounded,
@@ -411,9 +555,10 @@ class _ReelItemState extends State<_ReelItem> {
     final reel = widget.reel;
     final thumb = reel.thumbnail ?? reel.mediaUrl;
 
-    if (_isVideo) {
+    if (widget.isVideo) {
       final v = _video;
-      if (v != null && v.value.isInitialized && !_initFailed) {
+      final failed = v?.value.hasError ?? false;
+      if (v != null && v.value.isInitialized && !failed) {
         return Center(
           child: AspectRatio(
             aspectRatio: v.value.aspectRatio,
@@ -432,7 +577,7 @@ class _ReelItemState extends State<_ReelItem> {
               placeholder: (_, _) => Container(color: Colors.black),
               errorWidget: (_, _, _) => Container(color: Colors.black),
             ),
-            if (!_initFailed)
+            if (!failed)
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               ),

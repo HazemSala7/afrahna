@@ -411,6 +411,8 @@ class _VendorHeader extends StatelessWidget {
             Image.network(
               cover,
               fit: BoxFit.cover,
+              // Cap decode resolution so an oversized (4K) cover can't OOM.
+              cacheWidth: 1080,
               errorBuilder: (_, _, _) => const DecoratedBox(
                 decoration:
                     BoxDecoration(gradient: AppColors.brandDeepGradient),
@@ -726,6 +728,7 @@ class _ServiceCard extends StatelessWidget {
               child: Image.network(
                 service.image!,
                 fit: BoxFit.cover,
+                cacheWidth: 1080,
                 errorBuilder: (_, _, _) => Container(
                   color: Colors.black12,
                   child: const Icon(Icons.broken_image),
@@ -1022,7 +1025,9 @@ class _PostCard extends StatelessWidget {
         );
     if (url == null || url.isEmpty) return placeholder();
     return Image.network(url,
-        fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder());
+        fit: BoxFit.cover,
+        cacheWidth: 1080,
+        errorBuilder: (_, _, _) => placeholder());
   }
 
   @override

@@ -87,6 +87,37 @@ IconData categoryIcon(String name) {
   if (has(['خطوبة', 'ملكة', 'engagement'])) {
     return Icons.favorite_rounded;
   }
-  // Pleasant default — never the generic three-shapes placeholder.
-  return Icons.celebration_rounded;
+  // Home & furniture
+  if (has(['منزل', 'اثاث', 'أثاث', 'مفروش', 'ستائر', 'ستاير', 'مطبخ',
+      'furniture', 'home', 'kitchen'])) {
+    return Icons.weekend_rounded;
+  }
+  // Kids & children
+  if (has(['اطفال', 'أطفال', 'مواليد', 'بيبي', 'kid', 'child', 'baby'])) {
+    return Icons.child_friendly_rounded;
+  }
+  // Health / medical / clinics
+  if (has(['صح', 'طبي', 'عياد', 'اسنان', 'أسنان', 'health', 'medic', 'clinic',
+      'dental'])) {
+    return Icons.medical_services_rounded;
+  }
+  // Extra / other / miscellaneous services
+  if (has(['خدمات إضاف', 'خدمات اضاف', 'إضافي', 'اضافي', 'أخرى', 'اخرى',
+      'متنوع', 'misc', 'other', 'extra', 'خدمات'])) {
+    return Icons.miscellaneous_services_rounded;
+  }
+
+  // Varied fallback: unmapped categories still get DISTINCT icons (picked
+  // deterministically from the name) instead of all sharing one placeholder.
+  const fallback = <IconData>[
+    Icons.auto_awesome_rounded,
+    Icons.storefront_rounded,
+    Icons.redeem_rounded,
+    Icons.interests_rounded,
+    Icons.workspace_premium_rounded,
+    Icons.celebration_rounded,
+    Icons.emoji_events_rounded,
+    Icons.local_mall_rounded,
+  ];
+  return fallback[name.hashCode.abs() % fallback.length];
 }

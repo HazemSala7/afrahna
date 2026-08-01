@@ -560,12 +560,15 @@ class PostService {
     PostType? type,
     int page = 1,
     int perPage = 10,
+    int? seed,
   }) async {
     try {
       final res = await _dio.get('/posts', queryParameters: {
         if (type != null) 'type': postTypeTo(type),
         'page': page,
         'per_page': perPage,
+        // Stable per-session shuffle seed for the random tail of the reels feed.
+        'seed': ?seed,
       });
       final body = res.data;
       final items = _unwrapList(body).map(PostModel.fromJson).toList();
@@ -628,7 +631,20 @@ class PostService {
         'duration': ?duration,
         'is_published': isPublished,
       });
+      // The Dio client treats 4xx as a normal response (validateStatus < 500),
+      // so surface those (e.g. 429 daily-reel-limit) as an ApiException here
+      // instead of letting fromJson choke on the error body.
+      final code = res.statusCode ?? 0;
+      if (code >= 400) {
+        final data = res.data;
+        final msg = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'تعذّر نشر المحتوى';
+        throw ApiException(msg, statusCode: code);
+      }
       return PostModel.fromJson(_unwrapObject(res.data));
+    } on ApiException {
+      rethrow;
     } catch (e) {
       throw toApiException(e);
     }

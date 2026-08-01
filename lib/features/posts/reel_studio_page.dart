@@ -9,6 +9,7 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/image_upload_field.dart';
 
 /// Reels Studio — lets a vendor record/pick a short video, preview it, add a
@@ -192,7 +193,11 @@ class _ReelStudioPageState extends State<ReelStudioPage> {
       );
       Navigator.pop(context, true);
     } on ApiException catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+      // Daily reel limit reached → prompt to upgrade instead of a plain error.
+      if (e.statusCode == 429) {
+        await _showUpgradeDialog(e.message);
+      } else {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
       }
@@ -205,6 +210,87 @@ class _ReelStudioPageState extends State<ReelStudioPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// WhatsApp number vendors reach out to for an upgrade.
+  static const String _kUpgradePhone = '+972599252493';
+
+  /// Shown when a normal account hits its daily reel limit.
+  Future<void> _showUpgradeDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.workspace_premium_rounded,
+                  color: AppColors.primary, size: 32),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 17,
+                color: AppColors.textDark,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'حسابك الحالي يسمح بعدد محدود من الريلز يومياً. للترقية ونشر المزيد '
+          'تواصل معنا وسنساعدك فوراً.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textMuted, height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.chat_rounded, color: Colors.white),
+              label: const Text(
+                'تواصل معنا',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                final uri = vendorWhatsappUri(
+                  _kUpgradePhone,
+                  message:
+                      'مرحباً، أرغب بترقية اشتراكي لنشر المزيد من الريلز في تطبيق أفراحنا.',
+                );
+                if (uri != null) openExternal(uri);
+              },
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('لاحقاً',
+                style: TextStyle(color: AppColors.textMuted)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

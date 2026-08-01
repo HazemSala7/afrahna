@@ -71,6 +71,7 @@ class AuthService {
     required String phone,
     required String password,
     String? email,
+    String? referralCode,
   }) async {
     try {
       final res = await _dio.post('/auth/register', data: {
@@ -79,6 +80,8 @@ class AuthService {
         'password': password,
         'password_confirmation': password,
         if (email != null && email.isNotEmpty) 'email': email,
+        if (referralCode != null && referralCode.trim().isNotEmpty)
+          'referral_code': referralCode.trim().toUpperCase(),
       });
       if (res.statusCode != 200 && res.statusCode != 201) {
         throw _err(res.data);
@@ -1409,4 +1412,64 @@ class CompetitionService {
       throw toApiException(e);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// POINTS / REWARDS
+// ---------------------------------------------------------------------------
+
+/// Result of a successful points redemption at a vendor.
+class RedeemResult {
+  const RedeemResult({
+    required this.balance,
+    required this.discount,
+    required this.beneficiaries,
+    required this.message,
+  });
+  final int balance;
+  final int discount;
+  final int beneficiaries;
+  final String message;
+}
+
+class PointsService {
+  final _dio = ApiClient.instance.dio;
+
+  /// The signed-in user's points summary (balance, breakdown, history, code).
+  Future<PointsSummary> summary() async {
+    try {
+      final res = await _dio.get('/points/summary');
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _err(res.data);
+      return PointsSummary.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Redeem points at a vendor for an in-person discount. Because Dio treats
+  /// 4xx as a normal response (validateStatus < 500), we inspect the status and
+  /// surface the server's Arabic message on insufficient balance / cooldown.
+  Future<RedeemResult> redeem(int vendorId) async {
+    try {
+      final res = await _dio.post('/vendors/$vendorId/redeem-points');
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _err(res.data);
+      final m = _unwrapObject(res.data);
+      return RedeemResult(
+        balance: (m['balance'] as num?)?.toInt() ?? 0,
+        discount: (m['discount'] as num?)?.toInt() ?? 10,
+        beneficiaries: (m['beneficiaries_count'] as num?)?.toInt() ?? 0,
+        message: (m['message'] ?? 'تم استبدال النقاط').toString(),
+      );
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  Exception _err(dynamic data) => ApiException(
+        (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'تعذّرت العملية',
+      );
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import '../auth/login_page.dart';
 import '../calendar/calendar_page.dart';
 import '../coordinator/coordinator_page.dart';
 import '../invitations/invitations_page.dart';
@@ -82,6 +85,24 @@ Widget _calendar(BuildContext _) => const CalendarPage();
 Widget _coordinator(BuildContext _) => const CoordinatorPage();
 
 void _open(BuildContext context, PlanningTool tool) {
+  // Planning tools store data per user, so they require an account. Guests are
+  // prompted to log in instead of opening a page whose saves silently fail.
+  if (!context.read<SessionController>().isSignedIn) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('سجّل الدخول لاستخدام أدوات التخطيط وحفظ بياناتك'),
+        backgroundColor: AppColors.primaryDark,
+        action: SnackBarAction(
+          label: 'تسجيل الدخول',
+          textColor: Colors.white,
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+          ),
+        ),
+      ),
+    );
+    return;
+  }
   Navigator.of(context).push(MaterialPageRoute(builder: tool.builder));
 }
 

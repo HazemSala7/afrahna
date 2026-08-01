@@ -276,6 +276,8 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                           },
                           onOpenSocial: _launch,
                         ),
+                        const SizedBox(height: 18),
+                        _PointsRedeemSection(vendor: vendor),
                         const SizedBox(height: 22),
                         _Section(
                           icon: Icons.info_outline_rounded,
@@ -1819,6 +1821,155 @@ class _Stat extends StatelessWidget {
 // ============================================================
 // CONTACT ACTIONS
 // ============================================================
+
+/// "نقاط أفراحنا" card on a vendor profile: shows how many users have redeemed
+/// points here, and lets a signed-in user redeem 50 points for a 10% in-person
+/// discount (once per 24h). The vendor's own owner sees the counter but not the
+/// redeem button.
+class _PointsRedeemSection extends StatefulWidget {
+  const _PointsRedeemSection({required this.vendor});
+  final VendorModel vendor;
+
+  @override
+  State<_PointsRedeemSection> createState() => _PointsRedeemSectionState();
+}
+
+class _PointsRedeemSectionState extends State<_PointsRedeemSection> {
+  late int _beneficiaries = widget.vendor.beneficiariesCount;
+  bool _busy = false;
+
+  Future<void> _redeem() async {
+    final session = context.read<SessionController>();
+    if (!session.isSignedIn) {
+      await showLoginRequiredDialog(
+        context,
+        title: 'استبدال النقاط',
+        message: 'سجّل الدخول بحساب لتتمكن من استبدال نقاطك لدى هذا المعلن.',
+        icon: Icons.stars_rounded,
+      );
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('استبدال النقاط'),
+        content: const Text(
+          'سيتم خصم 50 نقطة من رصيدك مقابل خصم 10% لدى هذا المعلن.\n'
+          'أظهر شاشة التأكيد للمعلن عند الشراء. (مرة واحدة كل 24 ساعة لكل معلن)',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('تراجع'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('استبدال'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _busy = true);
+    try {
+      final res = await PointsService().redeem(widget.vendor.id);
+      if (!mounted) return;
+      setState(() => _beneficiaries += 1);
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('تم الاستبدال ✅'),
+          content: Text(
+            'حصلت على خصم ${res.discount}% لدى ${widget.vendor.name}.\n'
+            'أظهر هذه الرسالة للمعلن.\nرصيدك المتبقّي: ${res.balance} نقطة.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('تم'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionController>();
+    final isOwner = session.user != null &&
+        widget.vendor.ownerId != null &&
+        session.user!.id == widget.vendor.ownerId;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: AppColors.brandGradient,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded, color: AppColors.primaryDark),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('نقاط أفراحنا',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                        fontSize: 16)),
+              ),
+              Text('$_beneficiaries مستفيد',
+                  style: const TextStyle(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'استبدل 50 نقطة للحصول على خصم 10% عند الشراء من هذا المعلن.',
+            style: TextStyle(color: AppColors.textDark, fontSize: 13, height: 1.4),
+          ),
+          if (!isOwner) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _busy ? null : _redeem,
+                icon: _busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.redeem_rounded, size: 18),
+                label: Text(_busy ? 'جارٍ الاستبدال…' : 'استبدال 50 نقطة (خصم 10%)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryDark,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _ContactActions extends StatelessWidget {
   const _ContactActions({

@@ -88,6 +88,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
     required String phone,
     required String password,
     String? email,
+    String? referralCode,
   }) async {
     _error = null;
     try {
@@ -96,6 +97,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
         phone: phone,
         password: password,
         email: email,
+        referralCode: referralCode,
       );
       _user = result.user;
       _status = AuthStatus.signedIn;

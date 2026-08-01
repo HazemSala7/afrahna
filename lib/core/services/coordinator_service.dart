@@ -2,6 +2,20 @@ import 'package:dio/dio.dart';
 
 import '../api/api_client.dart';
 
+/// The shared Dio client accepts any status < 500 without throwing, so a 4xx
+/// (e.g. 401 for a guest) would otherwise be parsed as a fake success. Call
+/// this after every request so those surface as real errors instead.
+void _ensureOk(Response res) {
+  final code = res.statusCode ?? 0;
+  if (code >= 300) {
+    final data = res.data;
+    final msg = (data is Map && data['message'] != null)
+        ? data['message'].toString()
+        : (code == 401 ? 'يجب تسجيل الدخول أولاً' : 'تعذّر تنفيذ الطلب');
+    throw ApiException(msg, statusCode: code);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Budget
 // ---------------------------------------------------------------------------
@@ -129,11 +143,13 @@ class BudgetService {
 
   Future<List<BudgetItemModel>> list() async {
     final res = await _dio.get('/budget-items');
+    _ensureOk(res);
     return _asList(res.data).map(BudgetItemModel.fromJson).toList();
   }
 
   Future<BudgetSummary> summary() async {
     final res = await _dio.get('/budget-items/summary');
+    _ensureOk(res);
     return BudgetSummary.fromJson(_asMap(res.data));
   }
 
@@ -151,16 +167,19 @@ class BudgetService {
       'actual_amount': actual,
       'paid': paid,
     });
+    _ensureOk(res);
     return BudgetItemModel.fromJson(_asMap(res.data));
   }
 
   Future<BudgetItemModel> update(int id, Map<String, dynamic> patch) async {
     final res = await _dio.put('/budget-items/$id', data: patch);
+    _ensureOk(res);
     return BudgetItemModel.fromJson(_asMap(res.data));
   }
 
   Future<void> delete(int id) async {
-    await _dio.delete('/budget-items/$id');
+    final res = await _dio.delete('/budget-items/$id');
+    _ensureOk(res);
   }
 }
 
@@ -171,11 +190,13 @@ class GuestService {
     final res = await _dio.get('/guests', queryParameters: {
       'rsvp_status': ?rsvpStatus,
     });
+    _ensureOk(res);
     return _asList(res.data).map(GuestModel.fromJson).toList();
   }
 
   Future<GuestSummary> summary() async {
     final res = await _dio.get('/guests/summary');
+    _ensureOk(res);
     return GuestSummary.fromJson(_asMap(res.data));
   }
 
@@ -195,15 +216,18 @@ class GuestService {
       if (group != null && group.isNotEmpty) 'group': group,
       if (tableNumber != null && tableNumber.isNotEmpty) 'table_number': tableNumber,
     });
+    _ensureOk(res);
     return GuestModel.fromJson(_asMap(res.data));
   }
 
   Future<GuestModel> update(int id, Map<String, dynamic> patch) async {
     final res = await _dio.put('/guests/$id', data: patch);
+    _ensureOk(res);
     return GuestModel.fromJson(_asMap(res.data));
   }
 
   Future<void> delete(int id) async {
-    await _dio.delete('/guests/$id');
+    final res = await _dio.delete('/guests/$id');
+    _ensureOk(res);
   }
 }
