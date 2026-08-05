@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/auth_storage.dart';
+import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
@@ -23,6 +25,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   bool _obscure = true;
   bool _remember = true;
+
+  /// True while the reset flow is verifying the phone against the server.
+  bool _checkingPhone = false;
 
   @override
   void initState() {
@@ -100,12 +105,63 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _forgotPassword() {
+  /// Step 1 of the reset: the number must belong to a real account before we
+  /// hand the customer over to support. Without this, a typo sends support a
+  /// request for an account that never existed.
+  Future<void> _forgotPassword() async {
     final phone = _phone.text.trim();
+
+    if (phone.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.primaryDark,
+          behavior: SnackBarBehavior.floating,
+          content: Text('أدخل رقم جوالك أولاً لنتحقق من حسابك'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _checkingPhone = true);
+    ({bool exists, bool active, String? name}) result;
+    try {
+      result = await AuthService().checkPhone(phone);
+    } on ApiException {
+      // The check is a safeguard, not a gate. If it can't run (offline, or an
+      // app build newer than the server), still let the customer reach support
+      // — locking someone out of password recovery is the worse failure.
+      if (!mounted) return;
+      setState(() => _checkingPhone = false);
+      _openResetSheet(phone, null, verified: false);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _checkingPhone = false);
+
+    if (!result.exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.discount,
+          behavior: SnackBarBehavior.floating,
+          content: Text('لا يوجد حساب مسجّل بهذا الرقم — تأكّد من الرقم أو أنشئ حسابًا'),
+        ),
+      );
+      return;
+    }
+
+    _openResetSheet(phone, result.name);
+  }
+
+  void _openResetSheet(String phone, String? accountName,
+      {bool verified = true}) {
     final digits = _supportPhone.replaceAll(RegExp(r'\D'), '');
     final msg = Uri.encodeComponent(
       'مرحباً، نسيت كلمة المرور الخاصة بحسابي في تطبيق أفراحنا'
-      '${phone.isNotEmpty ? '\nرقم الجوال المسجّل: $phone' : ''}'
+      '\nرقم الجوال المسجّل: $phone'
+      '${accountName != null ? '\nاسم الحساب: $accountName' : ''}'
+      // Only claim verification when it actually happened — support relies on
+      // this line to know the number was checked against the database.
+      '${verified ? '\n(تم التحقق من وجود الحساب عبر التطبيق)' : ''}'
       '\nأرجو مساعدتي في إعادة تعيين كلمة المرور.',
     );
 
@@ -148,6 +204,37 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
             const SizedBox(height: 6),
+            // Confirming the account back to the user is the point of the
+            // check — they see straight away whether it's really theirs.
+            if (verified) Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B9C5A).withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.verified_user_rounded,
+                      size: 18, color: Color(0xFF1B9C5A)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      accountName == null
+                          ? 'تم العثور على حسابك المرتبط بالرقم $phone'
+                          : 'تم العثور على حساب «$accountName» بالرقم $phone',
+                      style: const TextStyle(
+                        color: Color(0xFF127a46),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (verified) const SizedBox(height: 10),
             const Text(
               'تواصل مع فريق الدعم لإعادة تعيين كلمة المرور الخاصة بك.',
               textAlign: TextAlign.center,
@@ -300,14 +387,26 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                       const Spacer(),
                                       TextButton(
-                                        onPressed: _forgotPassword,
-                                        child: const Text(
-                                          'نسيت كلمة المرور؟',
-                                          style: TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
+                                        onPressed: _checkingPhone
+                                            ? null
+                                            : _forgotPassword,
+                                        child: _checkingPhone
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: AppColors.primary,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'نسيت كلمة المرور؟',
+                                                style: TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                       ),
                                     ],
                                   ),

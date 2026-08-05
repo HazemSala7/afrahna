@@ -112,6 +112,24 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Replaces the cached user after a profile edit, so every screen watching
+  /// the session (header, account page, drawer) redraws with the new details.
+  void setUser(UserModel user) {
+    _user = user;
+    notifyListeners();
+  }
+
+  /// Re-reads the signed-in user from the server.
+  Future<void> refreshUser() async {
+    try {
+      final u = await _auth.me();
+      _user = u;
+      notifyListeners();
+    } catch (_) {
+      // Keep the cached user — a failed refresh must not sign anyone out.
+    }
+  }
+
   /// Enables/disables notifications for the signed-in user (offer alerts, etc.).
   Future<void> setNotificationsEnabled(bool enabled) async {
     final v = await _auth.updateNotifications(enabled);

@@ -58,12 +58,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Deep link: afrahna://vendor/123 (opened from the web share page). -->
+            <!-- Deep link: afrahna://vendor/123, afrahna://invite/AB12CD
+                 (opened from the web share / invite pages). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="afrahna"/>
+            </intent-filter>
+            <!-- App Links: open shared https links straight in the app when it
+                 is installed. Verified via /.well-known/assetlinks.json. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="afrahna.co" android:pathPrefix="/r/"/>
+                <data android:scheme="https" android:host="afrahna.co" android:pathPrefix="/v/"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

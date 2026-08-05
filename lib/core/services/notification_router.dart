@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/reels/reels_page.dart';
 import '../../features/vendors/vendor_details_page.dart';
+import 'referral_storage.dart';
 import 'services.dart';
 
 /// Listens for incoming deep links (custom scheme `afrahna://…` and the web
@@ -65,18 +66,42 @@ class NotificationRouter {
 
   /// Maps an incoming deep-link URI to a navigation.
   ///  - afrahna://vendor/313  ·  afrahna://reel/45  ·  afrahna://product/12
+  ///  - afrahna://invite/AB12CD  ·  https://afrahna.co/r/AB12CD
   ///  - https://afrahna.co/v/313
   static void handleUri(Uri uri) {
     if (uri.scheme == 'afrahna') {
-      final id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-      handle('${uri.host}:$id');
+      final first = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+      if (uri.host == 'invite') {
+        _handleInvite(first);
+        return;
+      }
+      handle('${uri.host}:$first');
       return;
     }
     final segs = uri.pathSegments;
     if (segs.length >= 2 && segs[0] == 'v') {
       handle('vendor:${segs[1]}');
+      return;
+    }
+    // Invite link shared from the app: https://afrahna.co/r/{CODE}
+    if (segs.length >= 2 && segs[0] == 'r') {
+      _handleInvite(segs[1]);
     }
   }
+
+  /// Stores the invite code and, for a signed-out visitor, opens registration
+  /// with it filled in — the inviter's point is only credited when the friend
+  /// actually creates an account.
+  static Future<void> _handleInvite(String rawCode) async {
+    final code = ReferralStorage.normalize(rawCode);
+    if (code == null) return;
+    await ReferralStorage.save(code);
+    onInvite?.call(code);
+  }
+
+  /// Set by the app shell so an incoming invite can reach the UI. Kept as a
+  /// callback so this router stays free of widget/session dependencies.
+  static void Function(String code)? onInvite;
 
   static (String, int)? _parse(String? link) {
     if (link == null || !link.contains(':')) return null;

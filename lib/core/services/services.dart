@@ -128,6 +128,67 @@ class AuthService {
     }
   }
 
+  /// Password-reset step 1: is there an account for this phone number?
+  /// Returns whether it exists, whether it's active, and a masked name so the
+  /// user can confirm it's really their account before contacting support.
+  Future<({bool exists, bool active, String? name})> checkPhone(
+      String phone) async {
+    try {
+      final res = await _dio.post('/auth/check-phone', data: {'phone': phone});
+      // Dio is configured with `validateStatus: < 500`, so a 404/422 arrives
+      // here as a normal response. Without this guard the missing `exists`
+      // field reads as false and a real account is reported as "not found" —
+      // the caller must be able to tell "no account" from "couldn't check".
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _err(res.data);
+
+      final m = _unwrapObject(res.data);
+      if (m['exists'] == null) throw _err(res.data);
+
+      return (
+        exists: m['exists'] == true,
+        active: m['active'] == true,
+        name: m['name'] is String ? m['name'] as String : null,
+      );
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Updates the signed-in user's own profile. Only the fields passed are
+  /// sent, so a screen editing just the avatar doesn't clear the rest.
+  /// Returns the refreshed user.
+  Future<UserModel> updateProfile({
+    String? name,
+    String? phone,
+    String? email,
+    String? avatar,
+    String? whatsapp,
+    String? instagram,
+    String? facebook,
+    String? tiktok,
+    String? snapchat,
+  }) async {
+    try {
+      final res = await _dio.patch('/auth/profile', data: {
+        'name': ?name,
+        'phone': ?phone,
+        'email': ?email,
+        'avatar': ?avatar,
+        'whatsapp': ?whatsapp,
+        'instagram': ?instagram,
+        'facebook': ?facebook,
+        'tiktok': ?tiktok,
+        'snapchat': ?snapchat,
+      });
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _err(res.data);
+      return UserModel.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   /// Changes the signed-in user's own password (any role). Requires the
   /// current password. Throws [ApiException] with the server message on failure.
   Future<void> changePassword({
@@ -583,9 +644,16 @@ class ServiceService {
 class BookingService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<BookingModel>> list() async {
+  /// [scope] overrides the role-based default:
+  /// `customer` — bookings this user made (works even for a shop owner, whose
+  /// default view is their shop's inbox), `vendor` — requests their shop
+  /// received. Omit for the role default.
+  Future<List<BookingModel>> list({String? scope}) async {
     try {
-      final res = await _dio.get('/bookings');
+      final res = await _dio.get('/bookings', queryParameters: {
+        'scope': ?scope,
+        'per_page': 50,
+      });
       return _unwrapList(res.data).map(BookingModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -620,6 +688,33 @@ class BookingService {
   Future<void> cancel(int id) async {
     try {
       await _dio.delete('/bookings/$id');
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// The shop's answer to a booking request. The API notifies the customer on
+  /// every status change, so this is what turns a request into a reply.
+  ///
+  /// [reason] is the shop's own words, shown to the customer when it declines.
+  Future<BookingModel> updateStatus(
+    int id,
+    String status, {
+    String? reason,
+  }) async {
+    try {
+      final res = await _dio.put('/bookings/$id', data: {
+        'status': status,
+        if (reason != null && reason.isNotEmpty) 'cancellation_reason': reason,
+      });
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        throw ApiException(
+          (res.data is Map && res.data['message'] != null)
+              ? res.data['message'].toString()
+              : 'تعذّر تحديث الحجز',
+        );
+      }
+      return BookingModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
@@ -1169,6 +1264,53 @@ class ProductService {
     }
   }
 
+  /// Marketplace feed: available products from every active shop.
+  ///
+  /// [seed] keeps the shuffle stable while paging (only used by the default
+  /// `random` order) — reuse the same value for page 2 onwards, and change it
+  /// to reshuffle. The remaining arguments are the advanced filters.
+  Future<({List<ProductModel> items, bool hasMore})> marketplace({
+    required int seed,
+    int page = 1,
+    int perPage = 20,
+    String sort = 'random',
+    int? vendorId,
+    int? categoryId,
+    int? cityId,
+    double? minPrice,
+    double? maxPrice,
+    bool discountedOnly = false,
+  }) async {
+    try {
+      final res = await _dio.get('/products', queryParameters: {
+        'sort': sort,
+        if (sort == 'random') 'seed': seed,
+        'available_only': 1,
+        'vendor_id': ?vendorId,
+        'category_id': ?categoryId,
+        'city_id': ?cityId,
+        'min_price': ?minPrice,
+        'max_price': ?maxPrice,
+        if (discountedOnly) 'discounted': 1,
+        // A price-sorted list is meaningless with unpriced products in it.
+        if (sort == 'price_asc' || sort == 'price_desc') 'priced_only': 1,
+        'page': page,
+        'per_page': perPage,
+      });
+      final body = res.data;
+      final items = _unwrapList(body).map(ProductModel.fromJson).toList();
+      var hasMore = false;
+      if (body is Map) {
+        final cp = body['current_page'];
+        final lp = body['last_page'];
+        if (cp is num && lp is num) hasMore = cp.toInt() < lp.toInt();
+      }
+      return (items: items, hasMore: hasMore);
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Future<ProductModel> show(int id) async {
     try {
       final res = await _dio.get('/products/$id');
@@ -1332,6 +1474,9 @@ class OrderService {
     required Map<int, int> quantities,
     String? customerName,
     String? customerPhone,
+    int? cityId,
+    String? area,
+    String? landmark,
     String? note,
   }) async {
     try {
@@ -1344,6 +1489,9 @@ class OrderService {
         'items': items,
         'customer_name': ?customerName,
         'customer_phone': ?customerPhone,
+        'city_id': ?cityId,
+        'area': ?area,
+        'landmark': ?landmark,
         'note': ?note,
       });
       return OrderModel.fromJson(_unwrapObject(res.data));

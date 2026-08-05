@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -39,13 +41,23 @@ class _ReelsPageState extends State<ReelsPage> {
   /// across paginated requests (a new seed on each pull-to-refresh).
   int? _seed;
 
-  /// Pool of video controllers keyed by reel id. We keep only a small window
-  /// (current ± 1) alive and PRELOAD the neighbours so swiping feels instant.
+  /// Pool of READY video controllers keyed by reel id. A controller only lands
+  /// here once `initialize()` has completed, so an entry always renders a
+  /// picture. We keep a small window (current ± 1) alive and PRELOAD the
+  /// neighbours so swiping feels instant.
   final Map<int, VideoPlayerController> _controllers = {};
 
-  /// Ids whose controller is mid-creation (async cache lookup) — prevents
-  /// double-creating the same controller.
+  /// Ids whose controller is mid-creation (async cache lookup + initialize) —
+  /// prevents double-creating the same controller.
   final Set<int> _initializing = {};
+
+  /// Reel ids the window currently wants alive. A controller that finishes
+  /// initializing after its reel left the window is disposed instead of kept.
+  Set<int> _window = {};
+
+  /// A stalled prepare (dead socket / stalled CDN) must not park a reel on its
+  /// poster forever — give up after this and let the next retry start fresh.
+  static const _initTimeout = Duration(seconds: 10);
 
   /// Disk cache dedicated to reel videos, so an already-seen (or PREFETCHED)
   /// reel plays instantly from a local file instead of re-streaming.
@@ -113,15 +125,22 @@ class _ReelsPageState extends State<ReelsPage> {
   /// Create (once) the controller for a reel — from the CACHED local file when
   /// available (instant), otherwise stream from network while caching it in the
   /// background for next time.
+  ///
+  /// The controller is published to [_controllers] only AFTER `initialize()`
+  /// succeeds. Registering it up front used to make a stalled prepare
+  /// permanent: the half-built controller sat in the map, every later attempt
+  /// short-circuited on `containsKey`, and the reel showed its poster and a
+  /// spinner forever.
   Future<void> _ensureController(PostModel reel) async {
     final url = reel.mediaUrl;
     if (!_isVideoUrl(url)) return;
     final id = reel.id;
     if (_controllers.containsKey(id) || _initializing.contains(id)) return;
     _initializing.add(id);
+    VideoPlayerController? c;
     try {
-      VideoPlayerController c;
       final cached = await _videoCache.getFileFromCache(url!);
+      if (!mounted) return;
       if (cached != null) {
         c = VideoPlayerController.file(cached.file);
       } else {
@@ -129,23 +148,28 @@ class _ReelsPageState extends State<ReelsPage> {
         // Cache in the background so a replay / next session is instant.
         _videoCache.getSingleFile(url).ignore();
       }
-      if (!mounted) {
-        c.dispose();
+      c.setLooping(true);
+      await c.initialize().timeout(_initTimeout);
+      // Dropped out of the window (or the page went away) while preparing.
+      if (!mounted || !_window.contains(id)) {
+        await c.dispose();
         return;
       }
       _controllers[id] = c;
-      c.setLooping(true);
-      await c.initialize();
-      if (!mounted) {
-        _controllers.remove(id)?.dispose();
-        return;
-      }
       setState(() {}); // let the visible item pick it up + play
     } catch (_) {
-      _controllers.remove(id)?.dispose();
+      // Timed out or failed — drop it so the next retry starts from scratch.
+      await c?.dispose();
     } finally {
       _initializing.remove(id);
     }
+  }
+
+  /// Called by a visible reel that still has no picture — retries a failed or
+  /// timed-out prepare instead of leaving it stuck on the poster.
+  void _retryController(PostModel reel) {
+    _window.add(reel.id);
+    _ensureController(reel);
   }
 
   /// Keep controllers for [index-1 .. index+1] alive (preloading the neighbours),
@@ -155,6 +179,13 @@ class _ReelsPageState extends State<ReelsPage> {
     for (final j in [index - 1, index, index + 1]) {
       if (j >= 0 && j < _reels.length) {
         keep.add(_reels[j].id);
+      }
+    }
+    // Publish the window BEFORE creating controllers, so one that finishes
+    // initializing later can tell whether it's still wanted.
+    _window = keep;
+    for (final j in [index - 1, index, index + 1]) {
+      if (j >= 0 && j < _reels.length) {
         _ensureController(_reels[j]);
       }
     }
@@ -200,6 +231,7 @@ class _ReelsPageState extends State<ReelsPage> {
       c.dispose();
     }
     _controllers.clear();
+    _window = {};
     _warmDone = 0;
     _warmTarget = 0;
     try {
@@ -295,6 +327,7 @@ class _ReelsPageState extends State<ReelsPage> {
                 reel: _reels[i],
                 controller: _controllers[_reels[i].id],
                 isVideo: _isVideoUrl(_reels[i].mediaUrl),
+                onNeedsVideo: () => _retryController(_reels[i]),
               ),
             ),
           );
@@ -314,6 +347,7 @@ class _ReelItem extends StatefulWidget {
     required this.reel,
     required this.controller,
     required this.isVideo,
+    required this.onNeedsVideo,
   });
 
   final PostModel reel;
@@ -322,6 +356,10 @@ class _ReelItem extends StatefulWidget {
   /// or before the parent has created it).
   final VideoPlayerController? controller;
   final bool isVideo;
+
+  /// Asks the parent to (re)build this reel's controller — used when the reel
+  /// is on screen but still has no picture.
+  final VoidCallback onNeedsVideo;
 
   @override
   State<_ReelItem> createState() => _ReelItemState();
@@ -334,7 +372,27 @@ class _ReelItemState extends State<_ReelItem> {
   late int _likes;
   double _lastVisible = 0;
 
+  /// Keeps nudging the parent while this reel is visible without a picture, so
+  /// a failed or timed-out prepare can't strand it on its poster.
+  Timer? _retry;
+
+  /// Prepare attempts made so far, and when the last one was started. A reel
+  /// the device cannot decode should settle into its poster rather than spin
+  /// forever — but we keep retrying quietly underneath, so a video that was
+  /// only slow (weak signal) still appears once it finally loads.
+  int _attempts = 0;
+  DateTime? _lastAsk;
+  bool _gaveUp = false;
+
+  /// Attempts before the spinner is dropped. Must be paced slower than the
+  /// parent's initialize timeout, otherwise repeated ticks would burn the
+  /// budget on a request that is still being worked on.
+  static const _maxAttempts = 2;
+  static const _askCooldown = Duration(seconds: 13);
+
   VideoPlayerController? get _video => widget.controller;
+
+  bool get _isReady => _video?.value.isInitialized ?? false;
 
   @override
   void initState() {
@@ -349,9 +407,48 @@ class _ReelItemState extends State<_ReelItem> {
     // The parent rebuilds us when our controller finishes initializing — make
     // sure playback matches the current visibility once it's ready.
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncPlayback());
+    if (_isReady) _stopRetrying();
+  }
+
+  @override
+  void dispose() {
+    _stopRetrying();
+    super.dispose();
   }
 
   /// The parent owns/disposes the controller, so nothing to dispose here.
+
+  /// Ask the parent for a controller. After [_maxAttempts] the spinner is
+  /// dropped so an undecodable video reads as a still rather than an endless
+  /// load — retries continue quietly, so a merely slow one still turns up.
+  void _askForVideo() {
+    if (_isReady) return;
+    final now = DateTime.now();
+    // A request already in flight is worked on until it times out; asking again
+    // on top of it is a no-op that would burn the attempt budget for nothing.
+    if (_lastAsk != null && now.difference(_lastAsk!) < _askCooldown) return;
+
+    if (_attempts >= _maxAttempts && !_gaveUp && mounted) {
+      setState(() => _gaveUp = true);
+    }
+    _attempts++;
+    _lastAsk = now;
+    widget.onNeedsVideo();
+  }
+
+  void _startRetrying() {
+    if (_retry != null || !widget.isVideo) return;
+    _retry = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      if (_isReady || _lastVisible <= 0.6) return;
+      _askForVideo();
+    });
+  }
+
+  void _stopRetrying() {
+    _retry?.cancel();
+    _retry = null;
+  }
 
   void _onVisibility(VisibilityInfo info) {
     _lastVisible = info.visibleFraction;
@@ -359,6 +456,12 @@ class _ReelItemState extends State<_ReelItem> {
     if (!_viewSent && info.visibleFraction > 0.6) {
       _viewSent = true;
       PostService().markViewed(widget.reel.id);
+    }
+    if (info.visibleFraction > 0.6 && !_isReady) {
+      _askForVideo();
+      _startRetrying();
+    } else if (_isReady) {
+      _stopRetrying();
     }
     _syncPlayback();
   }
@@ -566,7 +669,9 @@ class _ReelItemState extends State<_ReelItem> {
           ),
         );
       }
-      // Fallback to thumbnail while loading or on failure
+      // Fallback to thumbnail while loading or on failure. The spinner only
+      // shows while we're still genuinely trying — once we've given up it
+      // would be a permanent lie, so the poster stands on its own.
       if (thumb != null && thumb.isNotEmpty) {
         return Stack(
           fit: StackFit.expand,
@@ -577,7 +682,7 @@ class _ReelItemState extends State<_ReelItem> {
               placeholder: (_, _) => Container(color: Colors.black),
               errorWidget: (_, _, _) => Container(color: Colors.black),
             ),
-            if (!failed)
+            if (!failed && !_gaveUp)
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               ),

@@ -6,6 +6,7 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
 import '../auth/login_page.dart';
 
@@ -63,6 +64,40 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  /// The shop's WhatsApp number, falling back to its phone number.
+  String _contactNumber(VendorModel v) {
+    final wa = (v.whatsapp ?? '').trim();
+    return wa.isNotEmpty ? wa : (v.phone ?? '').trim();
+  }
+
+  /// Opens WhatsApp on the vendor's number with the booking enquiry pre-filled.
+  /// Falls back to the shop's phone when no WhatsApp number is set, and stays
+  /// silent when the shop has neither — the booking itself already succeeded
+  /// and the vendor still gets the in-app notification.
+  Future<void> _messageVendorOnWhatsapp() async {
+    var raw = _contactNumber(widget.vendor);
+
+    // Reached from a list, the vendor can be a trimmed object with no contact
+    // details — fetch the full record once rather than silently skipping.
+    if (raw.isEmpty) {
+      try {
+        raw = _contactNumber(await VendorService().show(widget.vendor.id));
+      } catch (_) {
+        return;
+      }
+    }
+
+    final uri = vendorWhatsappUri(raw, message: kBookingWhatsappMessage);
+    if (uri == null) return;
+
+    final opened = await openExternal(uri);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تم الحجز، لكن تعذّر فتح واتساب — تواصل مع المعلن يدويًا'),
+      ));
+    }
+  }
+
   Future<void> _submit() async {
     final session = context.read<SessionController>();
     if (!session.isSignedIn) {
@@ -98,6 +133,11 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
         backgroundColor: AppColors.primary,
         content: Text('تم إرسال الحجز بنجاح'),
       ));
+      // Hand the customer straight to WhatsApp with the enquiry written for
+      // them, so the vendor also gets it as a message from the customer's own
+      // number instead of relying on the in-app notification alone.
+      await _messageVendorOnWhatsapp();
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;

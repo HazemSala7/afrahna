@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+// `intl` also exports a TextDirection, which would shadow the Flutter one used
+// for the LTR phone number below.
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
-import '../../core/api/api_client.dart';
+import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
-import '../../core/utils/link_launcher.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../admin/admin_dashboard_page.dart';
@@ -14,9 +16,16 @@ import '../auth/register_page.dart';
 import '../bookings/bookings_page.dart';
 import '../delegate/delegate_dashboard_page.dart';
 import '../favorites/favorites_page.dart';
+import '../invitations/invitations_page.dart';
 import '../notifications/notifications_page.dart';
+import '../offers/offers_page.dart';
 import '../points/points_page.dart';
 import '../posts/vendor_posts_page.dart';
+import 'account_shared.dart';
+import 'customer_header.dart';
+import 'edit_profile_page.dart';
+import 'followed_vendors_page.dart';
+import 'vendor_account_view.dart';
 import 'vendor_statement_page.dart';
 
 class AccountPage extends StatelessWidget {
@@ -25,11 +34,16 @@ class AccountPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
+    // Advertisers get their own shop-centric account screen.
+    final isVendor = session.isSignedIn && session.user!.isVendor;
     return AppScaffold(
-      appBar: const PinkAppBar(title: 'حسابي', showBack: false),
+      appBar:
+          isVendor ? null : const PinkAppBar(title: 'حسابي', showBack: false),
       body: !session.isSignedIn
           ? const _GuestView()
-          : _SignedInView(session: session),
+          : isVendor
+              ? VendorAccountView(session: session)
+              : _SignedInView(session: session),
     );
   }
 }
@@ -252,9 +266,30 @@ class _BenefitRow extends StatelessWidget {
   }
 }
 
-class _SignedInView extends StatelessWidget {
+class _SignedInView extends StatefulWidget {
   const _SignedInView({required this.session});
   final SessionController session;
+
+  @override
+  State<_SignedInView> createState() => _SignedInViewState();
+}
+
+class _SignedInViewState extends State<_SignedInView> {
+  SessionController get session => widget.session;
+
+  /// Drives the red bubble on the notifications shortcut.
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    final n = await NotificationService().unreadCount();
+    if (mounted) setState(() => _unread = n);
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -330,103 +365,117 @@ class _SignedInView extends StatelessWidget {
         );
 
     // Role-specific management shortcuts (only shown when relevant).
-    final manage = <_MenuItem>[
+    final manage = <AccountMenuItem>[
       if (user.isAdmin)
-        _MenuItem(
+        AccountMenuItem(
           icon: Icons.admin_panel_settings_rounded,
           label: 'لوحة الإدارة',
-          tint: _kTintTeal,
+          tint: kTintTeal,
           onTap: () => go(const AdminDashboardPage()),
         ),
       if (user.isDelegate)
-        _MenuItem(
+        AccountMenuItem(
           icon: Icons.badge_rounded,
           label: 'لوحة المندوب',
-          tint: _kTintGold,
+          tint: kTintGold,
           onTap: () => go(const DelegateDashboardPage()),
         ),
       if (user.isVendor)
-        _MenuItem(
+        AccountMenuItem(
           icon: Icons.dynamic_feed_rounded,
           label: 'محتواي (منشورات وريلز)',
-          tint: _kTintTerracotta,
+          tint: kTintTerracotta,
           onTap: () => go(const VendorPostsPage()),
         ),
       if (user.isVendor)
-        _MenuItem(
+        AccountMenuItem(
           icon: Icons.receipt_long_rounded,
           label: 'كشف حساب (الاشتراكات والدفعات)',
-          tint: _kTintSage,
+          tint: kTintSage,
           onTap: () => go(const VendorStatementPage()),
         ),
     ];
 
-    final account = <_MenuItem>[
-      _MenuItem(
+    final account = <AccountMenuItem>[
+      AccountMenuItem(
+        icon: Icons.manage_accounts_rounded,
+        label: 'تعديل الملف الشخصي',
+        subtitle: 'الاسم، الجوال، الصورة، وسائل التواصل',
+        tint: kTintTeal,
+        onTap: () => go(const EditProfilePage()),
+      ),
+      AccountMenuItem(
         icon: Icons.stars_rounded,
         label: 'نقاطي ومكافآتي',
-        tint: _kTintGold,
+        subtitle: '${user.pointsBalance} نقطة',
+        tint: kTintGold,
         onTap: () => go(const PointsPage()),
       ),
-      _MenuItem(
+      AccountMenuItem(
+        icon: Icons.storefront_rounded,
+        label: 'المحلات المتابَعة',
+        tint: kTintSage,
+        onTap: () => go(const FollowedVendorsPage()),
+      ),
+      AccountMenuItem(
         icon: Icons.calendar_month_rounded,
         label: 'مناسباتي',
-        tint: _kTintMauve,
+        tint: kTintMauve,
         onTap: () => go(const BookingsPage()),
       ),
-      _MenuItem(
+      AccountMenuItem(
         icon: Icons.favorite_rounded,
         label: 'المفضلة',
-        tint: _kTintRose,
+        tint: kTintRose,
         onTap: () => go(const FavoritesPage()),
       ),
-      _MenuItem(
+      AccountMenuItem(
         icon: Icons.notifications_rounded,
         label: 'الإشعارات',
-        tint: _kTintGold,
+        tint: kTintGold,
         onTap: () => go(const NotificationsPage()),
       ),
     ];
 
-    final prefs = <_MenuItem>[
-      _MenuItem(
+    final prefs = <AccountMenuItem>[
+      AccountMenuItem(
         icon: Icons.lock_rounded,
         label: 'تغيير كلمة المرور',
-        tint: _kTintTeal,
-        onTap: () => _showChangePasswordSheet(context),
+        tint: kTintTeal,
+        onTap: () => showChangePasswordSheet(context),
       ),
-      _MenuItem(
+      AccountMenuItem(
         icon: Icons.language_rounded,
         label: 'اللغة',
-        tint: _kTintTerracotta,
-        onTap: () => _showLanguageDialog(context),
+        tint: kTintTerracotta,
+        onTap: () => showLanguageDialog(context),
       ),
     ];
 
-    final support = <_MenuItem>[
-      _MenuItem(
+    final support = <AccountMenuItem>[
+      AccountMenuItem(
         icon: Icons.help_rounded,
         label: 'المساعدة والدعم',
-        tint: _kTintSage,
-        onTap: () => _showSupportSheet(context),
+        tint: kTintSage,
+        onTap: () => showSupportSheet(context),
       ),
-      _MenuItem(
+      AccountMenuItem(
         icon: Icons.info_rounded,
         label: 'حول التطبيق',
-        tint: _kTintMauve,
-        onTap: () => _showAboutSheet(context),
+        tint: kTintMauve,
+        onTap: () => showAppAboutSheet(context),
       ),
     ];
 
-    final danger = <_MenuItem>[
-      _MenuItem(
+    final danger = <AccountMenuItem>[
+      AccountMenuItem(
         icon: Icons.logout_rounded,
         label: 'تسجيل الخروج',
         tint: AppColors.discount,
         isDestructive: true,
         onTap: () => _confirmLogout(context),
       ),
-      _MenuItem(
+      AccountMenuItem(
         icon: Icons.delete_forever_rounded,
         label: 'حذف الحساب',
         tint: AppColors.discount,
@@ -446,431 +495,106 @@ class _SignedInView extends StatelessWidget {
       children: [
         FadeSlideIn(
           delay: next(),
-          child: _ProfileHeader(
-            name: user.name,
-            subtitle: user.phone.isNotEmpty ? user.phone : (user.email ?? ''),
-            role: user.role,
+          child: CustomerHeroCard(
+            user: user,
+            onEditProfile: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditProfilePage()),
+              );
+              if (mounted) setState(() {});
+            },
+            onOpenPoints: () => go(const PointsPage()),
           ),
         ),
+        const SizedBox(height: 12),
+        FadeSlideIn(
+          delay: next(),
+          child: CustomerQuickActions(
+            actions: [
+              CustomerQuickAction(
+                icon: Icons.favorite_rounded,
+                label: 'المفضلة',
+                onTap: () => go(const FavoritesPage()),
+              ),
+              CustomerQuickAction(
+                icon: Icons.calendar_month_rounded,
+                label: 'مناسباتي',
+                onTap: () => go(const BookingsPage()),
+              ),
+              CustomerQuickAction(
+                icon: Icons.notifications_rounded,
+                label: 'الإشعارات',
+                badge: _unread,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                  );
+                  _loadUnread();
+                },
+              ),
+              CustomerQuickAction(
+                icon: Icons.local_offer_rounded,
+                label: 'العروض',
+                onTap: () => go(const OffersPage()),
+              ),
+              CustomerQuickAction(
+                icon: Icons.storefront_rounded,
+                label: 'متابَعاتي',
+                onTap: () => go(const FollowedVendorsPage()),
+              ),
+              CustomerQuickAction(
+                icon: Icons.mail_rounded,
+                label: 'دعواتي',
+                onTap: () => go(const InvitationsPage()),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        FadeSlideIn(delay: next(), child: _AccountFacts(user: user)),
         if (manage.isNotEmpty) ...[
           const SizedBox(height: 22),
-          FadeSlideIn(delay: next(), child: const _SectionLabel('الإدارة')),
+          FadeSlideIn(delay: next(), child: const AccountSectionLabel('الإدارة')),
           const SizedBox(height: 10),
-          FadeSlideIn(delay: next(), child: _MenuGroup(items: manage)),
+          FadeSlideIn(delay: next(), child: AccountMenuGroup(items: manage)),
         ],
         const SizedBox(height: 22),
-        FadeSlideIn(delay: next(), child: const _SectionLabel('حسابي')),
+        FadeSlideIn(delay: next(), child: const AccountSectionLabel('حسابي')),
         const SizedBox(height: 10),
-        FadeSlideIn(delay: next(), child: _MenuGroup(items: account)),
+        FadeSlideIn(delay: next(), child: AccountMenuGroup(items: account)),
         const SizedBox(height: 22),
-        FadeSlideIn(delay: next(), child: const _SectionLabel('الإعدادات')),
+        FadeSlideIn(delay: next(), child: const AccountSectionLabel('الإعدادات')),
         const SizedBox(height: 10),
-        FadeSlideIn(delay: next(), child: _MenuGroup(items: prefs)),
+        FadeSlideIn(delay: next(), child: AccountMenuGroup(items: prefs)),
         const SizedBox(height: 22),
-        FadeSlideIn(delay: next(), child: const _SectionLabel('الدعم')),
+        FadeSlideIn(delay: next(), child: const AccountSectionLabel('الدعم')),
         const SizedBox(height: 10),
-        FadeSlideIn(delay: next(), child: _MenuGroup(items: support)),
+        FadeSlideIn(delay: next(), child: AccountMenuGroup(items: support)),
         const SizedBox(height: 22),
-        FadeSlideIn(delay: next(), child: _MenuGroup(items: danger)),
+        FadeSlideIn(delay: next(), child: AccountMenuGroup(items: danger)),
         const SizedBox(height: 22),
-        const _PoweredByNeurex(),
+        const PoweredByNeurex(),
         const SizedBox(height: 150),
       ],
     );
   }
 }
+/// Account facts the user can't edit: tier, join date and points at a glance.
+class _AccountFacts extends StatelessWidget {
+  const _AccountFacts({required this.user});
+  final UserModel user;
 
-/// Branded footer credit — taps through to Neurex on WhatsApp.
-class _PoweredByNeurex extends StatelessWidget {
-  const _PoweredByNeurex();
-
-  static const _phone = '972595324689';
-
-  Future<void> _contact() async {
-    final msg = Uri.encodeComponent(
-        'مرحباً Neurex 👋، تواصلت معكم من تطبيق أفراحنا.');
-    await _openUri(Uri.parse('https://wa.me/$_phone?text=$msg'));
+  static String _joined(DateTime? d) {
+    if (d == null) return '—';
+    return DateFormat('MMMM y', 'ar').format(d);
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // "Made with love"
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text(
-                'صُنع بكل ',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text('❤️', style: TextStyle(fontSize: 12.5)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Powered by Neurex — tappable pill.
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _contact,
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6D4AFF), Color(0xFF9C6BFF)],
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6D4AFF).withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.auto_awesome_rounded,
-                        color: Colors.white, size: 15),
-                    SizedBox(width: 7),
-                    Text(
-                      'Powered by ',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      'Neurex',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'تواصل معنا عبر واتساب',
-            style: TextStyle(
-              color: AppColors.textMuted.withValues(alpha: 0.8),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Settings actions (Language / Support / About)
-// ---------------------------------------------------------------------------
-
-const String _kSupportPhone = '+972599252493';
-
-Future<void> _openUri(Uri uri) async {
-  await openExternal(uri);
-}
-
-void _showLanguageDialog(BuildContext context) {
-  showDialog<void>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('اللغة'),
-      content: const Text(
-          'التطبيق متوفّر باللغة العربية حاليًا، وسيتم دعم الإنجليزية قريبًا.'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('حسناً'),
-        ),
-      ],
-    ),
-  );
-}
-
-void _showSupportSheet(BuildContext context) {
-  final digits = _kSupportPhone.replaceAll(RegExp(r'\D'), '');
-  final msg = Uri.encodeComponent('مرحباً، أحتاج للمساعدة في تطبيق أفراحنا');
-  showModalBottomSheet<void>(
-    context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (_) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text('المساعدة والدعم',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
-            title: const Text('تواصل عبر واتساب'),
-            onTap: () {
-              Navigator.pop(context);
-              _openUri(Uri.parse('https://wa.me/$digits?text=$msg'));
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.call, color: AppColors.primary),
-            title: const Text('اتصال هاتفي'),
-            subtitle: const Text(_kSupportPhone,
-                textDirection: TextDirection.ltr),
-            onTap: () {
-              Navigator.pop(context);
-              _openUri(Uri(scheme: 'tel', path: _kSupportPhone));
-            },
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
-}
-
-void _showAboutSheet(BuildContext context) {
-  showAboutDialog(
-    context: context,
-    applicationName: 'أفراحنا',
-    applicationVersion: 'الإصدار 1.8.0',
-    applicationIcon: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.asset('assets/images/logo.png',
-          width: 52, height: 52, errorBuilder: (_, _, _) => const Icon(
-              Icons.celebration, size: 44, color: AppColors.primary)),
-    ),
-    children: const [
-      SizedBox(height: 8),
-      Text(
-        'أفراحنا — دليلك الشامل لتجهيز المناسبات والأعراس: قاعات، خدمات، '
-        'عروض خاصة، ريلز وأكثر. كل ما تحتاجه ليومك المميّز في مكان واحد.',
-      ),
-    ],
-  );
-}
-
-void _showChangePasswordSheet(BuildContext context) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => const _ChangePasswordDialog(),
-  );
-}
-
-/// Bottom sheet letting the signed-in user (any role) change their own
-/// password: current + new + confirm, with show/hide toggles.
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog();
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  final _form = GlobalKey<FormState>();
-  final _current = TextEditingController();
-  final _new = TextEditingController();
-  final _confirm = TextEditingController();
-  bool _obscure = true;
-  bool _saving = false;
-
-  @override
-  void dispose() {
-    _current.dispose();
-    _new.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      await AuthService().changePassword(
-        currentPassword: _current.text,
-        newPassword: _new.text,
-      );
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تغيير كلمة المرور ✓')),
-      );
-    } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-        child: Form(
-          key: _form,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-              const Text('تغيير كلمة المرور',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-              const SizedBox(height: 16),
-              _field(_current, 'كلمة المرور الحالية'),
-              const SizedBox(height: 12),
-              _field(_new, 'كلمة المرور الجديدة',
-                  validator: (v) =>
-                      (v == null || v.length < 6) ? 'الحد الأدنى 6 أحرف' : null),
-              const SizedBox(height: 12),
-              _field(_confirm, 'تأكيد كلمة المرور الجديدة',
-                  validator: (v) =>
-                      v != _new.text ? 'كلمتا المرور غير متطابقتين' : null),
-              const SizedBox(height: 18),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                onPressed: _saving ? null : _submit,
-                child: _saving
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Text('حفظ'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController c, String label,
-      {String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: c,
-      obscureText: _obscure,
-      validator: validator ??
-          (v) => (v == null || v.isEmpty) ? 'حقل مطلوب' : null,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        suffixIcon: IconButton(
-          icon: Icon(_obscure
-              ? Icons.visibility_off_rounded
-              : Icons.visibility_rounded),
-          onPressed: () => setState(() => _obscure = !_obscure),
-        ),
-      ),
-    );
-  }
-}
-
-// ===========================================================================
-// ACCOUNT MENU — grouped, tinted rows
-// ===========================================================================
-
-// Warm accent tints so each row reads distinctly instead of one flat brown.
-const Color _kTintTeal = Color(0xFF5FA9A0);
-const Color _kTintGold = Color(0xFFCB9A3E);
-const Color _kTintTerracotta = Color(0xFFDD8A6A);
-const Color _kTintSage = Color(0xFF8FA97E);
-const Color _kTintMauve = Color(0xFFAF8FC4);
-const Color _kTintRose = Color(0xFFD98CA0);
-
-/// One row in the account menu.
-class _MenuItem {
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    required this.tint,
-    this.onTap,
-    this.isDestructive = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color tint;
-  final VoidCallback? onTap;
-  final bool isDestructive;
-}
-
-/// Small muted heading above each menu group.
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 6),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.w800,
-          fontSize: 13,
-          color: AppColors.textMuted,
-        ),
-      ),
-    );
-  }
-}
-
-/// A rounded card holding related rows, separated by hairline dividers.
-class _MenuGroup extends StatelessWidget {
-  const _MenuGroup({required this.items});
-  final List<_MenuItem> items;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -882,230 +606,88 @@ class _MenuGroup extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(start: 66, end: 14),
-                child: Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: AppColors.primaryLight.withValues(alpha: 0.55),
-                ),
-              ),
-            _MenuTile(item: items[i]),
-          ],
+          _Fact(
+            icon: Icons.workspace_premium_rounded,
+            label: 'تصنيف الحساب',
+            value: user.tierLabel,
+            tint: kTintGold,
+          ),
+          _FactDivider(),
+          _Fact(
+            icon: Icons.stars_rounded,
+            label: 'رصيد النقاط',
+            value: '${user.pointsBalance}',
+            tint: kTintTeal,
+          ),
+          _FactDivider(),
+          _Fact(
+            icon: Icons.event_available_rounded,
+            label: 'عضو منذ',
+            value: _joined(user.createdAt),
+            tint: kTintMauve,
+          ),
         ],
       ),
     );
   }
 }
 
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.item});
-  final _MenuItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = item.tint;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: item.onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(item.icon, color: color, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: item.isDestructive ? color : AppColors.textDark,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_left_rounded,
-                color: item.isDestructive
-                    ? color.withValues(alpha: 0.7)
-                    : AppColors.textMuted,
-                size: 22,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Gradient profile card at the top of the account page.
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.name,
-    required this.subtitle,
-    this.role,
+class _Fact extends StatelessWidget {
+  const _Fact({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.tint,
   });
 
-  final String name;
-  final String subtitle;
-  final String? role;
-
-  static String _roleLabel(String r) {
-    switch (r.toLowerCase()) {
-      case 'vendor':
-        return 'مزوّد خدمة';
-      case 'admin':
-        return 'مدير';
-      case 'delegate':
-        return 'مندوب';
-      case 'customer':
-      case 'user':
-        return 'عميل';
-      default:
-        return r;
-    }
-  }
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name.characters.first : '؟';
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.accent, AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned(
-            left: -24,
-            bottom: -34,
-            child: Icon(
-              Icons.celebration_rounded,
-              size: 130,
-              color: Colors.white.withValues(alpha: 0.10),
+          Icon(icon, color: tint, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 13.5,
+              color: AppColors.textDark,
             ),
           ),
-          Positioned(
-            top: 14,
-            left: 26,
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 15,
-              color: Colors.white.withValues(alpha: 0.45),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.3),
-                  ),
-                  child: CircleAvatar(
-                    radius: 33,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      initial,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 19,
-                        ),
-                      ),
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          textDirection: TextDirection.ltr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      if (role != null && role!.isNotEmpty) ...[
-                        const SizedBox(height: 9),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 11, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.24),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Text(
-                            _roleLabel(role!),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FactDivider extends StatelessWidget {
+  const _FactDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 34,
+      color: AppColors.primaryLight.withValues(alpha: 0.7),
     );
   }
 }

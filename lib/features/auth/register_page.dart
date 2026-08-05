@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/services/referral_storage.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../home/home_page.dart';
@@ -26,6 +27,26 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscure1 = true;
   bool _obscure2 = true;
   bool _agree = true;
+
+  /// True when the code was filled in from an invite link rather than typed.
+  bool _referralFromLink = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingReferral();
+  }
+
+  /// Pre-fills the invite code captured when the friend tapped the invite link,
+  /// so the inviter's point doesn't depend on the friend retyping it.
+  Future<void> _loadPendingReferral() async {
+    final code = await ReferralStorage.read();
+    if (code == null || !mounted || _referral.text.trim().isNotEmpty) return;
+    setState(() {
+      _referral.text = code;
+      _referralFromLink = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -57,6 +78,9 @@ class _RegisterPageState extends State<RegisterPage> {
       email: _email.text.trim().isEmpty ? null : _email.text.trim(),
       referralCode: _referral.text.trim().isEmpty ? null : _referral.text.trim(),
     );
+    // The code has now been handed to the server, so it must not be reused on
+    // a second account from the same device.
+    if (ok) await ReferralStorage.clear();
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
@@ -176,6 +200,27 @@ class _RegisterPageState extends State<RegisterPage> {
                                     icon: Icons.group_add_rounded,
                                     textDirection: TextDirection.ltr,
                                   ),
+                                  if (_referralFromLink)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 6, right: 6),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.check_circle_rounded,
+                                              size: 15, color: Color(0xFF1B9C5A)),
+                                          SizedBox(width: 5),
+                                          Expanded(
+                                            child: Text(
+                                              'تم تعبئة كود الدعوة تلقائيًا من الرابط',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF1B9C5A),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   const SizedBox(height: 12),
                                   AuthField(
                                     controller: _password,

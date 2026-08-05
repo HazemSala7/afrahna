@@ -8,8 +8,10 @@ import 'package:provider/provider.dart';
 import 'core/services/local_favorites.dart';
 import 'core/services/notification_router.dart';
 import 'core/services/push_notifications.dart';
+import 'core/state/cart.dart';
 import 'core/state/session.dart';
 import 'core/theme.dart';
+import 'features/auth/register_page.dart';
 import 'features/splash/splash_page.dart';
 
 Future<void> main() async {
@@ -18,6 +20,18 @@ Future<void> main() async {
   await LocalFavorites.instance.load();
   await PushNotificationService.instance.init();
   runApp(const AfrahnaApp());
+
+  // A tapped invite link must land the friend on sign-up — the inviter's point
+  // is only credited when an account is actually created. Signed-in users keep
+  // browsing; the code simply stays stored and unused.
+  NotificationRouter.onInvite = (code) {
+    final nav = rootNavigatorKey.currentState;
+    if (nav == null) return;
+    final ctx = nav.context;
+    if (ctx.read<SessionController>().isSignedIn) return;
+    nav.push(MaterialPageRoute(builder: (_) => const RegisterPage()));
+  };
+
   // Start listening for share/deep links after the app is running.
   unawaited(initDeepLinks());
 }
@@ -30,6 +44,8 @@ class AfrahnaApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SessionController()),
+        // Shared cart: one shop at a time, restored from the last session.
+        ChangeNotifierProvider(create: (_) => CartController()..load()),
         ChangeNotifierProvider<LocalFavorites>.value(
           value: LocalFavorites.instance,
         ),

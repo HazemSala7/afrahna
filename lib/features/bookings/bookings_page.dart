@@ -9,9 +9,14 @@ import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
 import '../auth/login_page.dart';
+import 'booking_status.dart';
 
 class BookingsPage extends StatefulWidget {
-  const BookingsPage({super.key});
+  const BookingsPage({super.key, this.initialMine = false});
+
+  /// Open on «حجوزاتي» rather than the shop's inbox. Set when arriving from
+  /// the home-page card, which only ever lists the user's own bookings.
+  final bool initialMine;
 
   @override
   State<BookingsPage> createState() => _BookingsPageState();
@@ -19,6 +24,10 @@ class BookingsPage extends StatefulWidget {
 
 class _BookingsPageState extends State<BookingsPage> {
   Future<List<BookingModel>>? _future;
+
+  /// Shop owners have two lists: bookings they made («حجوزاتي») and requests
+  /// their shop received. Everyone else only ever has the first.
+  late bool _mine = widget.initialMine;
 
   @override
   void initState() {
@@ -29,35 +38,95 @@ class _BookingsPageState extends State<BookingsPage> {
   void _maybeLoad() {
     final session = context.read<SessionController>();
     if (session.isSignedIn) {
-      _future = BookingService().list();
+      _future = BookingService().list(scope: _mine ? 'customer' : null);
     }
   }
 
-  Color _statusColor(String? status) {
-    switch (status) {
-      case 'confirmed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.redAccent;
-      case 'completed':
-        return Colors.blueGrey;
-      default:
-        return AppColors.primary;
-    }
+  /// True when this account also runs a shop and therefore has an inbox.
+  bool _hasInbox(SessionController session) {
+    final role = session.user?.role;
+    return role == 'vendor' || role == 'admin';
   }
 
-  String _statusLabel(String? status) {
-    switch (status) {
-      case 'confirmed':
-        return 'مؤكد';
-      case 'cancelled':
-        return 'ملغي';
-      case 'completed':
-        return 'مكتمل';
-      case 'pending':
-      default:
-        return 'قيد المراجعة';
-    }
+  void _switchTo(bool mine) {
+    if (_mine == mine) return;
+    setState(() {
+      _mine = mine;
+      _future = BookingService().list(scope: mine ? 'customer' : 'vendor');
+    });
+  }
+
+  /// The shop's answer to the request: the outcome, plus its own words when it
+  /// gave a reason. Without this the customer only ever saw a coloured pill.
+  Widget _vendorReply(BookingModel b) {
+    final s = BookingStatusStyle.of(b.status);
+    final reason = (b.cancellationReason ?? '').trim();
+    final shop = b.vendor?.name ?? 'المتجر';
+
+    final message = switch (b.status) {
+      'confirmed' => 'أكّد $shop حجزك.',
+      'rejected' => 'اعتذر $shop عن قبول الحجز.',
+      'cancelled' => 'أُلغي الحجز.',
+      'completed' => 'تم إنجاز الحجز. نتمنى أن تكون التجربة سعيدة!',
+      _ => '',
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: s.color.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: s.color.withValues(alpha: .22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.mark_chat_read_rounded, size: 16, color: s.color),
+              const SizedBox(width: 6),
+              Text(
+                'رد المتجر',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12.5,
+                  color: s.color,
+                ),
+              ),
+              const Spacer(),
+              if (b.updatedAt != null)
+                Text(
+                  DateFormat('d MMM', 'ar').format(b.updatedAt!),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+            ],
+          ),
+          if (message.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textDark),
+            ),
+          ],
+          if (reason.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '«$reason»',
+              style: const TextStyle(
+                fontSize: 12.5,
+                height: 1.6,
+                color: AppColors.textDark,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// Contact panel for the person who made the booking. Shown only to the
@@ -146,6 +215,114 @@ class _BookingsPageState extends State<BookingsPage> {
     );
   }
 
+  void _reload() => setState(() => _future = BookingService().list());
+
+  /// Shop side: confirm the request. The API notifies the customer, whose
+  /// bookings page and home card then show the reply.
+  Future<void> _confirm(BookingModel b) async {
+    try {
+      await BookingService().updateStatus(b.id, 'confirmed');
+      if (!mounted) return;
+      _reload();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تأكيد الحجز وإشعار الزبون ✅')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  /// Shop side: decline, with an optional reason that reaches the customer
+  /// verbatim — a bare rejection with no explanation is what people complain
+  /// about most.
+  Future<void> _reject(BookingModel b) async {
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('رفض الحجز'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'سيصل ردّك إلى الزبون مباشرة. اكتب سبباً مختصراً إن أمكن.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reason,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'السبب (اختياري)',
+                hintText: 'مثال: التاريخ محجوز مسبقاً',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('تراجع'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('رفض الحجز'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) {
+      reason.dispose();
+      return;
+    }
+    final text = reason.text.trim();
+    reason.dispose();
+    try {
+      await BookingService()
+          .updateStatus(b.id, 'rejected', reason: text.isEmpty ? null : text);
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  /// Confirm / reject buttons, shown to the shop on a pending request.
+  Widget _vendorActions(BookingModel b) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _reject(b),
+              icon: const Icon(Icons.close_rounded, size: 18),
+              label: const Text('رفض'),
+              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _confirm(b),
+              icon: const Icon(Icons.check_rounded, size: 18),
+              label: const Text('تأكيد الحجز'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E9E5B),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _cancel(BookingModel b) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -167,10 +344,12 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (ok != true) return;
     try {
-      await BookingService().cancel(b.id);
-      setState(() {
-        _future = BookingService().list();
-      });
+      // Not `cancel()` — that hits DELETE, which the API restricts to admins,
+      // so it 403'd for the very people the button is shown to. Setting the
+      // status is the path the API opens to customers and shops.
+      await BookingService().updateStatus(b.id, 'cancelled');
+      if (!mounted) return;
+      _reload();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -183,7 +362,10 @@ class _BookingsPageState extends State<BookingsPage> {
     final session = context.watch<SessionController>();
     if (!session.isSignedIn) {
       return AppScaffold(
-        appBar: const PinkAppBar(title: 'مناسباتي', showBack: false),
+        // The page is always pushed (from the home card or the account menu),
+        // so it needs a way back. PinkAppBar hides the arrow by itself when
+        // there is nothing to pop.
+        appBar: const PinkAppBar(title: 'مناسباتي'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -211,9 +393,44 @@ class _BookingsPageState extends State<BookingsPage> {
         ),
       );
     }
+    final hasInbox = _hasInbox(session);
+
     return AppScaffold(
-      appBar: const PinkAppBar(title: 'مناسباتي', showBack: false),
-      body: FutureBuilder<List<BookingModel>>(
+      appBar: const PinkAppBar(title: 'مناسباتي'),
+      body: Column(
+        children: [
+          // A shop owner books services too. Without this switch their own
+          // bookings were unreachable — the page only ever showed the inbox.
+          if (hasInbox)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: true,
+                    label: Text('حجوزاتي'),
+                    icon: Icon(Icons.event_available_rounded, size: 17),
+                  ),
+                  ButtonSegment(
+                    value: false,
+                    label: Text('طلبات واردة'),
+                    icon: Icon(Icons.inbox_rounded, size: 17),
+                  ),
+                ],
+                selected: {_mine},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => _switchTo(s.first),
+              ),
+            ),
+          Expanded(child: _list(hasInbox)),
+        ],
+      ),
+    );
+  }
+
+  Widget _list(bool hasInbox) {
+    final session = context.watch<SessionController>();
+    return FutureBuilder<List<BookingModel>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -222,15 +439,15 @@ class _BookingsPageState extends State<BookingsPage> {
           if (snap.hasError) {
             return ErrorState(
               message: snap.error.toString(),
-              onRetry: () => setState(() {
-                _future = BookingService().list();
-              }),
+              onRetry: () => setState(_maybeLoad),
             );
           }
           final items = snap.data ?? const [];
           if (items.isEmpty) {
-            return const EmptyState(
-              message: 'لا يوجد حجوزات حالياً\nابدأ بحجز خدمة لمناسبتك',
+            return EmptyState(
+              message: hasInbox && !_mine
+                  ? 'لا توجد طلبات حجز واردة'
+                  : 'لا يوجد حجوزات حالياً\nابدأ بحجز خدمة لمناسبتك',
               icon: Icons.event_busy,
             );
           }
@@ -249,6 +466,10 @@ class _BookingsPageState extends State<BookingsPage> {
               itemBuilder: (_, i) {
                 final b = items[i];
                 final df = DateFormat('EEEE، d MMMM y', 'ar');
+                // A booking someone else made with this shop, i.e. the vendor
+                // is looking at their inbox rather than their own bookings.
+                final isIncoming =
+                    b.customer != null && b.customer!.id != session.user?.id;
                 return Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -279,23 +500,7 @@ class _BookingsPageState extends State<BookingsPage> {
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _statusColor(b.status)
-                                  .withValues(alpha: .12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _statusLabel(b.status),
-                              style: TextStyle(
-                                color: _statusColor(b.status),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
+                          BookingStatusChip(status: b.status),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -332,9 +537,15 @@ class _BookingsPageState extends State<BookingsPage> {
                             ],
                           ),
                         ),
-                      if (b.customer != null &&
-                          b.customer!.id != session.user?.id)
+                      if (isIncoming) ...[
                         _customerBlock(b),
+                        // The shop answers here; without this a reply could
+                        // only ever be sent from the admin dashboard.
+                        if (b.status == 'pending') _vendorActions(b),
+                      ]
+                      // The shop's answer, on the customer's own bookings.
+                      else if (b.hasVendorReply)
+                        _vendorReply(b),
                       if (b.totalPrice != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
@@ -346,7 +557,10 @@ class _BookingsPageState extends State<BookingsPage> {
                             ),
                           ),
                         ),
+                      // Nothing left to cancel once the booking is closed —
+                      // 'rejected' used to slip through and still offer it.
                       if (b.status != 'cancelled' &&
+                          b.status != 'rejected' &&
                           b.status != 'completed')
                         Align(
                           alignment: AlignmentDirectional.centerEnd,
@@ -364,8 +578,6 @@ class _BookingsPageState extends State<BookingsPage> {
               },
             ),
           );
-        },
-      ),
-    );
+        });
   }
 }
