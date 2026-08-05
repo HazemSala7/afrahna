@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/feature_flags.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
@@ -362,12 +363,14 @@ class _SignedInView extends StatelessWidget {
     ];
 
     final account = <_MenuItem>[
-      _MenuItem(
-        icon: Icons.stars_rounded,
-        label: 'نقاطي ومكافآتي',
-        tint: _kTintGold,
-        onTap: () => go(const PointsPage()),
-      ),
+      // Points / rewards entry — hidden behind the points feature flag.
+      if (kShowPointsSystem)
+        _MenuItem(
+          icon: Icons.stars_rounded,
+          label: 'نقاطي ومكافآتي',
+          tint: _kTintGold,
+          onTap: () => go(const PointsPage()),
+        ),
       _MenuItem(
         icon: Icons.calendar_month_rounded,
         label: 'مناسباتي',

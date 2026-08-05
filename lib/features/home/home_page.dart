@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/feature_flags.dart';
 import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/services/event_service.dart';
@@ -359,12 +360,15 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               )),
-              const SizedBox(height: 20),
               // Points / rewards — your balance (signed in) or a sign-in CTA.
-              _hpad(FadeSlideIn(
-                delay: const Duration(milliseconds: 310),
-                child: const _PointsHomeCard(),
-              )),
+              // Hidden behind the points feature flag.
+              if (kShowPointsSystem) ...[
+                const SizedBox(height: 20),
+                _hpad(FadeSlideIn(
+                  delay: const Duration(milliseconds: 310),
+                  child: const _PointsHomeCard(),
+                )),
+              ],
               const SizedBox(height: 20),
               // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
@@ -467,12 +471,15 @@ class _HomeTabState extends State<_HomeTab> {
                   ],
                 ),
               )),
-              const SizedBox(height: 22),
-              // Invite-a-friend rewards card.
-              _hpad(FadeSlideIn(
-                delay: const Duration(milliseconds: 330),
-                child: const _InviteFriendsCard(),
-              )),
+              // Invite-a-friend rewards card. Its reward is points, so it is
+              // hidden together with the rest of the points system.
+              if (kShowPointsSystem) ...[
+                const SizedBox(height: 22),
+                _hpad(FadeSlideIn(
+                  delay: const Duration(milliseconds: 330),
+                  child: const _InviteFriendsCard(),
+                )),
+              ],
               const SizedBox(height: 20),
               // Stats band with side margins.
               _hpad(FadeSlideIn(
