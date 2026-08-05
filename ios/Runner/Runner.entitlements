@@ -4,5 +4,12 @@
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- Universal Links: lets https://afrahna.co/r/{code} (invites) and /v/{id}
+	     (shop shares) open the app directly instead of Safari. Verified against
+	     https://afrahna.co/.well-known/apple-app-site-association -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:afrahna.co</string>
+	</array>
 </dict>
 </plist>

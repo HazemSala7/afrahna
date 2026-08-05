@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "afrahna.sala7.neurex",
+      "sha256_cert_fingerprints": [
+        "79:B2:13:22:4A:FF:B5:93:46:E2:21:F4:21:19:E5:51:A3:01:B3:58:2F:D7:B2:49:53:E2:4B:B2:71:62:CD:59"
+      ]
+    }
+  }
+]

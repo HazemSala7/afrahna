@@ -158,7 +158,7 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('شكراً! سيظهر تقييمك بعد موافقة الإدارة'),
+          content: Text('شكراً! تم نشر تقييمك ✓'),
         ),
       );
     }
@@ -237,7 +237,12 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                               followers: _followersLive ?? vendor.followersCount,
                             ),
                             const SizedBox(height: 18),
+                            // The discount banner and the points card are the
+                            // same offer: the banner announces it, this card is
+                            // where it's redeemed — so they sit together.
                             const _DiscountBanner(),
+                            _PointsRedeemSection(vendor: vendor),
+                            const SizedBox(height: 18),
                             _HighlightsSection(
                               vendor: vendor,
                               future: _highlightsFuture,
@@ -245,8 +250,8 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                             _StoriesSection(
                               vendor: vendor,
                               future: _storiesFuture,
-                        ),
-                        const SizedBox(height: 16),
+                            ),
+                            const SizedBox(height: 16),
                         _ContactActions(
                           vendor: vendor,
                           onCall: () {
@@ -276,8 +281,6 @@ class _VendorDetailsPageState extends State<VendorDetailsPage> {
                           },
                           onOpenSocial: _launch,
                         ),
-                        const SizedBox(height: 18),
-                        _PointsRedeemSection(vendor: vendor),
                         const SizedBox(height: 22),
                         _Section(
                           icon: Icons.info_outline_rounded,

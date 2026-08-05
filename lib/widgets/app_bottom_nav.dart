@@ -25,8 +25,9 @@ class AppBottomNav extends StatelessWidget {
     AppNavItem('الرئيسية', Icons.home_rounded, Icons.home_rounded),
     AppNavItem('ريلز', Icons.movie_filter_outlined,
         Icons.movie_filter_rounded),
-    AppNavItem('القصص', Icons.auto_awesome_motion_outlined,
-        Icons.auto_awesome_motion_rounded),
+    // Stories moved to a rail at the top of the home tab; this slot now holds
+    // the marketplace, which needs a permanent entry point.
+    AppNavItem('المتجر', Icons.storefront_outlined, Icons.storefront_rounded),
   ];
 
   // Index of the highlighted centre tab.

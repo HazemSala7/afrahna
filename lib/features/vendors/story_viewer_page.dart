@@ -216,6 +216,13 @@ class _StoryViewerPageState extends State<StoryViewerPage>
               ),
             ),
 
+            // Bottom-start: how many people have seen this story.
+            PositionedDirectional(
+              bottom: stories[_index].caption.isNotEmpty ? 88 : 24,
+              start: 18,
+              child: _ViewersPill(count: stories[_index].viewsCount),
+            ),
+
             // Bottom: caption
             if (stories[_index].caption.isNotEmpty)
               Positioned(
@@ -248,6 +255,46 @@ class _StoryViewerPageState extends State<StoryViewerPage>
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "١٬٢٠٤ مشاهدة" — the story's viewer count, shown over the media.
+class _ViewersPill extends StatelessWidget {
+  const _ViewersPill({required this.count});
+  final int count;
+
+  static String _fmt(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.visibility_rounded, color: Colors.white, size: 15),
+          const SizedBox(width: 5),
+          Text(
+            '${_fmt(count)} مشاهدة',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              shadows: [Shadow(blurRadius: 5, color: Colors.black87)],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+// `intl` also exports a TextDirection that clashes with Flutter's.
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -21,7 +23,13 @@ import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
 import '../account/account_page.dart';
+import '../account/customer_header.dart';
+import '../account/edit_profile_page.dart';
+import '../account/followed_vendors_page.dart';
 import '../assistant/assistant_page.dart';
+import '../bookings/booking_status.dart';
+import '../bookings/bookings_page.dart';
+import '../invitations/invitations_page.dart';
 import '../auth/login_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
@@ -38,6 +46,9 @@ import '../points/points_page.dart';
 import '../posts/post_details_page.dart';
 import '../reels/reels_page.dart';
 import '../stories/all_stories_page.dart';
+import '../store/marketplace.dart';
+import '../store/marketplace_page.dart';
+import '../vendors/story_viewer_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
 
@@ -54,6 +65,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late int _currentTab = widget.initialTab; // الرئيسية = الوسط (افتراضي)
 
+  /// Tabs the user has actually opened. [IndexedStack] builds every child
+  /// eagerly, which used to start the reels feed (and its video preloading)
+  /// during app launch even for users who never open it. We keep the stack —
+  /// so a visited tab keeps its scroll position and state — but hold back the
+  /// unvisited ones behind an empty placeholder until they're first selected.
+  late final Set<int> _visited = {widget.initialTab};
+
   @override
   Widget build(BuildContext context) {
     // Guest encouragement banner: pinned above the bottom nav on the home tab.
@@ -69,13 +87,19 @@ class _HomePageState extends State<HomePage> {
       const PlanningHubPage(),      // 1 - خطّطي (planning tools hub)
       const _HomeTab(),             // 2 - الرئيسية (centre)
       const ReelsPage(),            // 3 - ريلز
-      const AllStoriesPage(),       // 4 - القصص (leftmost)
+      const MarketplacePage(),      // 4 - المتجر (leftmost)
     ];
 
     return Scaffold(
       extendBody: true,
       backgroundColor: AppColors.background,
-      body: IndexedStack(index: _currentTab, children: pages),
+      body: IndexedStack(
+        index: _currentTab,
+        children: [
+          for (var i = 0; i < pages.length; i++)
+            if (_visited.contains(i)) pages[i] else const SizedBox.shrink(),
+        ],
+      ),
       // AI companion floats on its own when logged in; for guests it sits
       // inline next to the "join" banner (below) so the space is used nicely.
       floatingActionButton: (_currentTab == 2 && !showGuestBanner)
@@ -120,7 +144,10 @@ class _HomePageState extends State<HomePage> {
           AppBottomNav(
             current: _currentTab,
             onTap: (i) {
-              setState(() => _currentTab = i);
+              setState(() {
+                _visited.add(i);
+                _currentTab = i;
+              });
               // Re-show the competition popup whenever the user returns to home
               // (until they've predicted).
               if (i == 2) maybeShowCompetition(context);
@@ -245,6 +272,15 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<PromotionModel>> _promosFuture;
   late Future<List<VendorModel>> _topVendorsFuture;
   late Future<List<VendorModel>> _featuredVendorsFuture;
+
+  /// Shops that joined most recently — "انضمّوا حديثاً".
+  late Future<List<VendorModel>> _newVendorsFuture;
+
+  /// Marketplace row: products from every shop, shuffled.
+  late Future<List<ProductModel>> _marketFuture;
+
+  /// Active stories grouped per shop, for the rail near the top.
+  late Future<List<VendorStoriesGroup>> _storiesFuture;
   late Future<List<SliderModel>> _slidersFuture;
   late Future<List<PostModel>> _latestPostsFuture;
   late Future<HomeStats> _statsFuture;
@@ -287,9 +323,51 @@ class _HomeTabState extends State<_HomeTab> {
       _slidersFuture = HomeFeedCache.loadSliders();
       _statsFuture = StatsService().get();
     }
+    // Newest shops — the API already returns vendors newest-first, so the
+    // first page is exactly the ones that just joined.
+    _newVendorsFuture = VendorService().list(perPage: 12);
+    _storiesFuture = _loadStories();
+    // Marketplace: a fresh shuffle of everyone's products on each load.
+    _marketFuture = ProductService()
+        .marketplace(
+          seed: DateTime.now().millisecondsSinceEpoch & 0x7fffffff,
+          perPage: 14,
+        )
+        .then((r) => r.items);
     // Latest posts (newest first) for the home "آخر المنشورات" row.
     _latestPostsFuture = PostService().list(type: PostType.post, perPage: 15);
     _mainEventFuture = _loadMainEvent();
+  }
+
+  /// Groups active stories by shop, newest shop first, so the rail shows one
+  /// ring per shop rather than one per story.
+  Future<List<VendorStoriesGroup>> _loadStories() async {
+    try {
+      final stories = await StoryService().listAll();
+      final order = <int>[];
+      final byVendor = <int, List<StoryModel>>{};
+      final vendors = <int, VendorModel>{};
+
+      for (final s in stories) {
+        final v = s.vendor;
+        final vid = v?.id ?? s.vendorId;
+        if (v == null || vid == null || s.image.isEmpty) continue;
+        if (!byVendor.containsKey(vid)) {
+          order.add(vid);
+          vendors[vid] = v;
+          byVendor[vid] = [];
+        }
+        byVendor[vid]!.add(s);
+      }
+
+      return order
+          .map((id) =>
+              VendorStoriesGroup(vendor: vendors[id]!, stories: byVendor[id]!))
+          .toList();
+    } catch (_) {
+      // The rail is optional decoration — never fail the whole home tab for it.
+      return const [];
+    }
   }
 
   /// Only signed-in users have a personal event; guests get nothing.
@@ -318,6 +396,7 @@ class _HomeTabState extends State<_HomeTab> {
       _featuredVendorsFuture,
       _slidersFuture,
       _mainEventFuture,
+      _storiesFuture,
     ]);
   }
 
@@ -348,7 +427,14 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 60),
                 child: const _SearchBar(),
               )),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+              // Stories rail — moved here from its own bottom-nav tab, where
+              // it was a whole screen away from the content it belongs with.
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 120),
+                child: _StoriesRail(future: _storiesFuture),
+              ),
+              const SizedBox(height: 16),
               // Full-width auto-scrolling categories (no side gaps).
               FadeSlideIn(
                 delay: const Duration(milliseconds: 200),
@@ -360,16 +446,21 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               )),
-              // Points / rewards — your balance (signed in) or a sign-in CTA.
-              // Hidden behind the points feature flag.
-              if (kShowPointsSystem) ...[
-                const SizedBox(height: 20),
-                _hpad(FadeSlideIn(
-                  delay: const Duration(milliseconds: 310),
-                  child: const _PointsHomeCard(),
-                )),
-              ],
               const SizedBox(height: 20),
+              // Signed in: the account card (who you are + what your points are
+              // worth + shortcuts). Guests keep the sign-in CTA instead.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 310),
+                child: const _HomeAccountBlock(),
+              )),
+              const SizedBox(height: 20),
+              // Bookings the customer has made — right at the top, because a
+              // shop's answer to a booking is the most time-sensitive thing on
+              // this page. Renders nothing for guests or when there are none.
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 315),
+                child: const _MyBookingsBlock(),
+              ),
               // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 320),
@@ -392,6 +483,45 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 360),
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture, userPos: _userPos),
+              ),
+              const SizedBox(height: 24),
+              // Newest shops — gives a just-joined advertiser immediate
+              // exposure instead of waiting to earn a spot in the other rows.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 370),
+                child: _SectionHeader(
+                  title: 'انضمّوا حديثاً',
+                  emoji: '✨',
+                  onSeeAll: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VendorsPage(title: 'انضمّوا حديثاً'),
+                    ),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 380),
+                child: _NewVendorsRow(future: _newVendorsFuture),
+              ),
+              const SizedBox(height: 24),
+              // Marketplace — products from every shop, shuffled.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 390),
+                child: _SectionHeader(
+                  title: 'المتجر',
+                  emoji: '🛍️',
+                  onSeeAll: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MarketplacePage()),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 400),
+                child: _MarketRow(future: _marketFuture),
               ),
               FutureBuilder<EventModel?>(
                 future: _mainEventFuture,
@@ -1273,6 +1403,110 @@ class _InviteFriendsCard extends StatelessWidget {
 /// premium gold card (tap → full points screen); a guest sees an enticing
 /// sign-in call-to-action ("earn points"). Distinct gold theme so it reads as
 /// the "rewards" moment, separate from the rose invite card below.
+/// The account block on the home tab: for a signed-in user their profile card
+/// plus shortcuts; for a guest the original points teaser, which doubles as the
+/// sign-in call to action.
+class _HomeAccountBlock extends StatelessWidget {
+  const _HomeAccountBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionController>();
+    final user = session.user;
+    if (!session.isSignedIn || user == null) return const _PointsHomeCard();
+    return _HomeAccountCard(user: user);
+  }
+}
+
+class _HomeAccountCard extends StatefulWidget {
+  const _HomeAccountCard({required this.user});
+  final UserModel user;
+
+  @override
+  State<_HomeAccountCard> createState() => _HomeAccountCardState();
+}
+
+class _HomeAccountCardState extends State<_HomeAccountCard> {
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    final n = await NotificationService().unreadCount();
+    if (mounted) setState(() => _unread = n);
+  }
+
+  void _go(Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CustomerHeroCard(
+          user: widget.user,
+          onEditProfile: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EditProfilePage()),
+            );
+            if (mounted) setState(() {});
+          },
+          onOpenPoints: () => _go(const PointsPage()),
+        ),
+        const SizedBox(height: 12),
+        CustomerQuickActions(
+          actions: [
+            CustomerQuickAction(
+              icon: Icons.favorite_rounded,
+              label: 'المفضلة',
+              onTap: () => _go(const FavoritesPage()),
+            ),
+            CustomerQuickAction(
+              icon: Icons.calendar_month_rounded,
+              label: 'مناسباتي',
+              onTap: () => _go(const BookingsPage()),
+            ),
+            CustomerQuickAction(
+              icon: Icons.notifications_rounded,
+              label: 'الإشعارات',
+              badge: _unread,
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                );
+                _loadUnread();
+              },
+            ),
+            CustomerQuickAction(
+              icon: Icons.local_offer_rounded,
+              label: 'العروض',
+              onTap: () => _go(const OffersPage()),
+            ),
+            CustomerQuickAction(
+              icon: Icons.storefront_rounded,
+              label: 'متابَعاتي',
+              onTap: () => _go(const FollowedVendorsPage()),
+            ),
+            CustomerQuickAction(
+              icon: Icons.mail_rounded,
+              label: 'دعواتي',
+              onTap: () => _go(const InvitationsPage()),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Guest-only rewards teaser + sign-in call to action. Signed-in users get
+/// [_HomeAccountCard] in this slot instead.
 class _PointsHomeCard extends StatelessWidget {
   const _PointsHomeCard();
 
@@ -1284,10 +1518,6 @@ class _PointsHomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionController>();
-    final signedIn = session.isSignedIn;
-    final points = session.user?.pointsBalance ?? 0;
-
     return Container(
       decoration: BoxDecoration(
         gradient: _gradient,
@@ -1306,13 +1536,11 @@ class _PointsHomeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => signedIn ? const PointsPage() : const LoginPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const LoginPage()),
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: signedIn ? _signedIn(context, points) : _guest(context),
+            child: _guest(context),
           ),
         ),
       ),
@@ -1329,83 +1557,6 @@ class _PointsHomeCard extends StatelessWidget {
         ),
         child: Icon(icon, color: Colors.white, size: 28),
       );
-
-  Widget _signedIn(BuildContext context, int points) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _badge(Icons.stars_rounded),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'نقاطك في أفراحنا',
-                    style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '$points',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('نقطة',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              children: const [
-                Icon(Icons.chevron_left_rounded, color: Colors.white, size: 26),
-                Text('التفاصيل',
-                    style: TextStyle(color: Colors.white, fontSize: 11)),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .14),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.auto_awesome, color: Colors.white, size: 16),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'اكسب نقاطاً مع كل لايك · تعليق · تقييم · دعوة صديق',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _guest(BuildContext context) {
     return Row(
@@ -3377,6 +3528,407 @@ class _FooterSocial extends StatelessWidget {
 // EMPTY MINI
 // ===========================================================================
 
+/// Instagram-style stories rail at the top of the home tab: one gradient ring
+/// per shop with active stories. Hides itself entirely when there are none, so
+/// it never leaves an empty band.
+class _StoriesRail extends StatelessWidget {
+  const _StoriesRail({required this.future});
+  final Future<List<VendorStoriesGroup>> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<VendorStoriesGroup>>(
+      future: future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 104);
+        }
+        final groups = snap.data ?? const <VendorStoriesGroup>[];
+        if (groups.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 104,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: groups.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              if (i == groups.length) return const _AllStoriesTile();
+              return _StoryRailTile(group: groups[i]);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StoryRailTile extends StatelessWidget {
+  const _StoryRailTile({required this.group});
+  final VendorStoriesGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final vendor = group.vendor;
+    return SizedBox(
+      width: 72,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StoryViewerPage(
+              vendor: vendor,
+              stories: group.stories,
+            ),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              padding: const EdgeInsets.all(2.5),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    Color(0xFFF4C64B),
+                    Color(0xFFE1306C),
+                    Color(0xFFC13584),
+                    Color(0xFFF4C64B),
+                    Color(0xFFFF7A45),
+                    Color(0xFFF4C64B),
+                  ],
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.background,
+                ),
+                child: ClipOval(
+                  child: AppNetworkImage(
+                    url: vendor.logo ?? group.stories.first.image,
+                    fallbackIcon: Icons.storefront_rounded,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              vendor.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Trailing tile that opens the full stories screen.
+class _AllStoriesTile extends StatelessWidget {
+  const _AllStoriesTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AllStoriesPage()),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: AppColors.primaryLight, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.cardShadow,
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.grid_view_rounded,
+                  color: AppColors.primary, size: 26),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'كل القصص',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Marketplace row on the home tab: a shuffled sample of products from every
+/// shop, with add-to-cart on each card.
+class _MarketRow extends StatelessWidget {
+  const _MarketRow({required this.future});
+  final Future<List<ProductModel>> future;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 262,
+      child: FutureBuilder<List<ProductModel>>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: AfrahnaLoader(size: 42));
+          }
+          if (snap.hasError) {
+            return const _EmptyMini(text: 'تعذّر تحميل منتجات المتجر');
+          }
+          final items = snap.data ?? const <ProductModel>[];
+          if (items.isEmpty) {
+            return const _EmptyMini(text: 'لا توجد منتجات معروضة بعد');
+          }
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            // The row itself scrolls horizontally, so the cards' image strips
+            // stay fixed here — swiping anywhere keeps moving the row.
+            itemBuilder: (_, i) =>
+                MarketProductCard(product: items[i], swipeableGallery: false),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Horizontal row of the most recently joined shops. Each card carries a
+/// "جديد" ribbon plus how long ago the shop joined, so the row reads as news
+/// rather than just another vendor list.
+class _NewVendorsRow extends StatelessWidget {
+  const _NewVendorsRow({required this.future});
+  final Future<List<VendorModel>> future;
+
+  static const double _height = 196;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _height,
+      child: FutureBuilder<List<VendorModel>>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: AfrahnaLoader(size: 42));
+          }
+          if (snap.hasError) {
+            return const _EmptyMini(text: 'تعذّر تحميل المحلات الجديدة');
+          }
+          final items = snap.data ?? const <VendorModel>[];
+          if (items.isEmpty) {
+            return const _EmptyMini(text: 'لا توجد محلات جديدة بعد');
+          }
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _NewVendorCard(vendor: items[i]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NewVendorCard extends StatelessWidget {
+  const _NewVendorCard({required this.vendor});
+  final VendorModel vendor;
+
+  /// "انضمّ اليوم" / "قبل 3 أيام" — null when the join date is unknown.
+  static String? _joinedLabel(DateTime? d) {
+    if (d == null) return null;
+    final days = DateTime.now().difference(d).inDays;
+    if (days <= 0) return 'انضمّ اليوم';
+    if (days == 1) return 'انضمّ أمس';
+    if (days < 30) return 'انضمّ قبل $days يوم';
+    final months = (days / 30).floor();
+    return months == 1 ? 'انضمّ قبل شهر' : 'انضمّ قبل $months أشهر';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final joined = _joinedLabel(vendor.createdAt);
+    final subtitle = [
+      vendor.category?.name,
+      vendor.city?.name,
+    ].whereType<String>().where((s) => s.isNotEmpty).join(' • ');
+
+    return SizedBox(
+      width: 150,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VendorDetailsPage(vendorId: vendor.id),
+            ),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20)),
+                      child: SizedBox(
+                        height: 92,
+                        width: double.infinity,
+                        child: AppNetworkImage(
+                          url: vendor.cover ?? vendor.logo,
+                          fallbackIcon: Icons.storefront_rounded,
+                        ),
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 8,
+                      start: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF34C77B), Color(0xFF1B9C5A)],
+                          ),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: const Text(
+                          'جديد',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              vendor.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                          ),
+                          if (vendor.isVerified) ...[
+                            const SizedBox(width: 3),
+                            const Icon(Icons.verified_rounded,
+                                size: 13, color: AppColors.primary),
+                          ],
+                        ],
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                      if (joined != null) ...[
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded,
+                                size: 11, color: Color(0xFF1B9C5A)),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                joined,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1B9C5A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyMini extends StatelessWidget {
   const _EmptyMini({required this.text});
   final String text;
@@ -3813,3 +4365,219 @@ class _Stat extends StatelessWidget {
 // The bottom navigation bar now lives in `widgets/app_bottom_nav.dart`
 // (AppBottomNav) so it can be reused on full-screen pages such as the vendor
 // profile.
+
+/// «حجوزاتي» on the home page: the services this customer booked, and what the
+/// shop answered. Hidden entirely for guests and for customers with no
+/// bookings, so it never shows as an empty band.
+class _MyBookingsBlock extends StatefulWidget {
+  const _MyBookingsBlock();
+
+  @override
+  State<_MyBookingsBlock> createState() => _MyBookingsBlockState();
+}
+
+class _MyBookingsBlockState extends State<_MyBookingsBlock> {
+  Future<List<BookingModel>>? _future;
+  bool _wasSignedIn = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load on first build and again whenever the user signs in, so a booking
+    // made right after logging in still appears without a restart.
+    final signedIn = context.watch<SessionController>().isSignedIn;
+    if (signedIn != _wasSignedIn) {
+      _wasSignedIn = signedIn;
+      _future = signedIn ? _load() : null;
+    }
+  }
+
+  /// Always the customer scope — a shop owner's default booking view is their
+  /// shop's inbox, and their own bookings would otherwise never reach them.
+  Future<List<BookingModel>> _load() =>
+      BookingService().list(scope: 'customer');
+
+  Future<void> _openAll() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BookingsPage(initialMine: true)),
+    );
+    // The customer may have cancelled something while they were in there.
+    if (mounted) setState(() => _future = _load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _future;
+    if (future == null) return const SizedBox.shrink();
+
+    return FutureBuilder<List<BookingModel>>(
+      future: future,
+      builder: (context, snap) {
+        // A failed or empty request must not leave a heading with nothing
+        // under it — the whole block just disappears.
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final me = context.read<SessionController>().user?.id;
+        // Belt and braces: until the API deploys `scope`, a shop owner's
+        // request still comes back as their shop's inbox. Those are other
+        // people's bookings and must never appear under «حجوزاتي».
+        final all = (snap.data ?? const <BookingModel>[])
+            .where((b) => b.customer == null || b.customer!.id == me)
+            .toList();
+        if (all.isEmpty) return const SizedBox.shrink();
+
+        // Anything the shop has answered floats to the front; the rest follow
+        // by event date. That puts a fresh «مؤكّد» or «مرفوض» first.
+        final items = [...all]..sort((a, b) {
+            final byReply = (b.hasVendorReply ? 1 : 0) - (a.hasVendorReply ? 1 : 0);
+            if (byReply != 0) return byReply;
+            return b.eventDate.compareTo(a.eventDate);
+          });
+        final shown = items.take(6).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _SectionHeader(
+                title: 'حجوزاتي',
+                emoji: '🗓️',
+                onSeeAll: _openAll,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 132,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: shown.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (_, i) =>
+                    _BookingMiniCard(booking: shown[i], onTap: _openAll),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Compact booking card for the home row.
+class _BookingMiniCard extends StatelessWidget {
+  const _BookingMiniCard({required this.booking, required this.onTap});
+
+  final BookingModel booking;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = booking;
+    final style = BookingStatusStyle.of(b.status);
+    final reason = (b.cancellationReason ?? '').trim();
+    final df = DateFormat('d MMMM y', 'ar');
+
+    return SizedBox(
+      width: 252,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              // A shop reply is tinted in its own colour so a confirmation or a
+              // rejection is readable at a glance, without opening anything.
+              border: Border.all(
+                color: b.hasVendorReply
+                    ? style.color.withValues(alpha: .35)
+                    : AppColors.primaryLight,
+                width: b.hasVendorReply ? 1.4 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        b.service?.title ?? 'حجز',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13.5,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    const Icon(Icons.storefront_rounded,
+                        size: 12, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        b.vendor?.name ?? '—',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11.5, color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.event_rounded,
+                        size: 12, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      df.format(b.eventDate),
+                      style: const TextStyle(
+                          fontSize: 11.5, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                if (reason.isNotEmpty)
+                  Text(
+                    '«$reason»',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: style.color,
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                BookingStatusChip(status: b.status, compact: true),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

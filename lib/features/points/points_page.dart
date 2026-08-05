@@ -383,8 +383,15 @@ class _PointsPageState extends State<PointsPage> {
   }
 
   void _shareCode(String code) {
+    // Share a LINK, not just the code: it opens the app straight to sign-up
+    // when installed, and otherwise lands on a page that sends the friend to
+    // the right store (Android or iPhone) with the code on their clipboard.
+    // The code stays in the text as a fallback for anyone who types it by hand.
+    final link = 'https://afrahna.co/r/$code';
     Share.share(
-      'انضم إلى تطبيق أفراحنا 🎉\nاستخدم كود الدعوة الخاص بي عند التسجيل: $code',
+      'انضم إلى تطبيق أفراحنا 🎉\n'
+      'سجّل من هذا الرابط ليصلنا كلانا نقاط:\n$link\n\n'
+      'أو أدخل كود الدعوة عند التسجيل: $code',
       subject: 'دعوة أفراحنا',
     );
   }

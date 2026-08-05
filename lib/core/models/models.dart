@@ -67,6 +67,12 @@ class UserModel {
     this.notificationsEnabled = true,
     this.pointsBalance = 0,
     this.referralCode,
+    this.whatsapp,
+    this.instagram,
+    this.facebook,
+    this.tiktok,
+    this.snapchat,
+    this.createdAt,
   });
 
   final int id;
@@ -105,6 +111,25 @@ class UserModel {
   /// The user's own invite/referral code (share it to earn invite points).
   final String? referralCode;
 
+  /// Personal social handles, editable from the profile screen.
+  final String? whatsapp;
+  final String? instagram;
+  final String? facebook;
+  final String? tiktok;
+  final String? snapchat;
+
+  /// When the account was created — shown as "عضو منذ".
+  final DateTime? createdAt;
+
+  /// Loyalty tier derived from the points balance. Purely a display label; it
+  /// grants nothing on its own.
+  String get tierLabel {
+    if (pointsBalance >= 1000) return 'ماسي';
+    if (pointsBalance >= 500) return 'ذهبي';
+    if (pointsBalance >= 100) return 'فضي';
+    return 'برونزي';
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
         name: (json['name'] ?? '').toString(),
@@ -139,6 +164,12 @@ class UserModel {
                 json['notifications_enabled'] == 1),
         pointsBalance: _toInt(json['points_balance']) ?? 0,
         referralCode: _readT<String>(json, 'referral_code'),
+        whatsapp: _readT<String>(json, 'whatsapp'),
+        instagram: _readT<String>(json, 'instagram'),
+        facebook: _readT<String>(json, 'facebook'),
+        tiktok: _readT<String>(json, 'tiktok'),
+        snapchat: _readT<String>(json, 'snapchat'),
+        createdAt: _toDate(json['created_at']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -178,6 +209,12 @@ class UserModel {
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
         pointsBalance: pointsBalance,
         referralCode: referralCode,
+        whatsapp: whatsapp,
+        instagram: instagram,
+        facebook: facebook,
+        tiktok: tiktok,
+        snapchat: snapchat,
+        createdAt: createdAt,
       );
 
   bool get isVendor   => role == 'vendor';
@@ -304,6 +341,7 @@ class VendorModel {
     this.ownerPhone,
     this.pointsBalance = 0,
     this.beneficiariesCount = 0,
+    this.createdAt,
   });
 
   final int id;
@@ -378,6 +416,9 @@ class VendorModel {
   /// Permanent count of users who redeemed points at this vendor
   /// (does not reset when an admin zeroes the points balance).
   final int beneficiariesCount;
+
+  /// When the shop joined — drives the home "انضمّوا حديثاً" row.
+  final DateTime? createdAt;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
@@ -477,6 +518,7 @@ class VendorModel {
             : null,
         pointsBalance: _toInt(json['points_balance']) ?? 0,
         beneficiariesCount: _toInt(json['beneficiaries_count']) ?? 0,
+        createdAt: _toDate(json['created_at']),
       );
 }
 
@@ -553,8 +595,10 @@ class BookingModel {
   BookingModel({
     required this.id,
     required this.eventDate,
+    this.reference,
     this.status,
     this.notes,
+    this.cancellationReason,
     this.totalPrice,
     this.serviceId,
     this.vendorId,
@@ -563,17 +607,36 @@ class BookingModel {
     this.customer,
     this.eventTime,
     this.guestsCount,
+    this.createdAt,
+    this.updatedAt,
   });
 
   final int id;
   final DateTime eventDate;
+
+  /// Human-readable booking number, e.g. `BK-6A3F…`.
+  final String? reference;
+
   final String? status;
   final String? notes;
+
+  /// The shop's own words when it rejects or cancels — the closest thing to a
+  /// reply the customer gets, so it must never be swallowed.
+  final String? cancellationReason;
+
   final double? totalPrice;
   final int? serviceId;
   final int? vendorId;
   final ServiceModel? service;
   final VendorModel? vendor;
+
+  final DateTime? createdAt;
+
+  /// When the shop last touched the booking — used to date its reply.
+  final DateTime? updatedAt;
+
+  /// True once the shop has acted on the request (anything but `pending`).
+  bool get hasVendorReply => status != null && status != 'pending';
 
   /// The customer who made the booking. Present when a vendor/admin views their
   /// bookings (the API eager-loads the user). Null for a customer's own list.
@@ -585,8 +648,10 @@ class BookingModel {
         id: _toInt(json['id']) ?? 0,
         eventDate:
             _toDate(json['event_date']) ?? _toDate(json['date']) ?? DateTime.now(),
+        reference: _readT<String>(json, 'reference'),
         status: _readT<String>(json, 'status'),
         notes: _readT<String>(json, 'notes'),
+        cancellationReason: _readT<String>(json, 'cancellation_reason'),
         totalPrice: _toDouble(json['total_price']),
         serviceId: _toInt(json['service_id']),
         vendorId: _toInt(json['vendor_id']),
@@ -604,6 +669,8 @@ class BookingModel {
             : null,
         eventTime: _readT<String>(json, 'event_time'),
         guestsCount: _toInt(json['guests_count']),
+        createdAt: _toDate(json['created_at']),
+        updatedAt: _toDate(json['updated_at']),
       );
 }
 
@@ -1331,6 +1398,10 @@ class ProductModel {
     this.discountPrice,
     this.isAvailable = true,
     this.sort = 0,
+    this.vendorName,
+    this.vendorLogo,
+    this.vendorRating,
+    this.vendorReviewsCount,
   });
 
   final int id;
@@ -1346,6 +1417,16 @@ class ProductModel {
   final double? discountPrice;
   final bool isAvailable;
   final int sort;
+
+  /// Owning shop's name, eager-loaded by the API. Needed by the marketplace
+  /// feed, where products from many shops sit side by side.
+  final String? vendorName;
+
+  /// Owning shop's logo and rating — a product has no rating of its own, so
+  /// the marketplace card shows the shop's standing instead.
+  final String? vendorLogo;
+  final double? vendorRating;
+  final int? vendorReviewsCount;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
   String get description =>
@@ -1380,6 +1461,22 @@ class ProductModel {
             ? true
             : (json['is_available'] == true || json['is_available'] == 1),
         sort: _toInt(json['sort']) ?? 0,
+        vendorName: json['vendor'] is Map
+            ? (_readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
+                _readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
+            : null,
+        vendorLogo: json['vendor'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
+            : null,
+        vendorRating: json['vendor'] is Map
+            ? _toDouble((json['vendor'] as Map)['rating'])
+            : null,
+        vendorReviewsCount: json['vendor'] is Map
+            ? _toInt((json['vendor'] as Map)['reviews_count'])
+            : null,
       );
 }
 
@@ -1453,6 +1550,10 @@ class OrderModel {
     required this.vendorId,
     this.customerName,
     this.customerPhone,
+    this.cityId,
+    this.cityName,
+    this.area,
+    this.landmark,
     this.note,
     this.items = const [],
     required this.total,
@@ -1464,17 +1565,47 @@ class OrderModel {
   final int vendorId;
   final String? customerName;
   final String? customerPhone;
+
+  /// Where the order is delivered: city, area (neighbourhood) and a nearby
+  /// landmark. Collected at checkout — a shop can't deliver without them.
+  final int? cityId;
+  final String? cityName;
+  final String? area;
+  final String? landmark;
+
   final String? note;
   final List<OrderItemModel> items;
   final double total;
   final String status;
   final DateTime? createdAt;
 
+  /// One-line address, e.g. «الخليل — وادي الهرية، بالقرب من مسجد الرحمة».
+  String get addressLine {
+    final parts = [
+      if ((cityName ?? '').isNotEmpty) cityName!,
+      if ((area ?? '').isNotEmpty) area!,
+    ];
+    var line = parts.join(' — ');
+    if ((landmark ?? '').isNotEmpty) {
+      line = line.isEmpty
+          ? 'بالقرب من $landmark'
+          : '$line، بالقرب من $landmark';
+    }
+    return line;
+  }
+
   factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
         id: _toInt(json['id']) ?? 0,
         vendorId: _toInt(json['vendor_id']) ?? 0,
         customerName: _readT<String>(json, 'customer_name'),
         customerPhone: _readT<String>(json, 'customer_phone'),
+        cityId: _toInt(json['city_id']),
+        cityName: json['city'] is Map
+            ? _readT<String>(
+                Map<String, dynamic>.from(json['city'] as Map), 'name_ar')
+            : null,
+        area: _readT<String>(json, 'area'),
+        landmark: _readT<String>(json, 'landmark'),
         note: _readT<String>(json, 'note'),
         items: json['items'] is List
             ? (json['items'] as List)

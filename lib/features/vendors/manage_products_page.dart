@@ -33,10 +33,38 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
     if (ok == true && mounted) setState(() => _reload++);
   }
 
+  /// Sections are what products get filed under, so they have to be reachable
+  /// from here — otherwise the only route to them is back out to the account
+  /// screen.
+  Future<void> _openSections() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ManageSectionsPage(vendorId: widget.vendorId),
+      ),
+    );
+    // A renamed/deleted section changes what the product rows show.
+    if (mounted) setState(() => _reload++);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('منتجاتي')),
+      appBar: AppBar(
+        title: const Text('منتجاتي'),
+        actions: [
+          TextButton.icon(
+            onPressed: _openSections,
+            icon: const Icon(Icons.category_rounded, size: 19),
+            label: const Text('الأقسام'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primaryDark,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('إضافة منتج'),

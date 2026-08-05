@@ -5,6 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 const String kVendorWhatsappMessage =
     'رأيت إعلانك في تطبيق أفراحنا. هل يمكننا التواصل؟';
 
+/// Pre-filled in WhatsApp right after a booking is submitted, so the vendor
+/// also hears from the customer's own number — not just the in-app
+/// notification, which is easy to miss.
+const String kBookingWhatsappMessage =
+    'مرحباً، رأيت إعلانكم على تطبيق أفراحنا. أريد الحجز.';
+
 /// Builds a WhatsApp deep link for [raw] — either a phone number or an already
 /// complete wa.me/api.whatsapp link — with [message] pre-filled in the chat.
 ///
