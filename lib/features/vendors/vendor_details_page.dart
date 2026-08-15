@@ -918,6 +918,8 @@ class _FloatingLogoState extends State<_FloatingLogo>
         builder: (_) => StoryViewerPage(
           vendor: widget.vendor,
           stories: widget.stories,
+          // Already on this shop's page.
+          canOpenVendor: false,
         ),
       ),
     );

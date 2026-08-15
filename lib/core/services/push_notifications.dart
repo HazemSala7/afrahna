@@ -16,6 +16,11 @@ import 'notification_router.dart';
 /// shown by the system tray automatically.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // A message carrying a `notification` payload — which every push from the
+  // backend does — is already in the tray by the time this runs. Showing it
+  // again produced two notifications for one event, and the second one was
+  // the copy whose tap the app could not route.
+  if (message.notification != null) return;
   await Firebase.initializeApp();
   await PushNotificationService.instance._showFromMessage(message);
 }
@@ -40,6 +45,22 @@ class PushNotificationService {
   );
 
   bool _initialised = false;
+
+  static bool get _isApple =>
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+
+  /// Whether the app should draw its own notification for a message that
+  /// arrived while it was open.
+  ///
+  /// Android keeps a message out of the tray while the app is in the
+  /// foreground, so nothing appears unless we draw it. iOS presents it itself
+  /// — that is what [FirebaseMessaging.setForegroundNotificationPresentationOptions]
+  /// asks for — so drawing a copy there put two banners on screen for one
+  /// event, and each one's tap arrived through a different handler.
+  @visibleForTesting
+  static bool drawInForeground(RemoteMessage message) =>
+      !(_isApple && message.notification != null);
 
   /// Called once at startup (before the user is necessarily signed in).
   /// Any failure (e.g. missing native Firebase config) is swallowed so it can
@@ -66,8 +87,10 @@ class PushNotificationService {
         sound: true,
       );
 
-      // Foreground messages: render them ourselves via a local notification.
-      FirebaseMessaging.onMessage.listen(_showFromMessage);
+      // Foreground messages.
+      FirebaseMessaging.onMessage.listen((message) {
+        if (drawInForeground(message)) _showFromMessage(message);
+      });
 
       // App opened from a notification while it was in the background.
       FirebaseMessaging.onMessageOpenedApp.listen(_handleOpened);
@@ -82,10 +105,7 @@ class PushNotificationService {
       // On Apple platforms an FCM token cannot be fetched until the device has
       // received an APNS token. The iOS Simulator usually never provides one,
       // so guard the fetch to avoid the `apns-token-not-set` error.
-      final isApple =
-          defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS;
-      if (isApple && (await _messaging.getAPNSToken()) == null) {
+      if (_isApple && (await _messaging.getAPNSToken()) == null) {
         if (kDebugMode) {
           debugPrint(
             'APNS token unavailable (simulator?) — '
@@ -131,6 +151,22 @@ class PushNotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(_channel);
+
+    // A notification this app drew itself (one that arrived while the app was
+    // open) survives the app being killed. Tapping it then launches us cold,
+    // and the callback above never fires — the payload is only available
+    // here, so this is the one path that would otherwise be a dead tap.
+    try {
+      final launch = await _local.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        final payload = launch?.notificationResponse?.payload;
+        if (payload != null && payload.isNotEmpty) {
+          NotificationRouter.handle(payload);
+        }
+      }
+    } catch (_) {
+      // Not supported on every platform; never worth failing startup for.
+    }
   }
 
   /// Builds and displays a heads-up local notification from a [RemoteMessage].
@@ -178,6 +214,22 @@ class PushNotificationService {
   /// successful sign-in so notifications can be targeted to the user.
   Future<String?> registerToken() async {
     try {
+      // iOS has no FCM token until APNs has issued one, and this runs while
+      // the session restores at launch — usually a beat too early, so the
+      // fetch threw `apns-token-not-set` and the device stayed unreachable
+      // for the whole run. Wait for it briefly instead. Off the UI path
+      // (callers do not await), so the pause costs nothing.
+      if (_isApple) {
+        for (var i = 0; i < 10; i++) {
+          if (await _messaging.getAPNSToken() != null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        }
+        if (await _messaging.getAPNSToken() == null) {
+          if (kDebugMode) debugPrint('No APNS token — token sync skipped.');
+          return null;
+        }
+      }
+
       final token = await _messaging.getToken();
       if (token != null && token.isNotEmpty) {
         await _syncToken(token);

@@ -19,6 +19,7 @@ import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../core/utils/category_icon.dart';
 import '../../core/utils/link_launcher.dart';
+import '../../widgets/animated_invitation_bg.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
@@ -48,6 +49,7 @@ import '../reels/reels_page.dart';
 import '../stories/all_stories_page.dart';
 import '../store/marketplace.dart';
 import '../store/marketplace_page.dart';
+import '../store/my_orders_page.dart';
 import '../vendors/story_viewer_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
@@ -461,6 +463,13 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 315),
                 child: const _MyBookingsBlock(),
               ),
+              // Electronic invitations — the showpiece feature, so it gets a
+              // living card rather than another row of tiles.
+              _hpad(FadeSlideIn(
+                delay: const Duration(milliseconds: 318),
+                child: const _InvitationPromoCard(),
+              )),
+              const SizedBox(height: 20),
               // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
                 delay: const Duration(milliseconds: 320),
@@ -1469,7 +1478,12 @@ class _HomeAccountCardState extends State<_HomeAccountCard> {
             CustomerQuickAction(
               icon: Icons.calendar_month_rounded,
               label: 'مناسباتي',
-              onTap: () => _go(const BookingsPage()),
+              onTap: () => _go(const BookingsPage(initialMine: true)),
+            ),
+            CustomerQuickAction(
+              icon: Icons.receipt_long_rounded,
+              label: 'طلباتي',
+              onTap: () => _go(const MyOrdersPage()),
             ),
             CustomerQuickAction(
               icon: Icons.notifications_rounded,
@@ -4576,6 +4590,149 @@ class _BookingMiniCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Home-page showcase for electronic invitations. The card runs one of the
+/// real invitation themes behind it, so the feature sells itself: what you see
+/// moving here is exactly what the finished invitation looks like.
+class _InvitationPromoCard extends StatefulWidget {
+  const _InvitationPromoCard();
+
+  @override
+  State<_InvitationPromoCard> createState() => _InvitationPromoCardState();
+}
+
+class _InvitationPromoCardState extends State<_InvitationPromoCard> {
+  // Rotate through a few themes so the card isn't the same picture every day.
+  static const _themes = [
+    (InvitationAnim.goldDust, Color(0xFF1A1526), Color(0xFFE6C36B)),
+    (InvitationAnim.silk, Color(0xFF101A2E), Color(0xFFD8B45F)),
+    (InvitationAnim.arabesque, Color(0xFF0F2020), Color(0xFFC9A24D)),
+    (InvitationAnim.candles, Color(0xFF1E1410), Color(0xFFF0B876)),
+  ];
+
+  late final (InvitationAnim, Color, Color) _theme =
+      _themes[DateTime.now().day % _themes.length];
+
+  @override
+  Widget build(BuildContext context) {
+    final (anim, bg, accent) = _theme;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InvitationsPage()),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedInvitationBg(anim: anim, accent: accent),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: .18),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                              color: accent.withValues(alpha: .45)),
+                        ),
+                        child: Text(
+                          'جديد',
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.auto_awesome_rounded, size: 15, color: accent),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'دعوتك الإلكترونية',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'تصاميم متحركة فخمة، عدّ تنازلي، خريطة،\nوتأكيد حضور — جاهزة خلال دقيقة.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .78),
+                      fontSize: 12.5,
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [
+                            accent,
+                            Color.lerp(accent, Colors.white, .35) ?? accent,
+                          ]),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.mail_outline_rounded,
+                                size: 16, color: bg),
+                            const SizedBox(width: 6),
+                            Text(
+                              'أنشئ دعوتك',
+                              style: TextStyle(
+                                color: bg,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // A hint at the range of looks on offer.
+                      for (final t in _themes.take(4))
+                        Container(
+                          width: 9,
+                          height: 9,
+                          margin: const EdgeInsets.only(right: 5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: t.$3.withValues(
+                                alpha: t.$1 == anim ? 1 : .35),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

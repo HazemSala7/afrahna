@@ -11,6 +11,7 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../widgets/app_widgets.dart';
 import '../vendors/vendor_details_page.dart';
 import 'reel_comments_sheet.dart';
 
@@ -297,7 +298,19 @@ class _ReelsPageState extends State<ReelsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Builder(
+      body: Stack(
+        children: [
+          Positioned.fill(child: _feed()),
+          // Only when this page was pushed — as the home tab it is not a
+          // route you can leave, and the button hides itself there.
+          const OverlayBackButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _feed() {
+    return Builder(
         builder: (context) {
           if (_initialLoading) {
             return const Center(
@@ -332,7 +345,6 @@ class _ReelsPageState extends State<ReelsPage> {
             ),
           );
         },
-      ),
     );
   }
 }
@@ -630,18 +642,27 @@ class _ReelItemState extends State<_ReelItem> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Row(
-                    children: const [
-                      Text(
-                        'ريلز',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          shadows: [Shadow(blurRadius: 6, color: Colors.black54)],
+                    children: [
+                      // Arriving from a notification puts a back button in
+                      // this corner, so the heading steps out of its way —
+                      // and someone who came to see one reel does not need
+                      // to be told they are looking at reels.
+                      if (Navigator.of(context).canPop())
+                        const SizedBox(width: 44)
+                      else
+                        const Text(
+                          'ريلز',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            shadows: [
+                              Shadow(blurRadius: 6, color: Colors.black54),
+                            ],
+                          ),
                         ),
-                      ),
-                      Spacer(),
-                      Icon(Icons.camera_alt_outlined,
+                      const Spacer(),
+                      const Icon(Icons.camera_alt_outlined,
                           color: Colors.white, size: 26),
                     ],
                   ),

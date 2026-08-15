@@ -11,7 +11,7 @@ import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../notifications/notifications_page.dart';
 import '../points/points_page.dart';
-import '../posts/reel_studio_page.dart';
+import '../posts/manage_reels_page.dart';
 import '../posts/vendor_posts_page.dart';
 import '../subscriptions/subscription_plans.dart';
 import '../vendors/edit_vendor_page.dart';
@@ -1127,9 +1127,12 @@ class _QuickActions extends StatelessWidget {
       _QuickTileData(
         icon: Icons.movie_creation_rounded,
         title: 'الريلز',
-        sub: 'إنشاء ونشر مقاطع الريلز',
+        sub: 'عرض وإدارة مقاطعك',
         colors: const [Color(0xFFF8B75C), Color(0xFFEE8A3C)],
-        onTap: () => go(ReelStudioPage(vendorId: vendor.id)),
+        // Lands on the list of published reels (with an add button) rather
+        // than straight into the uploader — an advertiser had no way to see
+        // or remove what they had already posted.
+        onTap: () => go(ManageReelsPage(vendorId: vendor.id)),
       ),
       _QuickTileData(
         icon: Icons.article_rounded,

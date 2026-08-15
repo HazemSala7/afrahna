@@ -6,7 +6,8 @@
         "appID": "46HJNN64A9.afrahna.sala7.neurex",
         "paths": [
           "/r/*",
-          "/v/*"
+          "/v/*",
+          "/i/*"
         ]
       }
     ]

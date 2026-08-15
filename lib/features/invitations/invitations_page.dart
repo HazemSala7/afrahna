@@ -4,8 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/invitation_service.dart';
 import '../../core/theme.dart';
+import '../../widgets/animated_invitation_bg.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/feedback_snack.dart';
+import '../invitation/invitation_view_page.dart';
 
 class InvitationsPage extends StatefulWidget {
   const InvitationsPage({super.key});
@@ -143,6 +145,15 @@ class _InvitationsPageState extends State<InvitationsPage> {
                 invitation: items[i],
                 onEdit: () => _edit(items[i]),
                 onDelete: () => _delete(items[i]),
+                // Tapping the card shows the invitation the way a guest sees
+                // it; editing moved to its own button.
+                onPreview: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        InvitationViewPage(code: items[i].code),
+                  ),
+                ),
               ),
             ),
           );
@@ -157,9 +168,14 @@ class _InvitationsPageState extends State<InvitationsPage> {
 // ---------------------------------------------------------------------------
 
 class _InvitationCard extends StatelessWidget {
-  const _InvitationCard({required this.invitation, required this.onEdit, required this.onDelete});
+  const _InvitationCard({
+    required this.invitation,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onPreview,
+  });
   final InvitationModel invitation;
-  final VoidCallback onEdit, onDelete;
+  final VoidCallback onEdit, onDelete, onPreview;
 
   Color _parseColor(String hex, Color fallback) {
     try {
@@ -188,7 +204,7 @@ class _InvitationCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: onEdit,
+        onTap: onPreview,
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
@@ -256,6 +272,13 @@ class _InvitationCard extends StatelessWidget {
                   tooltip: 'فتح',
                   onPressed: () => _openLink(invitation.shareUrl),
                   icon: Icon(Icons.open_in_new, color: ac),
+                ),
+                // Tapping the card now previews it, so editing needs its own
+                // button — otherwise the editor becomes unreachable.
+                IconButton(
+                  tooltip: 'تعديل',
+                  onPressed: onEdit,
+                  icon: Icon(Icons.edit_outlined, color: ac),
                 ),
                 IconButton(
                   tooltip: 'حذف',
@@ -413,7 +436,12 @@ class _InvitationEditorState extends State<_InvitationEditor> {
           venue: _venue.text.trim(),
           mapUrl: _mapUrl.text.trim(),
           customMessage: _message.text.trim(),
-          templateId: widget.template?.id,
+          // Bundled animated themes (ids >=9000) have no row in the database,
+          // so sending their id fails the API's `exists:` rule and the save
+          // silently does nothing. Send null and keep the look locally.
+          templateId: (widget.template?.id ?? 0) >= 9000
+              ? null
+              : widget.template?.id,
         );
       } else {
         result = await widget.service.update(widget.existing!.id, {
@@ -567,6 +595,14 @@ class _TemplatePicker extends StatelessWidget {
             ),
             const Text('اختر تصميم الدعوة',
                 style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textDark, fontSize: 18)),
+            const SizedBox(height: 4),
+            const Text(
+              'التصاميم المتحركة تعرض خلفية حيّة داخل الدعوة',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            const InvitationSteps(current: 1),
             const SizedBox(height: 12),
             Expanded(
               child: GridView.builder(

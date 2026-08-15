@@ -49,8 +49,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
       } catch (_) {}
     }
     if (mounted) await _refresh();
-    // Deep-link to the related content (shop, reel, ...).
-    NotificationRouter.handle(n.link, type: n.type);
+    // Deep-link to the related content (shop, reel, booking, invitation, ...).
+    // `fromList` keeps a notification with no usable link from pushing another
+    // copy of this very screen.
+    NotificationRouter.handle(n.link, type: n.type, fromList: true);
   }
 
   @override
@@ -247,12 +249,31 @@ class _NotificationTile extends StatelessWidget {
   final NotificationModel n;
   final VoidCallback onTap;
 
+  /// One colour and one icon per kind of notification the backend sends, so
+  /// the list is scannable: money is green, an order is amber, a wedding
+  /// reply is pink, and so on.
   Color _accent() {
     switch (n.type) {
       case 'booking':
         return const Color(0xFF7C5CFF);
+      case 'order':
+        return const Color(0xFFD08A2E);
+      case 'invitation':
+        return AppColors.primary;
+      case 'payment':
+      case 'subscription':
+        return const Color(0xFF2E9E5B);
       case 'promo':
         return AppColors.discount;
+      case 'post':
+      case 'comment':
+        return const Color(0xFF3E8BC4);
+      case 'review':
+        return const Color(0xFFC9A24D);
+      case 'follow':
+      case 'vendor':
+      case 'service':
+        return const Color(0xFF4B7BA8);
       case 'system':
         return const Color(0xFF38BDF8);
       default:
@@ -264,8 +285,26 @@ class _NotificationTile extends StatelessWidget {
     switch (n.type) {
       case 'booking':
         return Icons.event_available_rounded;
+      case 'order':
+        return Icons.receipt_long_rounded;
+      case 'invitation':
+        return Icons.favorite_rounded;
+      case 'payment':
+      case 'subscription':
+        return Icons.payments_rounded;
       case 'promo':
         return Icons.local_offer_rounded;
+      case 'post':
+        return Icons.photo_library_rounded;
+      case 'comment':
+        return Icons.mode_comment_rounded;
+      case 'review':
+        return Icons.star_rounded;
+      case 'follow':
+        return Icons.person_add_alt_1_rounded;
+      case 'vendor':
+      case 'service':
+        return Icons.storefront_rounded;
       case 'system':
         return Icons.campaign_rounded;
       default:

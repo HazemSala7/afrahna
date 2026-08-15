@@ -39,6 +39,10 @@ class AppColors {
 
 class AppAssets {
   static const String logo = 'assets/images/logo.png';
+
+  /// Full-bleed artwork behind an invitation's opening screen. Used whenever a
+  /// theme has no background image of its own.
+  static const String invitationCover = 'assets/images/invitation_cover.jpg';
 }
 
 class AppTheme {

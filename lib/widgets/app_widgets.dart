@@ -278,6 +278,84 @@ class _AppBarGlassButton extends StatelessWidget {
   }
 }
 
+/// A way back for screens that have no app bar to put one in.
+///
+/// The invitation and the reels feed are full-bleed by design, and both can be
+/// pushed straight from a notification — which left the reader stranded on
+/// them with no exit. Drop this into the screen's [Stack] and it places itself
+/// in the top corner.
+///
+/// It disappears when there is nothing to go back to, so the same screen can
+/// still be used as a tab inside the home shell without growing a dead button.
+/// The arrow carries its own scrim because what sits behind it is a photograph
+/// or a video, light in one frame and dark in the next.
+class OverlayBackButton extends StatelessWidget {
+  const OverlayBackButton({super.key, this.onTap});
+
+  /// Defaults to popping the route.
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null && !Navigator.of(context).canPop()) {
+      return const SizedBox.shrink();
+    }
+
+    return SafeArea(
+      child: Align(
+        alignment: AlignmentDirectional.topStart,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(start: 10, top: 6),
+          child: Semantics(
+            button: true,
+            label: 'رجوع',
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: .28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.black.withValues(alpha: .34),
+                clipBehavior: Clip.antiAlias,
+                shape: CircleBorder(
+                  side: BorderSide(color: Colors.white.withValues(alpha: .28)),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    if (onTap != null) {
+                      onTap!();
+                    } else {
+                      Navigator.maybePop(context);
+                    }
+                  },
+                  child: const SizedBox(
+                    width: 44,
+                    height: 44,
+                    // arrow_back_rounded mirrors itself in RTL, so it points
+                    // the way an Arabic reader expects.
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 21,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Subtle sparkle dots pattern for the AppBar background.
 class _AppBarSparkles extends StatelessWidget {
   const _AppBarSparkles();

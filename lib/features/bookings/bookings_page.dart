@@ -12,11 +12,16 @@ import '../auth/login_page.dart';
 import 'booking_status.dart';
 
 class BookingsPage extends StatefulWidget {
-  const BookingsPage({super.key, this.initialMine = false});
+  const BookingsPage({super.key, this.initialMine = false, this.highlightId});
 
   /// Open on «حجوزاتي» rather than the shop's inbox. Set when arriving from
   /// the home-page card, which only ever lists the user's own bookings.
   final bool initialMine;
+
+  /// Scroll to this booking and mark it, for arrivals from a notification.
+  /// The same notification link reaches both sides of a booking, so the page
+  /// looks in the other list too rather than assuming which one holds it.
+  final int? highlightId;
 
   @override
   State<BookingsPage> createState() => _BookingsPageState();
@@ -29,6 +34,12 @@ class _BookingsPageState extends State<BookingsPage> {
   /// their shop received. Everyone else only ever has the first.
   late bool _mine = widget.initialMine;
 
+  // Deep-link highlight state, mirroring the shop page's product highlight.
+  final GlobalKey _highlightKey = GlobalKey();
+  late int? _highlightId = widget.highlightId;
+  bool _didScrollHighlight = false;
+  bool _didTryOtherScope = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +51,37 @@ class _BookingsPageState extends State<BookingsPage> {
     if (session.isSignedIn) {
       _future = BookingService().list(scope: _mine ? 'customer' : null);
     }
+  }
+
+  /// Scroll to the highlighted booking once it is laid out, then let the
+  /// marking fade so the list goes back to normal.
+  void _scheduleHighlightScroll() {
+    if (_highlightId == null || _didScrollHighlight) return;
+    _didScrollHighlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final ctx = _highlightKey.currentContext;
+      if (ctx != null) {
+        await Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.2,
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeInOut,
+        );
+      }
+      await Future.delayed(const Duration(seconds: 3));
+      if (mounted) setState(() => _highlightId = null);
+    });
+  }
+
+  /// The booking a notification pointed at is not in the list we opened — for
+  /// a shop owner that means it is in the other one, so switch over to it.
+  void _highlightMissing(List<BookingModel> items, bool hasInbox) {
+    if (_highlightId == null || _didTryOtherScope || !hasInbox) return;
+    if (items.any((b) => b.id == _highlightId)) return;
+    _didTryOtherScope = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _switchTo(!_mine);
+    });
   }
 
   /// True when this account also runs a shop and therefore has an inbox.
@@ -443,6 +485,7 @@ class _BookingsPageState extends State<BookingsPage> {
             );
           }
           final items = snap.data ?? const [];
+          _highlightMissing(items, hasInbox);
           if (items.isEmpty) {
             return EmptyState(
               message: hasInbox && !_mine
@@ -450,6 +493,9 @@ class _BookingsPageState extends State<BookingsPage> {
                   : 'لا يوجد حجوزات حالياً\nابدأ بحجز خدمة لمناسبتك',
               icon: Icons.event_busy,
             );
+          }
+          if (_highlightId != null && items.any((b) => b.id == _highlightId)) {
+            _scheduleHighlightScroll();
           }
           return RefreshIndicator(
             color: AppColors.primary,
@@ -470,15 +516,22 @@ class _BookingsPageState extends State<BookingsPage> {
                 // is looking at their inbox rather than their own bookings.
                 final isIncoming =
                     b.customer != null && b.customer!.id != session.user?.id;
+                final hi = _highlightId != null && b.id == _highlightId;
                 return Container(
+                  key: hi ? _highlightKey : null,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
+                    border: hi
+                        ? Border.all(color: AppColors.primary, width: 1.6)
+                        : null,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.cardShadow,
-                        blurRadius: 12,
+                        color: hi
+                            ? AppColors.primary.withValues(alpha: .28)
+                            : AppColors.cardShadow,
+                        blurRadius: hi ? 18 : 12,
                         offset: const Offset(0, 4),
                       ),
                     ],

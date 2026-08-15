@@ -12,6 +12,7 @@ import 'core/state/cart.dart';
 import 'core/state/session.dart';
 import 'core/theme.dart';
 import 'features/auth/register_page.dart';
+import 'features/invitation/invitation_view_page.dart';
 import 'features/splash/splash_page.dart';
 
 Future<void> main() async {
@@ -30,6 +31,16 @@ Future<void> main() async {
     final ctx = nav.context;
     if (ctx.read<SessionController>().isSignedIn) return;
     nav.push(MaterialPageRoute(builder: (_) => const RegisterPage()));
+  };
+
+  // An invitation link opens the invitation itself, for anyone who taps it —
+  // guest or member. The code in the URL is the capability to view it.
+  NotificationRouter.onInvitation = (code) {
+    final nav = rootNavigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(MaterialPageRoute(
+      builder: (_) => InvitationViewPage(code: code),
+    ));
   };
 
   // Start listening for share/deep links after the app is running.

@@ -66,6 +66,7 @@ class UserModel {
     this.activePlan,
     this.notificationsEnabled = true,
     this.pointsBalance = 0,
+    this.pointsPerShekel = 10,
     this.referralCode,
     this.whatsapp,
     this.instagram,
@@ -107,6 +108,20 @@ class UserModel {
 
   /// Rewards points balance available to spend.
   final int pointsBalance;
+
+  /// Points that equal one shekel, sent by the server so the rate can be
+  /// retuned from the dashboard without shipping a new build.
+  final int pointsPerShekel;
+
+  /// The balance expressed in shekels, e.g. 25 points at 10/₪ → 2.5.
+  double get pointsValueIls =>
+      pointsBalance / (pointsPerShekel < 1 ? 10 : pointsPerShekel);
+
+  /// Money value formatted for display, e.g. «2.5 ₪».
+  String get pointsValueLabel {
+    final v = pointsValueIls;
+    return '${v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2)} ₪';
+  }
 
   /// The user's own invite/referral code (share it to earn invite points).
   final String? referralCode;
@@ -163,6 +178,7 @@ class UserModel {
             : (json['notifications_enabled'] == true ||
                 json['notifications_enabled'] == 1),
         pointsBalance: _toInt(json['points_balance']) ?? 0,
+        pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
         referralCode: _readT<String>(json, 'referral_code'),
         whatsapp: _readT<String>(json, 'whatsapp'),
         instagram: _readT<String>(json, 'instagram'),
@@ -208,6 +224,7 @@ class UserModel {
         activePlan: activePlan,
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
         pointsBalance: pointsBalance,
+        pointsPerShekel: pointsPerShekel,
         referralCode: referralCode,
         whatsapp: whatsapp,
         instagram: instagram,
@@ -1548,6 +1565,7 @@ class OrderModel {
   OrderModel({
     required this.id,
     required this.vendorId,
+    this.vendorName,
     this.customerName,
     this.customerPhone,
     this.cityId,
@@ -1563,6 +1581,11 @@ class OrderModel {
 
   final int id;
   final int vendorId;
+
+  /// Owning shop's name, eager-loaded by the API — «طلباتي» lists orders from
+  /// several shops side by side, so the id alone is useless there.
+  final String? vendorName;
+
   final String? customerName;
   final String? customerPhone;
 
@@ -1597,6 +1620,12 @@ class OrderModel {
   factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
         id: _toInt(json['id']) ?? 0,
         vendorId: _toInt(json['vendor_id']) ?? 0,
+        vendorName: json['vendor'] is Map
+            ? (_readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
+                _readT<String>(
+                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
+            : null,
         customerName: _readT<String>(json, 'customer_name'),
         customerPhone: _readT<String>(json, 'customer_phone'),
         cityId: _toInt(json['city_id']),
@@ -1754,9 +1783,18 @@ class PointsSummary {
     this.threshold = 10,
     this.redeemCost = 50,
     this.redeemDiscount = 10,
+    this.pointsPerShekel = 10,
+    this.valueIls = 0,
   });
 
   final int balance;
+
+  /// How many points equal one shekel. Server-driven so the rate can be
+  /// retuned from the dashboard without shipping a new build.
+  final int pointsPerShekel;
+
+  /// What [balance] is worth in shekels, as computed by the server.
+  final double valueIls;
 
   /// category => points earned so far (e.g. {'signup':5,'reel_like':4}).
   final Map<String, int> breakdown;
@@ -1797,7 +1835,20 @@ class PointsSummary {
         threshold: _toInt(json['threshold']) ?? 10,
         redeemCost: _toInt(json['redeem_cost']) ?? 50,
         redeemDiscount: _toInt(json['redeem_discount']) ?? 10,
+        pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
+        valueIls: _toDouble(json['value_ils']) ??
+            ((_toInt(json['balance']) ?? 0) /
+                ((_toInt(json['points_per_shekel']) ?? 10).clamp(1, 100000))),
       );
+
+  /// Money value formatted for display, e.g. «2.5 ₪» / «12 ₪».
+  String get valueLabel {
+    final v = valueIls;
+    final text = v == v.roundToDouble()
+        ? v.toStringAsFixed(0)
+        : v.toStringAsFixed(2);
+    return '$text ₪';
+  }
 
   /// Arabic label for each earning category, for the breakdown UI.
   static String categoryLabel(String key) {
@@ -1816,6 +1867,8 @@ class PointsSummary {
         return 'تعليقات على المنشورات';
       case 'review':
         return 'تقييم الصفحات';
+      case 'follow':
+        return 'متابعة المحلات';
       default:
         return key;
     }

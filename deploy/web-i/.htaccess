@@ -1,0 +1,4 @@
+RewriteEngine On
+# Route /i/{anything} to index.php (index reads the code from the URL).
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]

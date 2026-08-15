@@ -84,6 +84,8 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
             flex: 42,
             child: _PointsBlock(
               points: u.pointsBalance,
+              valueLabel: u.pointsValueLabel,
+              perShekel: u.pointsPerShekel,
               onTap: widget.onOpenPoints,
             ),
           ),
@@ -158,7 +160,7 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
                       const SizedBox(height: 10),
                       _PillButton(
                         icon: Icons.person_rounded,
-                        label: 'عرض الملف الشخصي',
+                        label: 'الملف الشخصي',
                         onTap: widget.onEditProfile,
                         filled: false,
                       ),
@@ -177,8 +179,22 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
 }
 
 class _PointsBlock extends StatelessWidget {
-  const _PointsBlock({required this.points, required this.onTap});
+  const _PointsBlock({
+    required this.points,
+    required this.valueLabel,
+    required this.perShekel,
+    required this.onTap,
+  });
+
   final int points;
+
+  /// The balance in shekels, already formatted («2.5 ₪»).
+  final String valueLabel;
+
+  /// Points per shekel — server-driven, so the caption stays true if the
+  /// dashboard retunes the rate.
+  final int perShekel;
+
   final VoidCallback onTap;
 
   @override
@@ -220,12 +236,30 @@ class _PointsBlock extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2),
-        const Text(
-          '1 نقطة = 1 شيكل',
-          style: TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+        const SizedBox(height: 3),
+        // What the balance is actually worth — the headline number alone
+        // doesn't tell a customer anything.
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD9557B).withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Text(
+            '= $valueLabel',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFFD9557B),
+            ),
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 3),
+        Text(
+          '$perShekel نقاط = 1 شيكل',
+          style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+        ),
+        const SizedBox(height: 8),
         _PillButton(
           icon: Icons.account_balance_wallet_rounded,
           label: 'محفظة النقاط',
@@ -377,15 +411,22 @@ class _PillButton extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: filled ? rose : AppColors.textMuted),
               const SizedBox(width: 5),
+              // Scale the label down rather than clipping it: this pill sits
+              // in the narrower half of the card, where «عرض الملف الشخصي»
+              // used to render as «عرض الملف …». Shrinking keeps the word
+              // whole at any device width or system font scale.
               Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: filled ? rose : AppColors.textDark,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: filled ? rose : AppColors.textDark,
+                    ),
                   ),
                 ),
               ),

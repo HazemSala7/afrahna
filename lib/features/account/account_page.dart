@@ -21,6 +21,7 @@ import '../notifications/notifications_page.dart';
 import '../offers/offers_page.dart';
 import '../points/points_page.dart';
 import '../posts/vendor_posts_page.dart';
+import '../store/my_orders_page.dart';
 import 'account_shared.dart';
 import 'customer_header.dart';
 import 'edit_profile_page.dart';
@@ -435,7 +436,14 @@ class _SignedInViewState extends State<_SignedInView> {
         icon: Icons.calendar_month_rounded,
         label: 'مناسباتي',
         tint: kTintMauve,
-        onTap: () => go(const BookingsPage()),
+        onTap: () => go(const BookingsPage(initialMine: true)),
+      ),
+      AccountMenuItem(
+        icon: Icons.receipt_long_rounded,
+        label: 'طلباتي',
+        subtitle: 'تابع مشترياتك من المتاجر',
+        tint: kTintTerracotta,
+        onTap: () => go(const MyOrdersPage()),
       ),
       AccountMenuItem(
         icon: Icons.favorite_rounded,
@@ -534,7 +542,12 @@ class _SignedInViewState extends State<_SignedInView> {
               CustomerQuickAction(
                 icon: Icons.calendar_month_rounded,
                 label: 'مناسباتي',
-                onTap: () => go(const BookingsPage()),
+                onTap: () => go(const BookingsPage(initialMine: true)),
+              ),
+              CustomerQuickAction(
+                icon: Icons.receipt_long_rounded,
+                label: 'طلباتي',
+                onTap: () => go(const MyOrdersPage()),
               ),
               CustomerQuickAction(
                 icon: Icons.notifications_rounded,

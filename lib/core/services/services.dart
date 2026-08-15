@@ -1455,11 +1455,19 @@ class ProductSectionService {
 class OrderService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<OrderModel>> list({int? vendorId, String? status}) async {
+  /// [scope] mirrors bookings: `customer` for orders this user placed (works
+  /// even for a shop owner, whose default view is their shop's inbox),
+  /// `vendor` for orders their shop received.
+  Future<List<OrderModel>> list({
+    int? vendorId,
+    String? status,
+    String? scope,
+  }) async {
     try {
       final res = await _dio.get('/orders', queryParameters: {
         'vendor_id': ?vendorId,
         'status': ?status,
+        'scope': ?scope,
         'per_page': 50,
       });
       return _unwrapList(res.data).map(OrderModel.fromJson).toList();

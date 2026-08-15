@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/services/notification_router.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
@@ -58,6 +59,13 @@ class _SplashPageState extends State<SplashPage>
                 session.isSignedIn ? const HomePage() : const LoginPage(),
           ),
         ),
+      );
+      // Once the shell has been laid out, a link the app was launched with can
+      // finally be acted on — before this point the replacement wipes it.
+      // (pushReplacement's future resolves when the *new* route pops, so it
+      // can't be awaited here.)
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => NotificationRouter.drainPending(),
       );
     });
   }

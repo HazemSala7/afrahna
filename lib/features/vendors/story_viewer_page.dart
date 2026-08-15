@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/models.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import 'vendor_details_page.dart';
 
 /// Full-screen Instagram-style story viewer.
 class StoryViewerPage extends StatefulWidget {
@@ -11,11 +12,17 @@ class StoryViewerPage extends StatefulWidget {
     required this.vendor,
     required this.stories,
     this.initialIndex = 0,
+    this.canOpenVendor = true,
   });
 
   final VendorModel vendor;
   final List<StoryModel> stories;
   final int initialIndex;
+
+  /// Whether tapping the shop in the header opens its page. False when the
+  /// story was opened from that page to begin with — pushing a second copy of
+  /// it on top of itself would only make the back button lie.
+  final bool canOpenVendor;
 
   @override
   State<StoryViewerPage> createState() => _StoryViewerPageState();
@@ -84,6 +91,23 @@ class _StoryViewerPageState extends State<StoryViewerPage>
     } else {
       _progress.forward();
     }
+  }
+
+  /// Open the shop whose story this is.
+  ///
+  /// A story is where a shop gets noticed, and there was no way through from
+  /// it to the shop itself. The story is held while the page is open,
+  /// otherwise its five seconds would run out behind your back — the viewer
+  /// closes itself on the last one, so you would return to a screen that had
+  /// already dismissed itself.
+  Future<void> _openVendor() async {
+    _pause(true);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VendorDetailsPage(vendorId: widget.vendor.id),
+      ),
+    );
+    if (mounted) _pause(false);
   }
 
   @override
@@ -174,35 +198,57 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: Colors.white, width: 2),
-                          ),
-                          child: ClipOval(
-                            child: AppNetworkImage(
-                              url: widget.vendor.logo ??
-                                  widget.vendor.cover,
-                              fallbackIcon: Icons.storefront,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
+                        // The shop itself is the link to its page, the way it
+                        // works everywhere else stories exist.
                         Expanded(
-                          child: Text(
-                            widget.vendor.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14.5,
-                              shadows: [
-                                Shadow(blurRadius: 6, color: Colors.black54),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.canOpenVendor ? _openVendor : null,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                  child: ClipOval(
+                                    child: AppNetworkImage(
+                                      url: widget.vendor.logo ??
+                                          widget.vendor.cover,
+                                      fallbackIcon: Icons.storefront,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Text(
+                                    widget.vendor.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14.5,
+                                      shadows: [
+                                        Shadow(
+                                            blurRadius: 6,
+                                            color: Colors.black54),
+                                      ],
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (widget.canOpenVendor) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.chevron_left_rounded,
+                                    color: Colors.white70,
+                                    size: 20,
+                                  ),
+                                ],
                               ],
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         IconButton(
@@ -366,6 +412,8 @@ class StoriesRing extends StatelessWidget {
                   vendor: vendor,
                   stories: stories,
                   initialIndex: i,
+                  // Already on this shop's page.
+                  canOpenVendor: false,
                 ),
               ),
             ),

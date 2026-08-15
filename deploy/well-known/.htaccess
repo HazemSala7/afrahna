@@ -1,0 +1,10 @@
+# Apple fetches /.well-known/apple-app-site-association through its own CDN and
+# expects it as JSON. The file has no extension, so the server was sending it
+# with no Content-Type header at all — which can cost the app its Universal
+# Links, and https://afrahna.co/i/{CODE} then opens Safari instead of the
+# invitation inside the app.
+#
+# assetlinks.json (Android) already gets the right type from its extension.
+<Files "apple-app-site-association">
+    ForceType application/json
+</Files>
