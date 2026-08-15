@@ -3516,7 +3516,7 @@ class _AppFooterState extends State<_AppFooter> {
 
 class _FooterSocial extends StatelessWidget {
   const _FooterSocial({required this.icon, required this.onTap});
-  final IconData icon;
+  final FaIconData icon;
   final VoidCallback onTap;
 
   @override

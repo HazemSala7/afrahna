@@ -667,7 +667,7 @@ class _SponsorCard extends StatelessWidget {
 
 class _Social extends StatelessWidget {
   const _Social({required this.icon, required this.color, required this.onTap});
-  final IconData icon;
+  final FaIconData icon;
   final Color color;
   final VoidCallback onTap;
 
@@ -679,7 +679,7 @@ class _Social extends StatelessWidget {
       child: CircleAvatar(
           radius: 18,
           backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, size: 18, color: color)),
+          child: FaIcon(icon, size: 18, color: color)),
     );
   }
 }

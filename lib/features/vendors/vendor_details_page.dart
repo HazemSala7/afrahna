@@ -2287,7 +2287,7 @@ class _SocialTileState extends State<_SocialTile> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Icon(it.icon, color: it.iconColor, size: 22),
+                child: FaIcon(it.icon, color: it.iconColor, size: 22),
               ),
               const SizedBox(height: 6),
               Text(
@@ -2318,7 +2318,7 @@ class _SocialItem {
     required this.uri,
     this.iconColor = Colors.white,
   });
-  final IconData icon;
+  final FaIconData icon;
   final String label;
   final Gradient gradient;
   final Color glow;

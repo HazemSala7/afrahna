@@ -37,7 +37,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   # Authentic social-media brand glyphs (TikTok / Instagram / WhatsApp / ...).
-  font_awesome_flutter: ^10.8.0
+  font_awesome_flutter: ^11.0.0
   google_fonts: ^6.2.1
   intl: ^0.20.2
   dio: ^5.7.0
@@ -50,7 +50,7 @@ dependencies:
   path_provider: ^2.1.4
   app_links: ^6.3.2
   speech_to_text: ^7.0.0
-  permission_handler: ^11.3.1
+  permission_handler: ^13.0.1
   video_player: ^2.9.2
   visibility_detector: ^0.4.0+2
   image_picker: ^1.1.2
