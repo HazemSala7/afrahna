@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../api/api_client.dart';
+import 'guest_invitations.dart';
 
 class InvitationTemplateModel {
   InvitationTemplateModel({
@@ -310,6 +311,43 @@ class InvitationService {
     return InvitationModel.fromJson(_asMap(res.data));
   }
 
+  /// Invitations made on this device while signed out, newest first.
+  ///
+  /// They have no owner on the server, so there is no list endpoint to ask —
+  /// each one is fetched by the code the device kept. A code that no longer
+  /// resolves (deleted, or claimed by another account) is dropped rather than
+  /// failing the whole screen.
+  Future<List<InvitationModel>> listGuest() async {
+    final codes = await GuestInvitations.all();
+    final out = <InvitationModel>[];
+    for (final code in codes) {
+      try {
+        out.add((await viewByCode(code)).invitation);
+      } catch (_) {
+        // Leave it in storage: a network blip should not erase the only
+        // thread back to someone's invitation.
+      }
+    }
+    return out;
+  }
+
+  /// Hands the codes kept on this device to the account that just signed in,
+  /// so invitations made before registering become theirs. Best-effort.
+  Future<int> claimGuest() async {
+    final codes = await GuestInvitations.all();
+    if (codes.isEmpty) return 0;
+    try {
+      final res = await _dio.post('/invitations/claim', data: {'codes': codes});
+      final claimed = ((_asMap(res.data)['claimed'] as num?) ?? 0).toInt();
+      await GuestInvitations.clear();
+      return claimed;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// [asGuest] posts to the public endpoint, which creates the invitation
+  /// without an owner — the app remembers its code so it is not lost.
   Future<InvitationModel> create({
     required String brideName,
     required String groomName,
@@ -318,8 +356,9 @@ class InvitationService {
     String? mapUrl,
     String? customMessage,
     int? templateId,
+    bool asGuest = false,
   }) async {
-    final res = await _dio.post('/invitations', data: {
+    final res = await _dio.post(asGuest ? '/invitations/public' : '/invitations', data: {
       'bride_name': brideName,
       'groom_name': groomName,
       'event_date': eventDate.toUtc().toIso8601String(),
@@ -328,7 +367,9 @@ class InvitationService {
       if (customMessage != null && customMessage.isNotEmpty) 'custom_message': customMessage,
       'template_id': ?templateId,
     });
-    return InvitationModel.fromJson(_asMap(res.data));
+    final inv = InvitationModel.fromJson(_asMap(res.data));
+    if (asGuest) await GuestInvitations.add(inv.code);
+    return inv;
   }
 
   Future<InvitationModel> update(int id, Map<String, dynamic> patch) async {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/services/invitation_service.dart';
+import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/animated_invitation_bg.dart';
 import '../../widgets/app_widgets.dart';
@@ -20,13 +22,21 @@ class _InvitationsPageState extends State<InvitationsPage> {
   late Future<List<InvitationModel>> _future;
   List<InvitationModel>? _last;
 
+  /// Signed out, an invitation belongs to nobody and there is no list to ask
+  /// the server for — the device's own codes are the list, and the invitation
+  /// cannot be edited or deleted until an account claims it.
+  bool get _guest => !context.read<SessionController>().isSignedIn;
+
+  Future<List<InvitationModel>> _load() =>
+      _guest ? _service.listGuest() : _service.list();
+
   @override
   void initState() {
     super.initState();
-    _future = _service.list();
+    _future = _load();
   }
 
-  void _reload() => setState(() { _future = _service.list(); });
+  void _reload() => setState(() { _future = _load(); });
 
   void _applyLocal(List<InvitationModel> items) {
     setState(() => _last = items);
@@ -128,6 +138,7 @@ class _InvitationsPageState extends State<InvitationsPage> {
       body: FutureBuilder<List<InvitationModel>>(
         future: _future,
         builder: (context, snap) {
+          final guest = !context.watch<SessionController>().isSignedIn;
           if (snap.hasData) _last = snap.data;
           final items = _last;
           if (items == null) {
@@ -143,6 +154,7 @@ class _InvitationsPageState extends State<InvitationsPage> {
               itemCount: items.length,
               itemBuilder: (_, i) => _InvitationCard(
                 invitation: items[i],
+                guest: guest,
                 onEdit: () => _edit(items[i]),
                 onDelete: () => _delete(items[i]),
                 // Tapping the card shows the invitation the way a guest sees
@@ -173,9 +185,15 @@ class _InvitationCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPreview,
+    this.guest = false,
   });
   final InvitationModel invitation;
   final VoidCallback onEdit, onDelete, onPreview;
+
+  /// Made on this device while signed out. It has no owner yet, so the server
+  /// has nobody to check edits and deletes against — the card says so instead
+  /// of offering buttons that would come back with «غير مصرح».
+  final bool guest;
 
   Color _parseColor(String hex, Color fallback) {
     try {
@@ -275,17 +293,37 @@ class _InvitationCard extends StatelessWidget {
                 ),
                 // Tapping the card now previews it, so editing needs its own
                 // button — otherwise the editor becomes unreachable.
-                IconButton(
-                  tooltip: 'تعديل',
-                  onPressed: onEdit,
-                  icon: Icon(Icons.edit_outlined, color: ac),
-                ),
-                IconButton(
-                  tooltip: 'حذف',
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B)),
-                ),
+                if (!guest) ...[
+                  IconButton(
+                    tooltip: 'تعديل',
+                    onPressed: onEdit,
+                    icon: Icon(Icons.edit_outlined, color: ac),
+                  ),
+                  IconButton(
+                    tooltip: 'حذف',
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B)),
+                  ),
+                ],
               ]),
+              if (guest) ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  Icon(Icons.lock_open_rounded,
+                      size: 14, color: tc.withValues(alpha: 0.6)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'سجّل الدخول لتصبح الدعوة في حسابك وتتمكن من تعديلها',
+                      style: TextStyle(
+                        color: tc.withValues(alpha: 0.7),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
             ],
           ),
         ),
@@ -442,6 +480,10 @@ class _InvitationEditorState extends State<_InvitationEditor> {
           templateId: (widget.template?.id ?? 0) >= 9000
               ? null
               : widget.template?.id,
+          // Signed out, this goes to the public endpoint and the invitation
+          // is created without an owner; the service keeps its code so the
+          // person who made it can still find it.
+          asGuest: !context.read<SessionController>().isSignedIn,
         );
       } else {
         result = await widget.service.update(widget.existing!.id, {

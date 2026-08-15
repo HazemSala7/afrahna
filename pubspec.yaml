@@ -50,7 +50,12 @@ dependencies:
   path_provider: ^2.1.4
   app_links: ^6.3.2
   speech_to_text: ^7.0.0
-  permission_handler: ^13.0.1
+  # Held at 12.x on purpose. From 13.0.0 it pulls permission_handler_android
+  # 14, whose build script requires AGP 9 / Gradle 9 / Kotlin 2.3 and
+  # compileSdk 37 — this project is on AGP 8.11 / Gradle 8.14, so the plugin's
+  # own Gradle script fails to compile before any app code is built. The only
+  # call site is Permission.microphone.request(), which is the same in both.
+  permission_handler: ^12.0.3
   video_player: ^2.9.2
   visibility_detector: ^0.4.0+2
   image_picker: ^1.1.2

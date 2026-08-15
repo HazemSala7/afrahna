@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../api/api_client.dart';
 import '../api/auth_storage.dart';
 import '../models/models.dart';
+import '../services/invitation_service.dart';
 import '../services/push_notifications.dart';
 import '../services/services.dart';
 
@@ -58,6 +59,9 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       _status = AuthStatus.signedIn;
       _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
+      // Invitations made on this device before signing in have no owner.
+      // Hand their codes over so they land in this account.
+      unawaited(InvitationService().claimGuest());
     } catch (_) {
       await AuthStorage.instance.clear();
       _user = null;
@@ -74,6 +78,9 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       _status = AuthStatus.signedIn;
       _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
+      // Invitations made on this device before signing in have no owner.
+      // Hand their codes over so they land in this account.
+      unawaited(InvitationService().claimGuest());
       notifyListeners();
       return true;
     } catch (e) {
@@ -103,6 +110,9 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       _status = AuthStatus.signedIn;
       _startHeartbeat();
       unawaited(PushNotificationService.instance.registerToken());
+      // Invitations made on this device before signing in have no owner.
+      // Hand their codes over so they land in this account.
+      unawaited(InvitationService().claimGuest());
       notifyListeners();
       return true;
     } catch (e) {
