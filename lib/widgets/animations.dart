@@ -15,12 +15,32 @@ class FadeSlideIn extends StatefulWidget {
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 550),
     this.offset = const Offset(0, 0.18),
+    this.id,
   });
 
   final Widget child;
   final Duration delay;
   final Duration duration;
   final Offset offset;
+
+  /// Identifies this spot on the page so its entrance plays once and not
+  /// every time it is scrolled back to.
+  ///
+  /// A long list disposes whatever is far off-screen and mounts it again on
+  /// the way back, which starts this animation over: the section fades up
+  /// from nothing under the finger, and the page feels like it is snagging
+  /// rather than scrolling. With an [id] the arrival is remembered, so
+  /// returning to a section shows it already in place.
+  ///
+  /// Leave null for one-off entrances (a splash, a page that is not scrolled),
+  /// where replaying cannot happen.
+  final String? id;
+
+  /// Ids whose entrance has already been played this run.
+  static final Set<String> _played = <String>{};
+
+  @visibleForTesting
+  static void debugResetPlayed() => _played.clear();
 
   @override
   State<FadeSlideIn> createState() => _FadeSlideInState();
@@ -40,8 +60,16 @@ class _FadeSlideInState extends State<FadeSlideIn>
   @override
   void initState() {
     super.initState();
+    final id = widget.id;
+    if (id != null && FadeSlideIn._played.contains(id)) {
+      // Been here before: show it as it was left, not as an arrival.
+      _c.value = 1;
+      return;
+    }
     Future.delayed(widget.delay, () {
-      if (mounted) _c.forward();
+      if (!mounted) return;
+      if (id != null) FadeSlideIn._played.add(id);
+      _c.forward();
     });
   }
 

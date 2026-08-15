@@ -85,18 +85,38 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
 
+# The launcher icon is built from icon/, not from assets/images/. These are
+# build-time inputs only, and assets/images/ is bundled into the app — keeping
+# them there shipped 1.4 MB of icon sources inside the download.
+#
+# The launcher icon is built from app_icon.png, not logo.png. logo.png carries
+# a 15% transparent margin for use inside the app; as a launcher icon that
+# margin turns white and the launcher then insets it again, which is why the
+# icon sat small in a white square. app_icon.png is the same artwork bled to
+# every edge.
+#
+# Android gets adaptive layers as well — a legacy PNG is shrunk onto a white
+# plate by every launcher since Android 8, no matter how it is drawn. The
+# artwork (background included) is the background layer, so the foreground is
+# deliberately an empty image.
+#
+# Regenerate after changing the artwork:  dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "icon/app_icon.png"
+  # Pre-inset: Android draws this layer at 108dp and guarantees only the
+  # middle 66dp, so the full-bleed art would have its wordmark cropped.
+  adaptive_icon_background: "icon/app_icon_adaptive_bg.png"
+  adaptive_icon_foreground: "icon/app_icon_fg.png"
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "icon/app_icon.png"
   windows:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "icon/app_icon.png"
     icon_size: 256
 
 # For information on the generic Dart part of this file, see the

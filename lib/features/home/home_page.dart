@@ -426,6 +426,7 @@ class _HomeTabState extends State<_HomeTab> {
               _hpad(const _TopBar()),
               const SizedBox(height: 16),
               _hpad(FadeSlideIn(
+                id: 'home.0',
                 delay: const Duration(milliseconds: 60),
                 child: const _SearchBar(),
               )),
@@ -433,18 +434,21 @@ class _HomeTabState extends State<_HomeTab> {
               // Stories rail — moved here from its own bottom-nav tab, where
               // it was a whole screen away from the content it belongs with.
               FadeSlideIn(
+                id: 'home.1',
                 delay: const Duration(milliseconds: 120),
                 child: _StoriesRail(future: _storiesFuture),
               ),
               const SizedBox(height: 16),
               // Full-width auto-scrolling categories (no side gaps).
               FadeSlideIn(
+                id: 'home.2',
                 delay: const Duration(milliseconds: 200),
                 child: _CategoriesGrid(future: _categoriesFuture),
               ),
               const SizedBox(height: 22),
               // Hero slider with side margins (aligned with the rest of the page).
               _hpad(FadeSlideIn(
+                id: 'home.3',
                 delay: const Duration(milliseconds: 300),
                 child: _HeroBanner(future: _slidersFuture),
               )),
@@ -452,6 +456,7 @@ class _HomeTabState extends State<_HomeTab> {
               // Signed in: the account card (who you are + what your points are
               // worth + shortcuts). Guests keep the sign-in CTA instead.
               _hpad(FadeSlideIn(
+                id: 'home.4',
                 delay: const Duration(milliseconds: 310),
                 child: const _HomeAccountBlock(),
               )),
@@ -460,18 +465,21 @@ class _HomeTabState extends State<_HomeTab> {
               // shop's answer to a booking is the most time-sensitive thing on
               // this page. Renders nothing for guests or when there are none.
               FadeSlideIn(
+                id: 'home.5',
                 delay: const Duration(milliseconds: 315),
                 child: const _MyBookingsBlock(),
               ),
               // Electronic invitations — the showpiece feature, so it gets a
               // living card rather than another row of tiles.
               _hpad(FadeSlideIn(
+                id: 'home.6',
                 delay: const Duration(milliseconds: 318),
                 child: const _InvitationPromoCard(),
               )),
               const SizedBox(height: 20),
               // Featured companies — placed right below the hero slider/ads.
               _hpad(FadeSlideIn(
+                id: 'home.7',
                 delay: const Duration(milliseconds: 320),
                 child: _SectionHeader(
                   title: 'الشركات المميّزة',
@@ -489,6 +497,7 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
+                id: 'home.8',
                 delay: const Duration(milliseconds: 360),
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture, userPos: _userPos),
@@ -497,6 +506,7 @@ class _HomeTabState extends State<_HomeTab> {
               // Newest shops — gives a just-joined advertiser immediate
               // exposure instead of waiting to earn a spot in the other rows.
               _hpad(FadeSlideIn(
+                id: 'home.9',
                 delay: const Duration(milliseconds: 370),
                 child: _SectionHeader(
                   title: 'انضمّوا حديثاً',
@@ -511,12 +521,14 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
+                id: 'home.10',
                 delay: const Duration(milliseconds: 380),
                 child: _NewVendorsRow(future: _newVendorsFuture),
               ),
               const SizedBox(height: 24),
               // Marketplace — products from every shop, shuffled.
               _hpad(FadeSlideIn(
+                id: 'home.11',
                 delay: const Duration(milliseconds: 390),
                 child: _SectionHeader(
                   title: 'المتجر',
@@ -529,6 +541,7 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
+                id: 'home.12',
                 delay: const Duration(milliseconds: 400),
                 child: _MarketRow(future: _marketFuture),
               ),
@@ -543,6 +556,7 @@ class _HomeTabState extends State<_HomeTab> {
                   return _hpad(Padding(
                     padding: const EdgeInsets.only(top: 22),
                     child: FadeSlideIn(
+                      id: 'home.13',
                       delay: const Duration(milliseconds: 380),
                       child: CountdownCard(
                         title: event.title,
@@ -555,6 +569,7 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 22),
               // Planning tools: prominent coordinator banner + a row of 3 tools.
               _hpad(FadeSlideIn(
+                id: 'home.14',
                 delay: const Duration(milliseconds: 320),
                 child: Column(
                   children: [
@@ -615,6 +630,7 @@ class _HomeTabState extends State<_HomeTab> {
               if (kShowPointsSystem) ...[
                 const SizedBox(height: 22),
                 _hpad(FadeSlideIn(
+                  id: 'home.15',
                   delay: const Duration(milliseconds: 330),
                   child: const _InviteFriendsCard(),
                 )),
@@ -622,6 +638,7 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 20),
               // Stats band with side margins.
               _hpad(FadeSlideIn(
+                id: 'home.16',
                 delay: const Duration(milliseconds: 340),
                 child: _StatsBand(future: _statsFuture),
               )),
@@ -629,11 +646,13 @@ class _HomeTabState extends State<_HomeTab> {
               // "Advertise with us" call-to-action aimed at business owners:
               // placed right after the reach stats so the numbers prime them.
               _hpad(FadeSlideIn(
+                id: 'home.17',
                 delay: const Duration(milliseconds: 360),
                 child: const _AdvertiseCta(),
               )),
               const SizedBox(height: 22),
               _hpad(FadeSlideIn(
+                id: 'home.18',
                 delay: const Duration(milliseconds: 480),
                 child: _SectionHeader(
                   title: 'عروض اليوم',
@@ -647,11 +666,13 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 12),
               // Full-width offers row.
               FadeSlideIn(
+                id: 'home.19',
                 delay: const Duration(milliseconds: 540),
                 child: _OffersRow(future: _promosFuture),
               ),
               const SizedBox(height: 22),
               _hpad(FadeSlideIn(
+                id: 'home.20',
                 delay: const Duration(milliseconds: 520),
                 child: _SectionHeader(
                   title: 'الأكثر تقييماً',
@@ -665,12 +686,14 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 12),
               // Full-width top-rated row.
               FadeSlideIn(
+                id: 'home.21',
                 delay: const Duration(milliseconds: 580),
                 child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
               ),
               const SizedBox(height: 26),
               // Latest posts — horizontal scroll of the newest vendor posts.
               _hpad(FadeSlideIn(
+                id: 'home.22',
                 delay: const Duration(milliseconds: 600),
                 child: const _SectionHeader(
                   title: 'آخر المنشورات',
@@ -679,22 +702,26 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
+                id: 'home.23',
                 delay: const Duration(milliseconds: 640),
                 child: _LatestPostsRow(future: _latestPostsFuture),
               ),
               const SizedBox(height: 28),
               // Wedding-planning tips (full-width horizontal cards).
               FadeSlideIn(
+                id: 'home.24',
                 delay: const Duration(milliseconds: 620),
                 child: const _TipsSection(),
               ),
               const SizedBox(height: 26),
               _hpad(FadeSlideIn(
+                id: 'home.25',
                 delay: const Duration(milliseconds: 640),
                 child: const _WhyAfrahnaSection(),
               )),
               const SizedBox(height: 26),
               _hpad(FadeSlideIn(
+                id: 'home.26',
                 delay: const Duration(milliseconds: 660),
                 child: const _AppFooter(),
               )),

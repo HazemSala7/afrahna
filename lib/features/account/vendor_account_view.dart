@@ -359,6 +359,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             )
           else ...[
             FadeSlideIn(
+              id: 'vendor.0',
               delay: next(),
               child: _VendorHero(
                 vendor: vendor,
@@ -370,6 +371,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 12),
             FadeSlideIn(
+              id: 'vendor.1',
               delay: next(),
               child: Row(
                 children: [
@@ -394,11 +396,13 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 16),
             FadeSlideIn(
+              id: 'vendor.2',
               delay: next(),
               child: _QuickActions(vendor: vendor, go: _go),
             ),
             const SizedBox(height: 16),
             FadeSlideIn(
+              id: 'vendor.3',
               delay: next(),
               child: AccountMenuGroup(items: [
                 AccountMenuItem(
@@ -433,6 +437,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 16),
             FadeSlideIn(
+              id: 'vendor.4',
               delay: next(),
               child: _StorePointsCard(
                 vendor: vendor,
@@ -441,9 +446,11 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 22),
             FadeSlideIn(
+                id: 'vendor.5',
                 delay: next(), child: const AccountSectionLabel('إدارة المتجر')),
             const SizedBox(height: 10),
             FadeSlideIn(
+              id: 'vendor.6',
               delay: next(),
               child: AccountMenuGroup(items: [
                 AccountMenuItem(
@@ -490,6 +497,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 22),
             FadeSlideIn(
+              id: 'vendor.7',
               delay: next(),
               child: AccountMenuGroup(items: [
                 AccountMenuItem(

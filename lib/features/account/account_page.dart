@@ -516,6 +516,7 @@ class _SignedInViewState extends State<_SignedInView> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
       children: [
         FadeSlideIn(
+          id: 'account.0',
           delay: next(),
           child: CustomerHeroCard(
             user: user,
@@ -531,6 +532,7 @@ class _SignedInViewState extends State<_SignedInView> {
         ),
         const SizedBox(height: 12),
         FadeSlideIn(
+          id: 'account.1',
           delay: next(),
           child: CustomerQuickActions(
             actions: [
@@ -583,17 +585,20 @@ class _SignedInViewState extends State<_SignedInView> {
         ),
         const SizedBox(height: 12),
         FadeSlideIn(
+          id: 'account.2',
           delay: next(),
           child: _AccountFacts(user: user),
         ),
         if (manage.isNotEmpty) ...[
           const SizedBox(height: 22),
           FadeSlideIn(
+            id: 'account.3',
             delay: next(),
             child: const AccountSectionLabel('الإدارة'),
           ),
           const SizedBox(height: 10),
           FadeSlideIn(
+            id: 'account.4',
             delay: next(),
             child: AccountMenuGroup(items: manage),
           ),
@@ -602,16 +607,19 @@ class _SignedInViewState extends State<_SignedInView> {
         FadeSlideIn(delay: next(), child: const AccountSectionLabel('حسابي')),
         const SizedBox(height: 10),
         FadeSlideIn(
+          id: 'account.5',
           delay: next(),
           child: AccountMenuGroup(items: account),
         ),
         const SizedBox(height: 22),
         FadeSlideIn(
+          id: 'account.6',
           delay: next(),
           child: const AccountSectionLabel('الإعدادات'),
         ),
         const SizedBox(height: 10),
         FadeSlideIn(
+          id: 'account.7',
           delay: next(),
           child: AccountMenuGroup(items: prefs),
         ),
@@ -619,11 +627,13 @@ class _SignedInViewState extends State<_SignedInView> {
         FadeSlideIn(delay: next(), child: const AccountSectionLabel('الدعم')),
         const SizedBox(height: 10),
         FadeSlideIn(
+          id: 'account.8',
           delay: next(),
           child: AccountMenuGroup(items: support),
         ),
         const SizedBox(height: 22),
         FadeSlideIn(
+          id: 'account.9',
           delay: next(),
           child: AccountMenuGroup(items: danger),
         ),
