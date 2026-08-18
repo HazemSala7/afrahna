@@ -5,6 +5,8 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/attention.dart';
+import '../../widgets/tier_badge.dart';
 
 /// Header card at the top of a customer's account: who they are on one side,
 /// what their points are worth on the other, with the two actions they reach
@@ -59,7 +61,7 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
     final since = _memberSince(u.createdAt);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFDF0F3), Color(0xFFF8E3E8)],
@@ -76,101 +78,114 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      // Stacked rather than two columns side by side. As columns, the name had
+      // about ninety pixels to live in — every real name arrived as «فؤاد -
+      // م…» — while the points half had room to spare, and both buttons were
+      // squeezed into what was left. Now the identity gets the full width, the
+      // points sit beside it as a small readable badge, and the two actions
+      // share a row of their own. Same height as before.
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // start (right in RTL) — points
-          Expanded(
-            flex: 42,
-            child: _PointsBlock(
-              points: u.pointsBalance,
-              valueLabel: u.pointsValueLabel,
-              perShekel: u.pointsPerShekel,
-              onTap: widget.onOpenPoints,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 96,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            color: const Color(0xFFEBC9D2),
-          ),
-          // end (left in RTL) — identity
-          Expanded(
-            flex: 58,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _Avatar(url: u.avatar, name: u.name, onTap: widget.onEditProfile),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            u.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        TierMedal(rewardsTaken: u.rewardsTaken, size: 20),
+                      ],
+                    ),
+                    if (since.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        since,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                    if (_cityName != null) ...[
+                      const SizedBox(height: 3),
                       Row(
                         children: [
+                          const Icon(Icons.place_rounded,
+                              size: 13, color: AppColors.primary),
+                          const SizedBox(width: 3),
                           Flexible(
                             child: Text(
-                              u.name,
+                              _cityName!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
                                 color: AppColors.textDark,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          _TierDot(label: u.tierLabel),
                         ],
                       ),
-                      if (since.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          since,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                      if (_cityName != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.place_rounded,
-                                size: 13, color: AppColors.primary),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                _cityName!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      _PillButton(
-                        icon: Icons.person_rounded,
-                        label: 'الملف الشخصي',
-                        onTap: widget.onEditProfile,
-                        filled: false,
-                      ),
                     ],
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                _Avatar(url: u.avatar, name: u.name, onTap: widget.onEditProfile),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              _PointsMini(
+                points: u.pointsBalance,
+                valueLabel: u.pointsValueLabel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // The level, and the distance left to the next 50 ₪. The card used
+          // to show the balance as a bare number: 6 points says nothing on its
+          // own, «باقي 94 نقطة على 50 شيكل» says what it is for.
+          TierProgressStrip(
+            balance: u.pointsBalance,
+            rewardsTaken: u.rewardsTaken,
+            onTap: widget.onOpenPoints,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _PillButton(
+                  icon: Icons.person_rounded,
+                  label: 'الملف الشخصي',
+                  onTap: widget.onEditProfile,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _WalletPill(
+                  onTap: widget.onOpenPoints,
+                  ready: u.pointsBalance >= u.tierGoal,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -178,93 +193,64 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
   }
 }
 
-class _PointsBlock extends StatelessWidget {
-  const _PointsBlock({
-    required this.points,
-    required this.valueLabel,
-    required this.perShekel,
-    required this.onTap,
-  });
+/// The balance, small enough to sit beside the name: the count and what it is
+/// worth on this member's rung. The strip below it says what the number is
+/// heading towards; the rewards screen this card taps through to has room for
+/// the whole ladder.
+class _PointsMini extends StatelessWidget {
+  const _PointsMini({required this.points, required this.valueLabel});
 
   final int points;
-
-  /// The balance in shekels, already formatted («2.5 ₪»).
   final String valueLabel;
 
-  /// Points per shekel — server-driven, so the caption stays true if the
-  /// dashboard retunes the rate.
-  final int perShekel;
-
-  final VoidCallback onTap;
+  static const _rose = Color(0xFFD9557B);
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Text(
-          'إجمالي نقاطك',
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textMuted,
-          ),
-        ),
-        const SizedBox(height: 4),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              NumberFormat.decimalPattern('en').format(points),
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFD9557B),
-                height: 1.1,
-              ),
-            ),
-            const SizedBox(width: 6),
             Container(
-              width: 26,
-              height: 26,
+              width: 22,
+              height: 22,
               decoration: const BoxDecoration(
                 color: Color(0xFFE8B33D),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.star_rounded,
-                  color: Colors.white, size: 17),
+                  color: Colors.white, size: 14),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              NumberFormat.decimalPattern('en').format(points),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: _rose,
+                height: 1.1,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 3),
-        // What the balance is actually worth — the headline number alone
-        // doesn't tell a customer anything.
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: const Color(0xFFD9557B).withValues(alpha: .10),
+            color: _rose.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(99),
           ),
           child: Text(
-            '= $valueLabel',
+            valueLabel,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w900,
-              color: Color(0xFFD9557B),
+              color: _rose,
             ),
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          '$perShekel نقاط = 1 شيكل',
-          style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-        ),
-        const SizedBox(height: 8),
-        _PillButton(
-          icon: Icons.account_balance_wallet_rounded,
-          label: 'محفظة النقاط',
-          onTap: onTap,
-          filled: true,
         ),
       ],
     );
@@ -281,14 +267,14 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initial = name.isNotEmpty ? name.characters.first : '؟';
     return SizedBox(
-      width: 74,
-      height: 74,
+      width: 58,
+      height: 58,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 74,
-            height: 74,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
@@ -310,7 +296,7 @@ class _Avatar extends StatelessWidget {
                       child: Text(
                         initial,
                         style: const TextStyle(
-                          fontSize: 26,
+                          fontSize: 22,
                           fontWeight: FontWeight.w900,
                           color: AppColors.primaryDark,
                         ),
@@ -328,8 +314,8 @@ class _Avatar extends StatelessWidget {
                 customBorder: const CircleBorder(),
                 onTap: onTap,
                 child: Container(
-                  width: 26,
-                  height: 26,
+                  width: 22,
+                  height: 22,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -341,7 +327,7 @@ class _Avatar extends StatelessWidget {
                     ],
                   ),
                   child: const Icon(Icons.photo_camera_rounded,
-                      size: 14, color: AppColors.primaryDark),
+                      size: 12, color: AppColors.primaryDark),
                 ),
               ),
             ),
@@ -352,22 +338,91 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _TierDot extends StatelessWidget {
-  const _TierDot({required this.label});
-  final String label;
+
+/// The points wallet, built to be looked at.
+///
+/// It used to be an outlined pill identical in weight to «الملف الشخصي», and
+/// nothing on the card suggested there was money behind it. Now it is the one
+/// filled control in the row, a slow band of light crosses it every few
+/// seconds, and the moment a reward is actually claimable it turns gold and
+/// says so — an animation that only ever means «there is something here» is
+/// noise; this one means «you can collect fifty shekels».
+class _WalletPill extends StatelessWidget {
+  const _WalletPill({required this.onTap, required this.ready});
+
+  final VoidCallback onTap;
+  final bool ready;
+
+  static const _rose = [Color(0xFFE0688C), Color(0xFFC33A63)];
+  static const _gold = [Color(0xFFF0C34A), Color(0xFFC98A1E)];
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'تصنيف الحساب: $label',
-      child: Container(
-        width: 18,
-        height: 18,
-        decoration: const BoxDecoration(
-          color: Color(0xFFE8B33D),
-          shape: BoxShape.circle,
+    final colors = ready ? _gold : _rose;
+
+    final pill = Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
         ),
-        child: const Icon(Icons.star_rounded, size: 12, color: Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: colors.last.withValues(alpha: ready ? .5 : .32),
+            blurRadius: ready ? 14 : 9,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            ready
+                ? Icons.card_giftcard_rounded
+                : Icons.account_balance_wallet_rounded,
+            size: 15,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                ready ? 'استلم 50 شيكل' : 'محفظة النقاط',
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(99),
+        onTap: onTap,
+        // A claimable reward earns a beat as well as a sweep, and a faster
+        // one; the everyday state gets the sweep alone.
+        child: NudgePulse(
+          enabled: ready,
+          child: ShimmerSweep(
+            period: Duration(milliseconds: ready ? 2200 : 4200),
+            strength: ready ? .7 : .5,
+            child: pill,
+          ),
+        ),
       ),
     );
   }
@@ -378,19 +433,16 @@ class _PillButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    required this.filled,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool filled;
 
   @override
   Widget build(BuildContext context) {
-    const rose = Color(0xFFD9557B);
     return Material(
-      color: filled ? Colors.white : Colors.white,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(99),
       child: InkWell(
         borderRadius: BorderRadius.circular(99),
@@ -402,14 +454,14 @@ class _PillButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
-              color: filled ? rose : const Color(0xFFEBC9D2),
+              color: const Color(0xFFEBC9D2),
               width: 1.2,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: filled ? rose : AppColors.textMuted),
+              Icon(icon, size: 14, color: AppColors.textMuted),
               const SizedBox(width: 5),
               // Scale the label down rather than clipping it: this pill sits
               // in the narrower half of the card, where «عرض الملف الشخصي»
@@ -425,7 +477,7 @@ class _PillButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      color: filled ? rose : AppColors.textDark,
+                      color: AppColors.textDark,
                     ),
                   ),
                 ),

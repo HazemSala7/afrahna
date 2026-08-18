@@ -114,7 +114,7 @@ class _InvitationViewPageState extends State<InvitationViewPage> {
       backgroundColor: _Ink.night,
       body: Stack(
         children: [
-          Positioned.fill(
+          SizedBox.expand(
             child: _error != null
                 ? _ErrorPane(error: _error!, onRetry: () {
                     setState(() => _error = null);
@@ -140,7 +140,7 @@ class _InvitationViewPageState extends State<InvitationViewPage> {
                               ),
                       ),
           ),
-          const OverlayBackButton(),
+          const Positioned.fill(child: OverlayBackButton()),
         ],
       ),
     );
@@ -235,10 +235,17 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
             builder: (context, box) {
               final w = box.maxWidth;
               final h = box.maxHeight;
-              // Body occupies the lower ~58%; the flap covers the rest.
-              final bodyH = h * 0.58;
-              final flapH = bodyH * 0.62;
-              final sealSize = w * 0.26;
+              // The pocket is the lower part; the flap covers exactly the
+              // rest, so its point lands on the pocket's edge and the two
+              // together are one closed envelope. The flap used to be shorter
+              // than the space above the pocket, which left the envelope's own
+              // corners transparent — the backdrop showed through them and the
+              // flap read as a triangle floating in the air.
+              final bodyH = h * 0.56;
+              final seamY = h - bodyH;   // the mouth: where the card comes out
+              final flapH = seamY;
+              final sealSize = w * 0.24;
+              final cardH = h * 0.42;
 
               return AnimatedBuilder(
                 animation: _open,
@@ -248,18 +255,50 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // The card rising out of the envelope.
+                        // Back panel: the sheet the flap is folded onto. Plain
+                        // paper, no folds — without it the envelope has holes.
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _EnvelopeBodyPainter(
+                                accent: accent, folds: false),
+                          ),
+                        ),
+                        // The inside of the envelope: paper in shadow, deeper
+                        // towards the mouth. It sits under the flap, so it is
+                        // only seen once the flap lifts — and it is what makes
+                        // the card look like it is coming out of something.
                         Positioned(
-                          bottom: bodyH * 0.55,
-                          child: Transform.translate(
-                            offset: Offset(0, -h * 0.18 * _card.value),
-                            child: Opacity(
-                              opacity: _card.value,
-                              child: _MiniCard(
-                                bride: inv.brideName,
-                                groom: inv.groomName,
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: seamY,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  const Color(0xFF6B5836).withValues(alpha: .05),
+                                  const Color(0xFF4A3A20).withValues(alpha: .30),
+                                ],
                               ),
                             ),
+                          ),
+                        ),
+                        // The card, sliding up out of the mouth. It starts
+                        // below the seam — hidden behind the pocket — and ends
+                        // standing above it.
+                        Positioned(
+                          // Ends with its foot still inside the envelope
+                          // rather than clear of it — a card resting in the
+                          // mouth reads as having come out of this envelope;
+                          // one floating above it reads as a separate object.
+                          top: seamY + 12 - (cardH * .82 + 12) * _card.value,
+                          child: _MiniCard(
+                            bride: inv.brideName,
+                            groom: inv.groomName,
+                            width: w * 0.66,
+                            height: cardH,
                           ),
                         ),
                         // Envelope body — edge to edge, no margins.
@@ -270,10 +309,10 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
                             painter: _EnvelopeBodyPainter(accent: accent),
                           ),
                         ),
-                        // The flap, hinged along its top edge, covering the
-                        // rest of the screen.
+                        // The flap, hinged along the envelope's top edge and
+                        // long enough for its point to meet the pocket.
                         Positioned(
-                          bottom: bodyH - 1,
+                          top: 0,
                           child: Transform(
                             alignment: Alignment.topCenter,
                             transform: Matrix4.identity()
@@ -289,7 +328,7 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
                         // Wax seal, sized to the screen and sitting on the
                         // seam where the flap meets the body.
                         Positioned(
-                          bottom: bodyH - sealSize / 2,
+                          top: seamY - sealSize / 2,
                           child: Transform.scale(
                             scale: (1 + 0.04 * _idle.value) *
                                 (1 + 0.5 * _seal.value),
@@ -354,16 +393,26 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
 
 /// The small card that rises out of the envelope.
 class _MiniCard extends StatelessWidget {
-  const _MiniCard({required this.bride, required this.groom});
+  const _MiniCard({
+    required this.bride,
+    required this.groom,
+    required this.width,
+    required this.height,
+  });
 
   final String bride;
   final String groom;
 
+  /// Sized against the envelope rather than fixed, so the card always looks
+  /// like it came out of *this* envelope on every screen size.
+  final double width;
+  final double height;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 250,
-      height: 320,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: _Ink.ivory,
         borderRadius: BorderRadius.circular(6),
@@ -1700,9 +1749,14 @@ class _ParticlePainter extends CustomPainter {
 
 /// Envelope body: ivory paper with the two folded side flaps.
 class _EnvelopeBodyPainter extends CustomPainter {
-  _EnvelopeBodyPainter({this.accent = _Ink.gold});
+  _EnvelopeBodyPainter({this.accent = _Ink.gold, this.folds = true});
 
   final Color accent;
+
+  /// The folded pocket is the front of the envelope; the same paper with no
+  /// folds is the back panel behind everything, which is what stops the
+  /// backdrop showing through the envelope's own corners.
+  final bool folds;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1735,6 +1789,11 @@ class _EnvelopeBodyPainter extends CustomPainter {
     // Blind-embossed florals, pressed into the stock. A flat repeating grid
     // reads as wallpaper; relief reads as paper you could run a thumb over.
     const _EmbossPainter(density: 1.0, seed: 7).paint(canvas, size);
+
+    if (!folds) {
+      canvas.restore();
+      return;
+    }
 
     // The two side folds and the bottom fold, each shaded rather than drawn as
     // a hairline, so the paper reads as folded instead of scored.
@@ -1825,6 +1884,18 @@ class _FlapPainter extends CustomPainter {
     // Past halfway the flap has turned over and we are looking at its lining,
     // which on good stationery is a deeper, richer colour than the outside.
     final inside = open > .5;
+
+    // The shadow it throws on the panel underneath. Without it, flap and back
+    // are the same paper at the same tone and the fold disappears — the flap
+    // stops reading as a separate sheet lying on top.
+    if (!inside) {
+      canvas.drawPath(
+        path.shift(const Offset(0, 5)),
+        Paint()
+          ..color = const Color(0xFF6B5836).withValues(alpha: .28)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+      );
+    }
 
     canvas.drawPath(
       path,

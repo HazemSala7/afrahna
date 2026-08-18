@@ -6,6 +6,7 @@ import '../../features/bookings/bookings_page.dart';
 import '../../features/invitation/invitation_view_page.dart';
 import '../../features/invitations/invitations_page.dart';
 import '../../features/notifications/notifications_page.dart';
+import '../../features/points/points_page.dart';
 import '../../features/posts/post_details_page.dart';
 import '../../features/reels/reels_page.dart';
 import '../../features/store/my_orders_page.dart';
@@ -83,7 +84,11 @@ class NotificationRouter {
       // No usable link. The kind of notification is still enough to pick the
       // screen it belongs to, which beats dropping the reader on a list of
       // notifications they just came from.
-      final byType = _screenForType(type);
+      //
+      // A link with no colon carries no id, so it is naming a screen rather
+      // than an entity — «points» is as complete an address as «points:me»
+      // would be, and reads better in the payload.
+      final byType = _screenForType(type) ?? _screenForType(link?.trim());
       if (byType != null) {
         _open(byType);
       } else if (!fromList) {
@@ -162,6 +167,11 @@ class NotificationRouter {
         _openInvitation(handle);
         break;
 
+      case 'points':
+      case 'reward':
+        _open((_) => const PointsPage());
+        break;
+
       default:
         if (!fromList) _open((_) => const NotificationsPage());
     }
@@ -180,6 +190,9 @@ class NotificationRouter {
         return (_) => const VendorStatementPage();
       case 'invitation':
         return (_) => const InvitationsPage();
+      case 'points':
+      case 'reward':
+        return (_) => const PointsPage();
       default:
         return null;
     }

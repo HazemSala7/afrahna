@@ -421,16 +421,16 @@ class _HomeTabState extends State<_HomeTab> {
           color: AppColors.primary,
           onRefresh: _refresh,
           child: ListView(
-            padding: EdgeInsets.fromLTRB(0, 8, 0, bottomReserve),
+            padding: EdgeInsets.fromLTRB(0, 4, 0, bottomReserve),
             children: [
               _hpad(const _TopBar()),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _hpad(FadeSlideIn(
                 id: 'home.0',
                 delay: const Duration(milliseconds: 60),
                 child: const _SearchBar(),
               )),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               // Stories rail — moved here from its own bottom-nav tab, where
               // it was a whole screen away from the content it belongs with.
               FadeSlideIn(
@@ -438,14 +438,14 @@ class _HomeTabState extends State<_HomeTab> {
                 delay: const Duration(milliseconds: 120),
                 child: _StoriesRail(future: _storiesFuture),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               // Full-width auto-scrolling categories (no side gaps).
               FadeSlideIn(
                 id: 'home.2',
                 delay: const Duration(milliseconds: 200),
                 child: _CategoriesGrid(future: _categoriesFuture),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 16),
               // Hero slider with side margins (aligned with the rest of the page).
               _hpad(FadeSlideIn(
                 id: 'home.3',
@@ -894,7 +894,7 @@ class _SearchBarState extends State<_SearchBar> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: TextField(
         controller: _controller,
@@ -911,18 +911,18 @@ class _SearchBarState extends State<_SearchBar> {
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           suffixIcon: GestureDetector(
             onTap: _submit,
             child: Container(
               margin: const EdgeInsetsDirectional.only(end: 6),
-              width: 38,
-              height: 38,
+              width: 34,
+              height: 34,
               decoration: const BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.search, color: Colors.white, size: 20),
+              child: const Icon(Icons.search, color: Colors.white, size: 18),
             ),
           ),
         ),
@@ -1314,7 +1314,7 @@ class _InviteFriendsCard extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           signedIn
-                              ? 'شارك كودك واكسب نقاط أفراحنا مع كل صديق ينضمّ'
+                              ? 'شارك كودك واكسب 3 نقاط عن كل صديق ينضمّ — بلا حدّ يومي'
                               : 'سجّل الدخول لتحصل على كود دعوة وتكسب النقاط',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: .9),
@@ -1413,7 +1413,7 @@ class _InviteFriendsCard extends StatelessWidget {
                           color: Colors.white, size: 16),
                       const SizedBox(width: 6),
                       Text(
-                        'كل 10 دعوات = نقطة · اعرض نقاطي',
+                        'كل صديق = 3 نقاط · اعرض نقاطي',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: .95),
                           fontSize: 12.5,
@@ -1617,7 +1617,8 @@ class _PointsHomeCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'سجّل الدخول واجمع نقاطاً مع كل تفاعل، واستبدلها بخصومات لدى المعلنين.',
+                'سجّل الدخول واجمع النقاط مع كل تفاعل ودعوة صديق — كل 100 نقطة'
+                ' تساوي 50 شيكل، وكلما صعدت مستوى زادت مكافآتك.',
                 style: TextStyle(
                     color: Colors.white, fontSize: 12.5, height: 1.4),
               ),
@@ -2038,7 +2039,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const SizedBox(
-            height: 96,
+            height: 84,
             child: Center(
               child: AfrahnaLoader(size: 42),
             ),
@@ -2079,8 +2080,8 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
             ),
         ];
 
-        const tileWidth = 78.0;
-        const tileHeight = 96.0;
+        const tileWidth = 72.0;
+        const tileHeight = 84.0;
         const spacing = 8.0;
 
         return SizedBox(
@@ -2132,8 +2133,8 @@ class _CategoryTile extends StatelessWidget {
           // Soft gradient "squircle" badge with a tinted glow — gives each
           // category its own colour so the row reads lively, not repetitive.
           Container(
-            width: 58,
-            height: 58,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -2143,7 +2144,7 @@ class _CategoryTile extends StatelessWidget {
                   Color.alphaBlend(tint.withValues(alpha: 0.42), Colors.white),
                 ],
               ),
-              borderRadius: BorderRadius.circular(21),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: tint.withValues(alpha: 0.30),
                 width: 1,
@@ -2172,11 +2173,11 @@ class _CategoryTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(icon, color: tint, size: 27),
+                Icon(icon, color: tint, size: 23),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             label,
             textAlign: TextAlign.center,
@@ -3582,13 +3583,13 @@ class _StoriesRail extends StatelessWidget {
       future: future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 104);
+          return const SizedBox(height: 88);
         }
         final groups = snap.data ?? const <VendorStoriesGroup>[];
         if (groups.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: 104,
+          height: 88,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -3613,7 +3614,7 @@ class _StoryRailTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final vendor = group.vendor;
     return SizedBox(
-      width: 72,
+      width: 64,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.push(
@@ -3629,8 +3630,8 @@ class _StoryRailTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 68,
-              height: 68,
+              width: 58,
+              height: 58,
               padding: const EdgeInsets.all(2.5),
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,

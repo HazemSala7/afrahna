@@ -937,6 +937,10 @@ class _FloatingLogoState extends State<_FloatingLogo>
       width: size,
       height: size,
       child: Stack(
+        // The stories pill hangs below the circle on purpose (bottom: -4) and
+        // carries a white border and a shadow. A Stack clips to its bounds by
+        // default, which sliced all three off and left the badge looking cut.
+        clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
           // Outer soft warm glow

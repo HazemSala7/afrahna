@@ -7,6 +7,7 @@ import 'package:afrahna/features/bookings/bookings_page.dart';
 import 'package:afrahna/features/invitation/invitation_view_page.dart';
 import 'package:afrahna/features/invitations/invitations_page.dart';
 import 'package:afrahna/features/notifications/notifications_page.dart';
+import 'package:afrahna/features/points/points_page.dart';
 import 'package:afrahna/features/reels/reels_page.dart';
 import 'package:afrahna/features/store/my_orders_page.dart';
 import 'package:afrahna/features/vendors/vendor_details_page.dart';
@@ -117,6 +118,19 @@ void main() {
     expect(byType('order'), isA<MyOrdersPage>());
     expect(byType('payment'), isA<VendorStatementPage>());
     expect(byType('invitation'), isA<InvitationsPage>());
+    // Every points award — a point, an invite, a streak, a level — is sent
+    // with this type and must land on نقاطي rather than the generic list.
+    expect(byType('points'), isA<PointsPage>());
+    expect(byType('reward'), isA<PointsPage>());
     expect(byType('user'), isNull);
+  });
+
+  testWidgets('a points notification opens نقاطي from its link too',
+      (tester) async {
+    await tester.pumpWidget(const SizedBox());
+    ctx = tester.element(find.byType(SizedBox));
+
+    expect(destinationOf('points'), isA<PointsPage>());
+    expect(destinationOf('reward'), isA<PointsPage>());
   });
 }

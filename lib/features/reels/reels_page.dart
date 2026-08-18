@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -14,6 +13,7 @@ import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/vendor_details_page.dart';
 import 'reel_comments_sheet.dart';
+import 'reels_cache.dart';
 
 class ReelsPage extends StatefulWidget {
   const ReelsPage({super.key, this.initialPostId});
@@ -60,16 +60,6 @@ class _ReelsPageState extends State<ReelsPage> {
   /// poster forever — give up after this and let the next retry start fresh.
   static const _initTimeout = Duration(seconds: 10);
 
-  /// Disk cache dedicated to reel videos, so an already-seen (or PREFETCHED)
-  /// reel plays instantly from a local file instead of re-streaming.
-  static final _videoCache = CacheManager(
-    Config(
-      'afrahna_reels_v1',
-      stalePeriod: const Duration(days: 7),
-      maxNrOfCacheObjects: 60,
-    ),
-  );
-
   static bool _isVideoUrl(String? url) {
     if (url == null || url.isEmpty) return false;
     final l = url.toLowerCase();
@@ -108,7 +98,7 @@ class _ReelsPageState extends State<ReelsPage> {
         final url = _reels[i].mediaUrl;
         if (_isVideoUrl(url)) {
           try {
-            await _videoCache.getSingleFile(url!);
+            await ReelsCache.videos.getSingleFile(url!);
           } catch (_) {
             // Ignore a single failed prefetch; keep warming the rest.
           }
@@ -140,14 +130,14 @@ class _ReelsPageState extends State<ReelsPage> {
     _initializing.add(id);
     VideoPlayerController? c;
     try {
-      final cached = await _videoCache.getFileFromCache(url!);
+      final cached = await ReelsCache.videos.getFileFromCache(url!);
       if (!mounted) return;
       if (cached != null) {
         c = VideoPlayerController.file(cached.file);
       } else {
         c = VideoPlayerController.networkUrl(Uri.parse(url));
         // Cache in the background so a replay / next session is instant.
-        _videoCache.getSingleFile(url).ignore();
+        ReelsCache.videos.getSingleFile(url).ignore();
       }
       c.setLooping(true);
       await c.initialize().timeout(_initTimeout);
@@ -244,8 +234,13 @@ class _ReelsPageState extends State<ReelsPage> {
           if (_hasMedia(p) && _ids.add(p.id)) _reels.add(p);
         } catch (_) {}
       }
-      final res = await _service.listPaged(
-          type: PostType.reel, page: 1, perPage: _pageSize, seed: _seed);
+      // Warmed during the splash? Then the feed opens on reels that are
+      // already here, with their first videos on disk.
+      final ready = ReelsCache.instance.takeFirstPage();
+      final res = ready ??
+          await _service.listPaged(
+              type: PostType.reel, page: 1, perPage: _pageSize, seed: _seed);
+      if (ready != null) _seed = ReelsCache.instance.seed ?? _seed;
       _page = 1;
       _hasMore = res.hasMore;
       _addAll(res.items);
@@ -300,10 +295,14 @@ class _ReelsPageState extends State<ReelsPage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Positioned.fill(child: _feed()),
+          // The feed must be the non-positioned child: a Stack takes its size
+          // from those, and the button collapses to nothing on the home tab
+          // (nothing to pop back to). With the two the other way round the
+          // Stack measured zero and the whole feed had no space to render in.
+          _feed(),
           // Only when this page was pushed — as the home tab it is not a
           // route you can leave, and the button hides itself there.
-          const OverlayBackButton(),
+          const Positioned.fill(child: OverlayBackButton()),
         ],
       ),
     );

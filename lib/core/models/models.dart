@@ -3,6 +3,8 @@
 
 import 'dart:convert';
 
+import '../rewards_ladder.dart';
+
 T? _readT<T>(Map<String, dynamic> json, String key) =>
     json[key] is T ? json[key] as T : null;
 
@@ -67,6 +69,7 @@ class UserModel {
     this.notificationsEnabled = true,
     this.pointsBalance = 0,
     this.pointsPerShekel = 10,
+    this.rewardsTaken = 0,
     this.referralCode,
     this.whatsapp,
     this.instagram,
@@ -113,9 +116,24 @@ class UserModel {
   /// retuned from the dashboard without shipping a new build.
   final int pointsPerShekel;
 
-  /// The balance expressed in shekels, e.g. 25 points at 10/₪ → 2.5.
-  double get pointsValueIls =>
-      pointsBalance / (pointsPerShekel < 1 ? 10 : pointsPerShekel);
+  /// How many 50 ₪ rewards this member has cashed out. It — not the balance —
+  /// is what decides the level: claiming a reward spends the balance back down
+  /// to near zero, so a balance-based tier would demote everyone the moment
+  /// they were paid.
+  final int rewardsTaken;
+
+  /// The balance expressed in shekels, read off the member's own rung: a full
+  /// goal pays [RewardsLadder.rewardIls], so 100 points is 50 ₪ at برونزي.
+  ///
+  /// Derived here rather than from [pointsPerShekel] so the account card and
+  /// the rewards screen can never quote two different prices for one point —
+  /// they did, briefly, and «تساوي 6.30 ₪» beside «باقي 137 نقطة على 50 شيكل»
+  /// is the kind of thing that reads as a bug even when both numbers are
+  /// individually defensible.
+  double get pointsValueIls {
+    final goal = RewardsLadder.goalFor(rewardsTaken);
+    return goal <= 0 ? 0 : pointsBalance * RewardsLadder.rewardIls / goal;
+  }
 
   /// Money value formatted for display, e.g. «2.5 ₪».
   String get pointsValueLabel {
@@ -136,14 +154,19 @@ class UserModel {
   /// When the account was created — shown as "عضو منذ".
   final DateTime? createdAt;
 
-  /// Loyalty tier derived from the points balance. Purely a display label; it
-  /// grants nothing on its own.
-  String get tierLabel {
-    if (pointsBalance >= 1000) return 'ماسي';
-    if (pointsBalance >= 500) return 'ذهبي';
-    if (pointsBalance >= 100) return 'فضي';
-    return 'برونزي';
-  }
+  /// The rung of the rewards ladder this member stands on.
+  ///
+  /// It used to be read off the balance (100 → فضي, 500 → ذهبي, 1000 → ماسي),
+  /// which had two problems once the ladder became real: «ماسي» is not a level
+  /// that exists, and a member who cashed out dropped a tier for having been
+  /// paid. Both now come from [rewardsTaken], the same number the server uses.
+  String get tierLabel => RewardsLadder.rungFor(rewardsTaken).name;
+
+  /// «المستوى 3» — keeps counting past بلاتيني.
+  int get tierLevel => RewardsLadder.levelFor(rewardsTaken);
+
+  /// Points this level asks for before it pays out.
+  int get tierGoal => RewardsLadder.goalFor(rewardsTaken);
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: _toInt(json['id']) ?? 0,
@@ -179,6 +202,7 @@ class UserModel {
                 json['notifications_enabled'] == 1),
         pointsBalance: _toInt(json['points_balance']) ?? 0,
         pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
+        rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
         referralCode: _readT<String>(json, 'referral_code'),
         whatsapp: _readT<String>(json, 'whatsapp'),
         instagram: _readT<String>(json, 'instagram'),
@@ -203,6 +227,8 @@ class UserModel {
         'permissions': permissions,
         'notifications_enabled': notificationsEnabled,
         'points_balance': pointsBalance,
+        'points_per_shekel': pointsPerShekel,
+        'rewards_taken': rewardsTaken,
         'referral_code': referralCode,
       };
 
@@ -225,6 +251,7 @@ class UserModel {
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
         pointsBalance: pointsBalance,
         pointsPerShekel: pointsPerShekel,
+        rewardsTaken: rewardsTaken,
         referralCode: referralCode,
         whatsapp: whatsapp,
         instagram: instagram,
@@ -1772,6 +1799,34 @@ class PointRedemptionModel {
 /// Full points summary shown on the rewards screen: balance, where the points
 /// came from (breakdown), progress toward the next point in each category,
 /// spend history, and the user's invite code.
+/// One 50 ₪ cash-out the member has already taken.
+class PointRewardModel {
+  const PointRewardModel({
+    required this.id,
+    required this.points,
+    required this.amountIls,
+    required this.tier,
+    required this.level,
+    this.createdAt,
+  });
+
+  final int id;
+  final int points;
+  final int amountIls;
+  final String tier;
+  final int level;
+  final DateTime? createdAt;
+
+  factory PointRewardModel.fromJson(Map<String, dynamic> j) => PointRewardModel(
+        id: _toInt(j['id']) ?? 0,
+        points: _toInt(j['points']) ?? 0,
+        amountIls: _toInt(j['amount_ils']) ?? 0,
+        tier: (j['tier'] ?? '').toString(),
+        level: _toInt(j['level']) ?? 1,
+        createdAt: DateTime.tryParse(j['created_at']?.toString() ?? ''),
+      );
+}
+
 class PointsSummary {
   PointsSummary({
     required this.balance,
@@ -1785,7 +1840,45 @@ class PointsSummary {
     this.redeemDiscount = 10,
     this.pointsPerShekel = 10,
     this.valueIls = 0,
+    this.tier = 'برونزي',
+    this.level = 1,
+    this.goal = 100,
+    this.rewardIls = 50,
+    this.canClaim = false,
+    this.rewardsTaken = 0,
+    this.dailyCap = 3,
+    this.dailyUsed = 0,
+    this.streakDays = 0,
+    this.streakNeeded = 30,
+    this.streakAward = 90,
+    this.invitePoints = 3,
+    this.rewards = const [],
   });
+
+  /// Where the member stands on the rewards ladder: the level's name, its
+  /// number (levels keep counting past بلاتيني), and the points this level
+  /// asks for before it pays [rewardIls].
+  final String tier;
+  final int level;
+  final int goal;
+  final int rewardIls;
+  final bool canClaim;
+  final int rewardsTaken;
+
+  /// Interactions that still count today, out of the daily cap.
+  final int dailyCap;
+  final int dailyUsed;
+
+  /// The run of consecutive days, what it must reach, and what it then pays.
+  final int streakDays;
+  final int streakNeeded;
+  final int streakAward;
+
+  /// Points a friend's registration is worth.
+  final int invitePoints;
+
+  /// Cash-outs already taken, newest first.
+  final List<PointRewardModel> rewards;
 
   final int balance;
 
@@ -1833,6 +1926,24 @@ class PointsSummary {
         referralCode: _readT<String>(json, 'referral_code'),
         invitesCount: _toInt(json['invites_count']) ?? 0,
         threshold: _toInt(json['threshold']) ?? 10,
+        tier: (json['tier'] ?? 'برونزي').toString(),
+        level: _toInt(json['level']) ?? 1,
+        goal: _toInt(json['goal']) ?? 100,
+        rewardIls: _toInt(json['reward_ils']) ?? 50,
+        canClaim: json['can_claim'] == true,
+        rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
+        dailyCap: _toInt(json['daily_cap']) ?? 3,
+        dailyUsed: _toInt(json['daily_used']) ?? 0,
+        streakDays: _toInt(json['streak_days']) ?? 0,
+        streakNeeded: _toInt(json['streak_needed']) ?? 30,
+        streakAward: _toInt(json['streak_award']) ?? 90,
+        invitePoints: _toInt(json['invite_points']) ?? 3,
+        rewards: (json['rewards'] is List)
+            ? (json['rewards'] as List)
+                .whereType<Map>()
+                .map((e) => PointRewardModel.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : const [],
         redeemCost: _toInt(json['redeem_cost']) ?? 50,
         redeemDiscount: _toInt(json['redeem_discount']) ?? 10,
         pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
@@ -1857,6 +1968,14 @@ class PointsSummary {
         return 'إنشاء حساب';
       case 'invite':
         return 'دعوة أصدقاء';
+      case 'subscription':
+        return 'اشتراك سنوي';
+      case 'streak':
+        return 'المواظبة اليومية';
+      case 'story_comment':
+        return 'تعليقات على الستوري';
+      case 'service_comment':
+        return 'تعليقات على الخدمات';
       case 'reel_like':
         return 'إعجابات على الريلز';
       case 'reel_comment':
@@ -1866,7 +1985,7 @@ class PointsSummary {
       case 'post_comment':
         return 'تعليقات على المنشورات';
       case 'review':
-        return 'تقييم الصفحات';
+        return 'تعليقات على الصفحات';
       case 'follow':
         return 'متابعة المحلات';
       default:

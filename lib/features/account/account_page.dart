@@ -10,6 +10,8 @@ import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/tier_badge.dart';
+import '../../widgets/tier_benefits.dart';
 import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
 import '../auth/register_page.dart';
@@ -589,6 +591,15 @@ class _SignedInViewState extends State<_SignedInView> {
           delay: next(),
           child: _AccountFacts(user: user),
         ),
+        const SizedBox(height: 12),
+        // The facts row names the level; this says what the level is worth,
+        // and what the ones above it are worth. A tier the member can't see
+        // is a tier they can't want.
+        FadeSlideIn(
+          id: 'account.2b',
+          delay: next(),
+          child: TierBenefitsCard(rewardsTaken: user.rewardsTaken),
+        ),
         if (manage.isNotEmpty) ...[
           const SizedBox(height: 22),
           FadeSlideIn(
@@ -673,9 +684,13 @@ class _AccountFacts extends StatelessWidget {
       child: Row(
         children: [
           _Fact(
+            // Not a generic gold trophy for everyone: the medal is struck in
+            // the level's own metal, so the tile reads at a glance and matches
+            // the badge on the card above it.
+            medal: user.rewardsTaken,
             icon: Icons.workspace_premium_rounded,
             label: 'تصنيف الحساب',
-            value: user.tierLabel,
+            value: 'المستوى ${user.tierLevel} · ${user.tierLabel}',
             tint: kTintGold,
           ),
           _FactDivider(),
@@ -704,6 +719,7 @@ class _Fact extends StatelessWidget {
     required this.label,
     required this.value,
     required this.tint,
+    this.medal,
   });
 
   final IconData icon;
@@ -711,22 +727,31 @@ class _Fact extends StatelessWidget {
   final String value;
   final Color tint;
 
+  /// Cash-outs taken. When set, the tile leads with a [TierMedal] instead of
+  /// a flat icon.
+  final int? medal;
+
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: tint, size: 20),
-          const SizedBox(height: 6),
+          if (medal != null)
+            TierMedal(rewardsTaken: medal!, size: 26, showRing: false)
+          else
+            Icon(icon, color: tint, size: 20),
+          SizedBox(height: medal != null ? 5 : 6),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
-              fontSize: 13.5,
+              // «المستوى 2 · فضي» is longer than a date or a count, and this
+              // tile is a third of a row.
+              fontSize: medal != null ? 11.5 : 13.5,
               color: AppColors.textDark,
             ),
           ),

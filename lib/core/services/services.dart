@@ -1623,6 +1623,21 @@ class PointsService {
     }
   }
 
+  /// Cash out a full rung of the ladder: the goal's worth of points comes off
+  /// the balance and the member moves up a level. Returns the server's Arabic
+  /// congratulation, which already names the next level and its goal.
+  Future<String> claimReward() async {
+    try {
+      final res = await _dio.post('/points/claim-reward');
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) throw _err(res.data);
+      final m = _unwrapObject(res.data);
+      return (m['message'] ?? 'تم استلام المكافأة').toString();
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
   Exception _err(dynamic data) => ApiException(
         (data is Map && data['message'] != null)
             ? data['message'].toString()

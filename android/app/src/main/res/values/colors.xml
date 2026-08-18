@@ -2,4 +2,8 @@
 <resources>
     <!-- Accent color used for the FCM notification icon tint. -->
     <color name="colorPrimary">#D4AF37</color>
+
+    <!-- The intro film's own background. Painted by the launch window so the
+         app never flashes white (or black, under dark mode) before it. -->
+    <color name="splashGround">#FAF3EC</color>
 </resources>
