@@ -4,6 +4,7 @@ import '../../core/services/task_service.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/feedback_snack.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -145,6 +146,7 @@ class _TasksPageState extends State<TasksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('قائمة المهام'),

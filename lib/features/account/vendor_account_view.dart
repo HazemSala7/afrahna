@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
+import '../../widgets/tier_badge.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
@@ -436,6 +437,21 @@ class _VendorAccountViewState extends State<VendorAccountView> {
               ]),
             ),
             const SizedBox(height: 16),
+            // A shop owner is also a member: they collect أفراحنا points and
+            // climb the same ladder as everyone else. Those points were only
+            // visible on the customer account screen, which an advertiser
+            // never sees — so their level lives here, immediately above the
+            // store's own points and clearly separated from them.
+            if (widget.session.user != null)
+              FadeSlideIn(
+                id: 'vendor.3b',
+                delay: next(),
+                child: _MemberPointsCard(
+                  user: widget.session.user!,
+                  onTap: () => _go(const PointsPage()),
+                ),
+              ),
+            if (widget.session.user != null) const SizedBox(height: 16),
             FadeSlideIn(
               id: 'vendor.4',
               delay: next(),
@@ -1260,6 +1276,99 @@ class _QuickTile extends StatelessWidget {
 // ===========================================================================
 // STORE POINTS CARD
 // ===========================================================================
+
+/// The owner's own أفراحنا level, on the advertiser account screen.
+///
+/// Two point counters share this page and they are not the same thing: the
+/// store's points buy subscription months, these buy the member's 50 ₪. The
+/// heading and the note exist to keep the two from reading as one number in
+/// two places.
+class _MemberPointsCard extends StatelessWidget {
+  const _MemberPointsCard({required this.user, required this.onTap});
+
+  final UserModel user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded,
+                  size: 19, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'نقاطك الشخصية',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14.5,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ),
+              // Wrapped in its own Material: the card is a plain Container, so
+              // an InkWell here has no surface to splash on and throws.
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(99),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'عرض',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                      Icon(Icons.chevron_left_rounded,
+                          size: 18, color: AppColors.primaryDark),
+                    ],
+                  ),
+                ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TierProgressStrip(
+            balance: user.pointsBalance,
+            rewardsTaken: user.rewardsTaken,
+            onTap: onTap,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'منفصلة عن نقاط المتجر: هذه نقاطك كعضو في أفراحنا، وتلك تُحتسب'
+            ' لاشتراك متجرك.',
+            style: TextStyle(
+                color: AppColors.textMuted, fontSize: 11.5, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _StorePointsCard extends StatelessWidget {
   const _StorePointsCard({required this.vendor, required this.onDetails});

@@ -4,6 +4,7 @@ import '../../core/services/event_service.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/feedback_snack.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -115,6 +116,7 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('التقويم الذكي'),

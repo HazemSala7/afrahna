@@ -355,6 +355,9 @@ class PlanningHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      // Already a tab inside the shell, which draws the bar itself — a second
+      // one here would stack two bars on top of each other.
+      showShellNav: false,
       appBar: const PinkAppBar(title: 'خطّطي فرحك', showBack: false),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),

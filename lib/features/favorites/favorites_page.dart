@@ -48,6 +48,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     _ensureFuture(favs.ids);
 
     return AppScaffold(
+
       appBar: const PinkAppBar(title: 'المفضلة', showBack: true),
       body: favs.ids.isEmpty
           ? const EmptyState(

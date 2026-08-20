@@ -14,6 +14,7 @@ import 'package:afrahna/core/rewards_ladder.dart';
 import 'package:afrahna/core/api/api_client.dart';
 import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/account/account_page.dart';
+import 'package:afrahna/features/bookings/my_bookings_block.dart';
 import 'package:afrahna/features/account/customer_header.dart';
 import 'package:afrahna/widgets/tier_badge.dart';
 import 'package:afrahna/widgets/tier_benefits.dart';
@@ -121,10 +122,25 @@ void main() {
     expect(find.textContaining('المستوى 2 · فضي'), findsOneWidget);
     expect(find.textContaining('باقي 137 نقطة'), findsOneWidget);
 
+
     await expectLater(
       find.byType(CustomerHeroCard),
       matchesGoldenFile('goldens/tier_hero_card.png'),
     );
+
+    // …and the same card leaves the ladder out on the home page.
+    await _pump(
+      tester,
+      CustomerHeroCard(
+        user: _user(rewardsTaken: 1, balance: 63),
+        onEditProfile: () {},
+        onOpenPoints: () {},
+        showLevel: false,
+      ),
+    );
+    expect(find.textContaining('المستوى 2 · فضي'), findsNothing);
+    expect(find.textContaining('باقي 137 نقطة'), findsNothing);
+    expect(find.byType(TierProgressStrip), findsNothing);
   });
 
   testWidgets('the account facts row shows the level in its own metal',
@@ -152,15 +168,33 @@ void main() {
 
     // A third of a row is not much space for «المستوى 2 · فضي» — if it has to
     // be ellipsised, the tile is lying about the level.
-    // Three times: the hero card's strip, the facts tile, and the row for
-    // this level in the benefits card.
-    expect(find.text('المستوى 2 · فضي'), findsNWidgets(3));
+    // The hero card's strip and the facts tile, both built up front.
+    expect(find.text('المستوى 2 · فضي'), findsNWidgets(2));
+
+    // «حجوزاتي» and «خطّطي فرحك» moved here from the home page.
+    expect(find.byType(MyBookingsBlock), findsOneWidget);
+    expect(find.text('خطّطي فرحك'), findsOneWidget);
+
+    // The ladder card sits further down, past what a lazy list builds on the
+    // first frame — so scroll to it rather than asserting it is already there.
+    // The outer list, explicitly: the blocks above it bring horizontal
+    // scrollables of their own.
+    final list = find.byType(ListView).first;
+    for (var i = 0; i < 6 && find.text('مزايا المستويات').evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -400));
+      await tester.pump(const Duration(milliseconds: 250));
+    }
     expect(find.text('مزايا المستويات'), findsOneWidget);
 
     await expectLater(
       find.byType(AccountPage),
       matchesGoldenFile('goldens/tier_account_page.png'),
     );
+
+    // «خطّطي فرحك» brings a timer of its own; let it run out on an empty tree
+    // rather than leaving it pending at teardown.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('every tier says what it is worth', (tester) async {

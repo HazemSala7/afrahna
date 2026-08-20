@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import 'shell_bottom_nav.dart';
 
 /// Pink gradient app background scaffold.
 class AppScaffold extends StatelessWidget {
@@ -16,6 +17,7 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.padding,
     this.extendBody = false,
+    this.showShellNav = true,
   });
 
   final Widget body;
@@ -25,12 +27,22 @@ class AppScaffold extends StatelessWidget {
   final EdgeInsets? padding;
   final bool extendBody;
 
+  /// Whether the app's five-tab bar is drawn at the bottom.
+  ///
+  /// On by default: a pushed screen without it is a dead end whose only exit
+  /// is the back arrow, and a reader several screens deep has no way to reach
+  /// الرئيسية or حسابي without unwinding the whole pile. Screens that already
+  /// pass their own [bottomNavigationBar] keep it — theirs wins — and the few
+  /// that are meant to be immersive turn this off explicitly.
+  final bool showShellNav;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: extendBody,
       appBar: appBar,
-      bottomNavigationBar: bottomNavigationBar,
+      bottomNavigationBar: bottomNavigationBar ??
+          (showShellNav ? const ShellBottomNav() : null),
       floatingActionButton: floatingActionButton,
       body: Container(
         decoration: const BoxDecoration(

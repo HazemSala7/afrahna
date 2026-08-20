@@ -12,6 +12,8 @@ import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/tier_badge.dart';
 import '../../widgets/tier_benefits.dart';
+import '../bookings/my_bookings_block.dart';
+import '../planning/plan_your_wedding_block.dart';
 import '../admin/admin_dashboard_page.dart';
 import '../auth/login_page.dart';
 import '../auth/register_page.dart';
@@ -40,6 +42,9 @@ class AccountPage extends StatelessWidget {
     // Advertisers get their own shop-centric account screen.
     final isVendor = session.isSignedIn && session.user!.isVendor;
     return AppScaffold(
+      // Already a tab inside the shell, which draws the bar itself — a second
+      // one here would stack two bars on top of each other.
+      showShellNav: false,
       appBar: isVendor
           ? null
           : const PinkAppBar(title: 'حسابي', showBack: false),
@@ -586,6 +591,17 @@ class _SignedInViewState extends State<_SignedInView> {
           ),
         ),
         const SizedBox(height: 12),
+        // «حجوزاتي» and «خطّطي فرحك», both moved off the home page. They are
+        // the member's own things — what they booked and what they are
+        // planning — so they belong on the member's own screen, above the
+        // read-only facts and the level ladder.
+        const MyBookingsBlock(),
+        FadeSlideIn(
+          id: 'account.1b',
+          delay: next(),
+          child: const PlanYourWeddingBlock(),
+        ),
+        const SizedBox(height: 18),
         FadeSlideIn(
           id: 'account.2',
           delay: next(),

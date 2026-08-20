@@ -461,7 +461,7 @@ class VendorModel {
   /// (does not reset when an admin zeroes the points balance).
   final int beneficiariesCount;
 
-  /// When the shop joined — drives the home "انضمّوا حديثاً" row.
+  /// When the shop joined — drives the home "انضم مؤخراً" row.
   final DateTime? createdAt;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
@@ -1971,7 +1971,7 @@ class PointsSummary {
       case 'subscription':
         return 'اشتراك سنوي';
       case 'streak':
-        return 'المواظبة اليومية';
+        return 'نقاط الولاء اليومية';
       case 'story_comment':
         return 'تعليقات على الستوري';
       case 'service_comment':

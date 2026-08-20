@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// Afrahna's WhatsApp — where the finished invitation order is sent.
 const String _kAfrahnaWhatsapp = '972599252493';
@@ -293,6 +294,8 @@ class _InvitationDesignerPageState extends State<InvitationDesignerPage> {
     final font = _fonts[_font];
 
     return Scaffold(
+
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: AppColors.background,
       appBar: const PinkAppBar(title: 'صمّم كرت فرحك'),
       body: Stack(

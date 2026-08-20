@@ -249,15 +249,14 @@ class _AvatarPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SizedBox(
-        width: 260,
-        child: ImageUploadField(
-          label: 'صورة البروفايل',
-          url: url,
-          folder: 'users/avatars',
-          fallbackIcon: Icons.person_rounded,
-          onChanged: onChanged,
-        ),
+      child: ImageUploadField(
+        label: 'صورة البروفايل',
+        url: url,
+        folder: 'users/avatars',
+        fallbackIcon: Icons.person_rounded,
+        onChanged: onChanged,
+        circular: true,
+        height: 150,
       ),
     );
   }

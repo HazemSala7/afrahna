@@ -7,6 +7,7 @@ import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// Notifications screen — list user's personal + broadcast notifications.
 class NotificationsPage extends StatefulWidget {
@@ -59,6 +60,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     // Flat, light background (no darkening gradient) so the page reads bright.
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: const Color(0xFFFCF8F3),
       appBar: PinkAppBar(
         title: 'الإشعارات',

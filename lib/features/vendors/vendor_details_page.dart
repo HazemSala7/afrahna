@@ -1832,7 +1832,7 @@ class _Stat extends StatelessWidget {
 // ============================================================
 
 /// "نقاط أفراحنا" card on a vendor profile: shows how many users have redeemed
-/// points here, and lets a signed-in user redeem 50 points for a 10% in-person
+/// points here, and lets a signed-in user redeem 50 points for an in-person
 /// discount (once per 24h). The vendor's own owner sees the counter but not the
 /// redeem button.
 class _PointsRedeemSection extends StatefulWidget {
@@ -1864,7 +1864,7 @@ class _PointsRedeemSectionState extends State<_PointsRedeemSection> {
       builder: (_) => AlertDialog(
         title: const Text('استبدال النقاط'),
         content: const Text(
-          'سيتم خصم 50 نقطة من رصيدك مقابل خصم 10% لدى هذا المعلن.\n'
+          'سيتم خصم 50 نقطة من رصيدك مقابل خصم يحدده صاحب المحل.\n'
           'أظهر شاشة التأكيد للمعلن عند الشراء. (مرة واحدة كل 24 ساعة لكل معلن)',
         ),
         actions: [
@@ -1891,7 +1891,7 @@ class _PointsRedeemSectionState extends State<_PointsRedeemSection> {
         builder: (_) => AlertDialog(
           title: const Text('تم الاستبدال ✅'),
           content: Text(
-            'حصلت على خصم ${res.discount}% لدى ${widget.vendor.name}.\n'
+            'حصلت على خصم لدى ${widget.vendor.name}، يحدّده صاحب المحل.\n'
             'أظهر هذه الرسالة للمعلن.\nرصيدك المتبقّي: ${res.balance} نقطة.',
           ),
           actions: [
@@ -1948,7 +1948,7 @@ class _PointsRedeemSectionState extends State<_PointsRedeemSection> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'استبدل 50 نقطة للحصول على خصم 10% عند الشراء من هذا المعلن.',
+            'استبدل 50 نقطة للحصول على خصم يحدده صاحب المحل عند الشراء منه.',
             style: TextStyle(color: AppColors.textDark, fontSize: 13, height: 1.4),
           ),
           if (!isOwner) ...[
@@ -1965,7 +1965,7 @@ class _PointsRedeemSectionState extends State<_PointsRedeemSection> {
                             strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.redeem_rounded, size: 18),
-                label: Text(_busy ? 'جارٍ الاستبدال…' : 'استبدال 50 نقطة (خصم 10%)'),
+                label: Text(_busy ? 'جارٍ الاستبدال…' : 'استبدال 50 نقطة'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryDark,
                   foregroundColor: Colors.white,

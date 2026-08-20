@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// Shows a vendor owner the list of users who follow their shop + the count.
 class VendorFollowersPage extends StatefulWidget {
@@ -30,6 +31,7 @@ class _VendorFollowersPageState extends State<VendorFollowersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       appBar: AppBar(title: const Text('المتابعون')),
       body: RefreshIndicator(
         onRefresh: () async => setState(_reload),

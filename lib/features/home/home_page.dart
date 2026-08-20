@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-// `intl` also exports a TextDirection that clashes with Flutter's.
-import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -23,19 +21,17 @@ import '../../widgets/animated_invitation_bg.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/section_header.dart';
 import '../account/account_page.dart';
 import '../account/customer_header.dart';
 import '../account/edit_profile_page.dart';
 import '../account/followed_vendors_page.dart';
 import '../assistant/assistant_page.dart';
-import '../bookings/booking_status.dart';
 import '../bookings/bookings_page.dart';
 import '../invitations/invitations_page.dart';
 import '../auth/login_page.dart';
 import '../categories/categories_page.dart';
 import '../categories/category_tabs_page.dart';
-import '../coordinator/coordinator_page.dart';
-import '../invitation/invitation_designer_page.dart';
 import 'home_feed_cache.dart';
 import '../favorites/favorites_page.dart';
 import '../planning/planning_hub_page.dart';
@@ -275,7 +271,7 @@ class _HomeTabState extends State<_HomeTab> {
   late Future<List<VendorModel>> _topVendorsFuture;
   late Future<List<VendorModel>> _featuredVendorsFuture;
 
-  /// Shops that joined most recently — "انضمّوا حديثاً".
+  /// Shops that joined most recently — "انضم مؤخراً".
   late Future<List<VendorModel>> _newVendorsFuture;
 
   /// Marketplace row: products from every shop, shuffled.
@@ -362,10 +358,16 @@ class _HomeTabState extends State<_HomeTab> {
         byVendor[vid]!.add(s);
       }
 
+      // Shuffled, the way the slider rotates its advertisers: the shop that
+      // happens to be first in the server's order would otherwise be first
+      // every single time the app opened, and the ones past the screen edge
+      // would never be seen at all. Once per load, not per rebuild — the rail
+      // must not reshuffle under a finger reaching for it.
       return order
           .map((id) =>
               VendorStoriesGroup(vendor: vendors[id]!, stories: byVendor[id]!))
-          .toList();
+          .toList()
+        ..shuffle();
     } catch (_) {
       // The rail is optional decoration — never fail the whole home tab for it.
       return const [];
@@ -431,14 +433,18 @@ class _HomeTabState extends State<_HomeTab> {
                 child: const _SearchBar(),
               )),
               const SizedBox(height: 10),
-              // Stories rail — moved here from its own bottom-nav tab, where
-              // it was a whole screen away from the content it belongs with.
+
+              // ---- 1. الستوريز ------------------------------------------
+              // Moved here from its own bottom-nav tab, where it was a whole
+              // screen away from the content it belongs with.
               FadeSlideIn(
                 id: 'home.1',
                 delay: const Duration(milliseconds: 120),
                 child: _StoriesRail(future: _storiesFuture),
               ),
               const SizedBox(height: 10),
+
+              // ---- 2. التصنيفات -----------------------------------------
               // Full-width auto-scrolling categories (no side gaps).
               FadeSlideIn(
                 id: 'home.2',
@@ -446,42 +452,20 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _CategoriesGrid(future: _categoriesFuture),
               ),
               const SizedBox(height: 16),
-              // Hero slider with side margins (aligned with the rest of the page).
+
+              // ---- 3. السلايدات -----------------------------------------
               _hpad(FadeSlideIn(
                 id: 'home.3',
-                delay: const Duration(milliseconds: 300),
+                delay: const Duration(milliseconds: 260),
                 child: _HeroBanner(future: _slidersFuture),
               )),
               const SizedBox(height: 20),
-              // Signed in: the account card (who you are + what your points are
-              // worth + shortcuts). Guests keep the sign-in CTA instead.
+
+              // ---- 4. الشركات المميّزة ----------------------------------
               _hpad(FadeSlideIn(
                 id: 'home.4',
-                delay: const Duration(milliseconds: 310),
-                child: const _HomeAccountBlock(),
-              )),
-              const SizedBox(height: 20),
-              // Bookings the customer has made — right at the top, because a
-              // shop's answer to a booking is the most time-sensitive thing on
-              // this page. Renders nothing for guests or when there are none.
-              FadeSlideIn(
-                id: 'home.5',
-                delay: const Duration(milliseconds: 315),
-                child: const _MyBookingsBlock(),
-              ),
-              // Electronic invitations — the showpiece feature, so it gets a
-              // living card rather than another row of tiles.
-              _hpad(FadeSlideIn(
-                id: 'home.6',
-                delay: const Duration(milliseconds: 318),
-                child: const _InvitationPromoCard(),
-              )),
-              const SizedBox(height: 20),
-              // Featured companies — placed right below the hero slider/ads.
-              _hpad(FadeSlideIn(
-                id: 'home.7',
-                delay: const Duration(milliseconds: 320),
-                child: _SectionHeader(
+                delay: const Duration(milliseconds: 300),
+                child: SectionHeader(
                   title: 'الشركات المميّزة',
                   emoji: '🏆',
                   onSeeAll: () => Navigator.push(
@@ -497,40 +481,19 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
-                id: 'home.8',
-                delay: const Duration(milliseconds: 360),
+                id: 'home.5',
+                delay: const Duration(milliseconds: 320),
                 child: _FeaturedVendorsCarousel(
                     future: _featuredVendorsFuture, userPos: _userPos),
               ),
               const SizedBox(height: 24),
-              // Newest shops — gives a just-joined advertiser immediate
-              // exposure instead of waiting to earn a spot in the other rows.
+
+              // ---- 5. المتجر --------------------------------------------
+              // Products from every shop, shuffled.
               _hpad(FadeSlideIn(
-                id: 'home.9',
-                delay: const Duration(milliseconds: 370),
-                child: _SectionHeader(
-                  title: 'انضمّوا حديثاً',
-                  emoji: '✨',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VendorsPage(title: 'انضمّوا حديثاً'),
-                    ),
-                  ),
-                ),
-              )),
-              const SizedBox(height: 12),
-              FadeSlideIn(
-                id: 'home.10',
-                delay: const Duration(milliseconds: 380),
-                child: _NewVendorsRow(future: _newVendorsFuture),
-              ),
-              const SizedBox(height: 24),
-              // Marketplace — products from every shop, shuffled.
-              _hpad(FadeSlideIn(
-                id: 'home.11',
-                delay: const Duration(milliseconds: 390),
-                child: _SectionHeader(
+                id: 'home.6',
+                delay: const Duration(milliseconds: 340),
+                child: SectionHeader(
                   title: 'المتجر',
                   emoji: '🛍️',
                   onSeeAll: () => Navigator.push(
@@ -541,10 +504,146 @@ class _HomeTabState extends State<_HomeTab> {
               )),
               const SizedBox(height: 12),
               FadeSlideIn(
-                id: 'home.12',
-                delay: const Duration(milliseconds: 400),
+                id: 'home.7',
+                delay: const Duration(milliseconds: 360),
                 child: _MarketRow(future: _marketFuture),
               ),
+              const SizedBox(height: 22),
+
+              // ---- 6. عروض اليوم ----------------------------------------
+              _hpad(FadeSlideIn(
+                id: 'home.8',
+                delay: const Duration(milliseconds: 380),
+                child: SectionHeader(
+                  title: 'عروض اليوم',
+                  emoji: '🔥',
+                  onSeeAll: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OffersPage()),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                id: 'home.9',
+                delay: const Duration(milliseconds: 400),
+                child: _OffersRow(future: _promosFuture),
+              ),
+              const SizedBox(height: 26),
+
+              // ---- 7. آخر المنشورات -------------------------------------
+              _hpad(FadeSlideIn(
+                id: 'home.10',
+                delay: const Duration(milliseconds: 420),
+                child: const SectionHeader(
+                  title: 'آخر المنشورات',
+                  emoji: '📝',
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                id: 'home.11',
+                delay: const Duration(milliseconds: 440),
+                child: _LatestPostsRow(future: _latestPostsFuture),
+              ),
+              const SizedBox(height: 24),
+
+              // ---- 8. انضم مؤخراً ------------------------------------
+              // Gives a just-joined advertiser immediate exposure instead of
+              // waiting to earn a spot in the other rows.
+              _hpad(FadeSlideIn(
+                id: 'home.12',
+                delay: const Duration(milliseconds: 460),
+                child: SectionHeader(
+                  title: 'انضم مؤخراً',
+                  emoji: '✨',
+                  onSeeAll: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VendorsPage(title: 'انضم مؤخراً'),
+                    ),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                id: 'home.13',
+                delay: const Duration(milliseconds: 480),
+                child: _NewVendorsRow(future: _newVendorsFuture),
+              ),
+              const SizedBox(height: 22),
+
+              // ---- 9. الأعلى تقييماً ------------------------------------
+              _hpad(FadeSlideIn(
+                id: 'home.14',
+                delay: const Duration(milliseconds: 500),
+                child: SectionHeader(
+                  title: 'الأعلى تقييماً',
+                  emoji: '⭐',
+                  onSeeAll: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const VendorsPage()),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                id: 'home.15',
+                delay: const Duration(milliseconds: 520),
+                child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
+              ),
+              const SizedBox(height: 22),
+
+              // ---- 10. دعوات إلكترونية ----------------------------------
+              // The showpiece feature, so it gets a living card rather than
+              // another row of tiles.
+              _hpad(FadeSlideIn(
+                id: 'home.16',
+                delay: const Duration(milliseconds: 540),
+                child: const _InvitationPromoCard(),
+              )),
+              const SizedBox(height: 22),
+
+              // ---- 11. تواصل معنا ---------------------------------------
+              // The "advertise with us" card, whose action is «تواصل معنا».
+              _hpad(FadeSlideIn(
+                id: 'home.17',
+                delay: const Duration(milliseconds: 560),
+                child: const _AdvertiseCta(),
+              )),
+              const SizedBox(height: 26),
+
+              // ---- 12. نصائح لتخطيط فرحك --------------------------------
+              FadeSlideIn(
+                id: 'home.18',
+                delay: const Duration(milliseconds: 580),
+                child: const _TipsSection(),
+              ),
+              const SizedBox(height: 26),
+
+              // ---- 13. ليش أفراحنا؟ -------------------------------------
+              _hpad(FadeSlideIn(
+                id: 'home.19',
+                delay: const Duration(milliseconds: 600),
+                child: const _WhyAfrahnaSection(),
+              )),
+              const SizedBox(height: 24),
+
+              // ---- Below the numbered order ------------------------------
+              // What is left of the sections that were not in the requested
+              // sequence. «حجوزاتي» and «خطّطي فرحك» have moved to the profile,
+              // and the statistics band is behind [kShowHomeStats].
+
+              // The member's own card — who they are, what their points are
+              // worth, and the shortcuts they use most. Guests get the sign-in
+              // call to action in the same slot.
+              _hpad(FadeSlideIn(
+                id: 'home.20',
+                delay: const Duration(milliseconds: 620),
+                child: const _HomeAccountBlock(),
+              )),
+              const SizedBox(height: 20),
+              // The next event's countdown, when one is scheduled.
               FutureBuilder<EventModel?>(
                 future: _mainEventFuture,
                 builder: (context, snap) {
@@ -556,8 +655,8 @@ class _HomeTabState extends State<_HomeTab> {
                   return _hpad(Padding(
                     padding: const EdgeInsets.only(top: 22),
                     child: FadeSlideIn(
-                      id: 'home.13',
-                      delay: const Duration(milliseconds: 380),
+                      id: 'home.22',
+                      delay: const Duration(milliseconds: 640),
                       child: CountdownCard(
                         title: event.title,
                         target: event.startsAt,
@@ -567,162 +666,29 @@ class _HomeTabState extends State<_HomeTab> {
                 },
               ),
               const SizedBox(height: 22),
-              // Planning tools: prominent coordinator banner + a row of 3 tools.
-              _hpad(FadeSlideIn(
-                id: 'home.14',
-                delay: const Duration(milliseconds: 320),
-                child: Column(
-                  children: [
-                    const _SectionHeader(title: 'خطّطي فرحك', emoji: '✨'),
-                    const SizedBox(height: 12),
-                    // Coordinator + card designer side by side.
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: _PlanCompactCard(
-                              colors: const [
-                                Color(0xFF57B3A8),
-                                Color(0xFF4FA69C),
-                                Color(0xFF2F7C74),
-                              ],
-                              icon: Icons.assignment_rounded,
-                              title: 'منسق المناسبة',
-                              subtitle: 'خطّطي تفاصيل يومك خطوة بخطوة',
-                              badge: 'مميّز',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const CoordinatorPage()),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _PlanCompactCard(
-                              colors: const [
-                                Color(0xFF8B5A3C),
-                                Color(0xFFB8835A),
-                                Color(0xFFD4A373),
-                              ],
-                              icon: Icons.card_giftcard_rounded,
-                              title: 'صمّم كرت فرحك',
-                              subtitle: 'اختر قالبك واطلبه من أفراحنا',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const InvitationDesignerPage()),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const PlanningToolsRow(),
-                  ],
-                ),
-              )),
               // Invite-a-friend rewards card. Its reward is points, so it is
               // hidden together with the rest of the points system.
               if (kShowPointsSystem) ...[
                 const SizedBox(height: 22),
                 _hpad(FadeSlideIn(
-                  id: 'home.15',
-                  delay: const Duration(milliseconds: 330),
+                  id: 'home.24',
+                  delay: const Duration(milliseconds: 660),
                   child: const _InviteFriendsCard(),
                 )),
               ],
-              const SizedBox(height: 20),
-              // Stats band with side margins.
-              _hpad(FadeSlideIn(
-                id: 'home.16',
-                delay: const Duration(milliseconds: 340),
-                child: _StatsBand(future: _statsFuture),
-              )),
-              const SizedBox(height: 15),
-              // "Advertise with us" call-to-action aimed at business owners:
-              // placed right after the reach stats so the numbers prime them.
-              _hpad(FadeSlideIn(
-                id: 'home.17',
-                delay: const Duration(milliseconds: 360),
-                child: const _AdvertiseCta(),
-              )),
-              const SizedBox(height: 22),
-              _hpad(FadeSlideIn(
-                id: 'home.18',
-                delay: const Duration(milliseconds: 480),
-                child: _SectionHeader(
-                  title: 'عروض اليوم',
-                  emoji: '🔥',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const OffersPage()),
-                  ),
-                ),
-              )),
-              const SizedBox(height: 12),
-              // Full-width offers row.
-              FadeSlideIn(
-                id: 'home.19',
-                delay: const Duration(milliseconds: 540),
-                child: _OffersRow(future: _promosFuture),
-              ),
-              const SizedBox(height: 22),
-              _hpad(FadeSlideIn(
-                id: 'home.20',
-                delay: const Duration(milliseconds: 520),
-                child: _SectionHeader(
-                  title: 'الأكثر تقييماً',
-                  emoji: '⭐',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const VendorsPage()),
-                  ),
-                ),
-              )),
-              const SizedBox(height: 12),
-              // Full-width top-rated row.
-              FadeSlideIn(
-                id: 'home.21',
-                delay: const Duration(milliseconds: 580),
-                child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
-              ),
-              const SizedBox(height: 26),
-              // Latest posts — horizontal scroll of the newest vendor posts.
-              _hpad(FadeSlideIn(
-                id: 'home.22',
-                delay: const Duration(milliseconds: 600),
-                child: const _SectionHeader(
-                  title: 'آخر المنشورات',
-                  emoji: '📝',
-                ),
-              )),
-              const SizedBox(height: 12),
-              FadeSlideIn(
-                id: 'home.23',
-                delay: const Duration(milliseconds: 640),
-                child: _LatestPostsRow(future: _latestPostsFuture),
-              ),
-              const SizedBox(height: 28),
-              // Wedding-planning tips (full-width horizontal cards).
-              FadeSlideIn(
-                id: 'home.24',
-                delay: const Duration(milliseconds: 620),
-                child: const _TipsSection(),
-              ),
-              const SizedBox(height: 26),
-              _hpad(FadeSlideIn(
-                id: 'home.25',
-                delay: const Duration(milliseconds: 640),
-                child: const _WhyAfrahnaSection(),
-              )),
+              // The reach-statistics band, hidden by default.
+              if (kShowHomeStats) ...[
+                const SizedBox(height: 20),
+                _hpad(FadeSlideIn(
+                  id: 'home.25',
+                  delay: const Duration(milliseconds: 670),
+                  child: _StatsBand(future: _statsFuture),
+                )),
+              ],
               const SizedBox(height: 26),
               _hpad(FadeSlideIn(
                 id: 'home.26',
-                delay: const Duration(milliseconds: 660),
+                delay: const Duration(milliseconds: 680),
                 child: const _AppFooter(),
               )),
             ],
@@ -1485,6 +1451,8 @@ class _HomeAccountCardState extends State<_HomeAccountCard> {
       children: [
         CustomerHeroCard(
           user: widget.user,
+          // The ladder belongs on حسابي; here it is detail nobody came for.
+          showLevel: false,
           onEditProfile: () async {
             await Navigator.push(
               context,
@@ -1763,23 +1731,43 @@ class _HeroBannerState extends State<_HeroBanner> {
     ),
   ];
 
+  /// How long a slide is held before the next one comes.
+  static const _dwell = Duration(seconds: 7);
+
+  /// How long the rotation waits after a touch, so reading or tapping a slide
+  /// is not interrupted by it sliding away mid-gesture.
+  static const _pauseAfterTouch = Duration(seconds: 4);
+
+  Timer? _resume;
+
   void _startTimer() {
     _timer?.cancel();
     if (_slides.length < 2) return;
-    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _timer = Timer.periodic(_dwell, (_) {
       if (!_controller.hasClients) return;
       final next = (_index + 1) % _slides.length;
       _controller.animateToPage(
         next,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOut,
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeInOut,
       );
+    });
+  }
+
+  /// Stop rotating, and pick it up again [_pauseAfterTouch] after the last
+  /// touch — each new touch pushes the restart further out.
+  void _holdForTouch() {
+    _timer?.cancel();
+    _resume?.cancel();
+    _resume = Timer(_pauseAfterTouch, () {
+      if (mounted) _startTimer();
     });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _resume?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -1804,11 +1792,18 @@ class _HeroBannerState extends State<_HeroBanner> {
             height: 240,
             child: Stack(
               children: [
-                PageView.builder(
-                  controller: _controller,
-                  itemCount: _slides.length,
-                  onPageChanged: (i) => setState(() => _index = i),
-                  itemBuilder: (_, i) => _HeroSlideView(slide: _slides[i]),
+                // Listener, not GestureDetector: the slide itself already
+                // claims the tap to open the advertiser, and a competing
+                // recogniser would have to win an arena fight to see it. A
+                // raw pointer-down is seen either way.
+                Listener(
+                  onPointerDown: (_) => _holdForTouch(),
+                  child: PageView.builder(
+                    controller: _controller,
+                    itemCount: _slides.length,
+                    onPageChanged: (i) => setState(() => _index = i),
+                    itemBuilder: (_, i) => _HeroSlideView(slide: _slides[i]),
+                  ),
                 ),
                 const Positioned.fill(
                   child: IgnorePointer(
@@ -2017,17 +2012,15 @@ class _CategoriesGrid extends StatefulWidget {
 
 class _CategoriesGridState extends State<_CategoriesGrid> {
   final ScrollController _controller = ScrollController();
-  final _auto = _AutoScroller(speed: 0.35);
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _auto.attach(_controller));
-  }
+  // No auto-scroll here any more. A row that slides while you are reaching for
+  // it is a row you cannot hit: the tile moves out from under the finger
+  // between deciding and touching. The slider below still rotates — it is one
+  // big target and nothing is lost by missing it — but these are 72 pixels
+  // wide and exist to be tapped.
 
   @override
   void dispose() {
-    _auto.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -2086,12 +2079,8 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
 
         return SizedBox(
           height: tileHeight,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (n) {
-              if (n is UserScrollNotification) _auto.pause();
-              return false;
-            },
-            child: ListView.separated(
+          child: Builder(
+            builder: (context) => ListView.separated(
               controller: _controller,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -2135,47 +2124,17 @@ class _CategoryTile extends StatelessWidget {
           Container(
             width: 50,
             height: 50,
+            // A flat tinted square with the icon in the same colour: one
+            // shape, one hue, no gloss. The gradient, the coloured glow and
+            // the little white "shine" dot made each tile look like a sticker
+            // — twelve stickers in a row is a lot of noise for what is really
+            // a list of links.
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.alphaBlend(tint.withValues(alpha: 0.20), Colors.white),
-                  Color.alphaBlend(tint.withValues(alpha: 0.42), Colors.white),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: tint.withValues(alpha: 0.30),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: tint.withValues(alpha: 0.28),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: Color.alphaBlend(tint.withValues(alpha: 0.14), Colors.white),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: tint.withValues(alpha: 0.22)),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Subtle glossy highlight in the top corner.
-                Positioned(
-                  top: 8,
-                  right: 10,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-                Icon(icon, color: tint, size: 23),
-              ],
-            ),
+            child: Icon(icon, color: tint, size: 24),
           ),
           const SizedBox(height: 6),
           Text(
@@ -2200,57 +2159,6 @@ class _CategoryTile extends StatelessWidget {
 // SECTION HEADER
 // ===========================================================================
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    this.emoji,
-    this.onSeeAll,
-  });
-  final String title;
-  final String? emoji;
-  final VoidCallback? onSeeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    // RTL: first child = start = right. We want title on the RIGHT
-    // (first thing read in Arabic) and "عرض الكل" action on the LEFT.
-    return Row(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textDark,
-          ),
-        ),
-        if (emoji != null) ...[
-          const SizedBox(width: 6),
-          Text(emoji!, style: const TextStyle(fontSize: 17)),
-        ],
-        const Spacer(),
-        if (onSeeAll != null)
-          GestureDetector(
-            onTap: onSeeAll,
-            child: Row(
-              children: const [
-                Text(
-                  'عرض الكل',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                  ),
-                ),
-                Icon(Icons.chevron_left,
-                    color: AppColors.primary, size: 18),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 // ===========================================================================
 // OFFERS ROW
@@ -2666,7 +2574,7 @@ class _TopRatedRow extends StatelessWidget {
               child: AfrahnaLoader(size: 42),
             );
           }
-          // "الأكثر تقييماً" — show only vendors with a full 5/5 rating.
+          // "الأعلى تقييماً" — show only vendors with a full 5/5 rating.
           final items = [
             ...(snap.data ?? const <VendorModel>[])
                 .where((v) => (v.rating ?? 0) >= 5.0),
@@ -2693,123 +2601,6 @@ class _TopRatedRow extends StatelessWidget {
 // COMPACT PLANNING CARD — coordinator / card-designer, side by side
 // ===========================================================================
 
-class _PlanCompactCard extends StatelessWidget {
-  const _PlanCompactCard({
-    required this.colors,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.badge,
-  });
-
-  final List<Color> colors; // [light, base, dark]
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Color.alphaBlend(
-        Colors.black.withValues(alpha: 0.35), colors[1]);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: colors[1].withValues(alpha: 0.42),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 1.2),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 23),
-                ),
-                const Spacer(),
-                if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(badge!,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 9.5)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15)),
-            const SizedBox(height: 5),
-            Text(subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
-                    height: 1.35)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('ابدأ الآن',
-                      style: TextStyle(
-                          color: dark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11.5)),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_back_rounded, color: dark, size: 15),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ===========================================================================
 // LATEST POSTS ROW
@@ -3218,7 +3009,7 @@ class _TipsSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _SectionHeader(title: 'نصائح لتخطيط فرحك', emoji: '💡'),
+          child: SectionHeader(title: 'نصائح لتخطيط فرحك', emoji: '💡'),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -3583,13 +3374,13 @@ class _StoriesRail extends StatelessWidget {
       future: future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 88);
+          return const SizedBox(height: 78);
         }
         final groups = snap.data ?? const <VendorStoriesGroup>[];
         if (groups.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: 88,
+          height: 78,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -3614,7 +3405,7 @@ class _StoryRailTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final vendor = group.vendor;
     return SizedBox(
-      width: 64,
+      width: 58,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.push(
@@ -3630,8 +3421,8 @@ class _StoryRailTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width: 52,
+              height: 52,
               padding: const EdgeInsets.all(2.5),
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
@@ -4160,7 +3951,7 @@ class _SearchTabState extends State<_SearchTab> {
                     color: Color(0xFFFFC107), size: 20),
                 const SizedBox(width: 6),
                 const Text(
-                  'المحلات الأكثر تقييماً',
+                  'المحلات الأعلى تقييماً',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
@@ -4411,222 +4202,6 @@ class _Stat extends StatelessWidget {
 /// «حجوزاتي» on the home page: the services this customer booked, and what the
 /// shop answered. Hidden entirely for guests and for customers with no
 /// bookings, so it never shows as an empty band.
-class _MyBookingsBlock extends StatefulWidget {
-  const _MyBookingsBlock();
-
-  @override
-  State<_MyBookingsBlock> createState() => _MyBookingsBlockState();
-}
-
-class _MyBookingsBlockState extends State<_MyBookingsBlock> {
-  Future<List<BookingModel>>? _future;
-  bool _wasSignedIn = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Load on first build and again whenever the user signs in, so a booking
-    // made right after logging in still appears without a restart.
-    final signedIn = context.watch<SessionController>().isSignedIn;
-    if (signedIn != _wasSignedIn) {
-      _wasSignedIn = signedIn;
-      _future = signedIn ? _load() : null;
-    }
-  }
-
-  /// Always the customer scope — a shop owner's default booking view is their
-  /// shop's inbox, and their own bookings would otherwise never reach them.
-  Future<List<BookingModel>> _load() =>
-      BookingService().list(scope: 'customer');
-
-  Future<void> _openAll() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const BookingsPage(initialMine: true)),
-    );
-    // The customer may have cancelled something while they were in there.
-    if (mounted) setState(() => _future = _load());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final future = _future;
-    if (future == null) return const SizedBox.shrink();
-
-    return FutureBuilder<List<BookingModel>>(
-      future: future,
-      builder: (context, snap) {
-        // A failed or empty request must not leave a heading with nothing
-        // under it — the whole block just disappears.
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const SizedBox.shrink();
-        }
-        final me = context.read<SessionController>().user?.id;
-        // Belt and braces: until the API deploys `scope`, a shop owner's
-        // request still comes back as their shop's inbox. Those are other
-        // people's bookings and must never appear under «حجوزاتي».
-        final all = (snap.data ?? const <BookingModel>[])
-            .where((b) => b.customer == null || b.customer!.id == me)
-            .toList();
-        if (all.isEmpty) return const SizedBox.shrink();
-
-        // Anything the shop has answered floats to the front; the rest follow
-        // by event date. That puts a fresh «مؤكّد» or «مرفوض» first.
-        final items = [...all]..sort((a, b) {
-            final byReply = (b.hasVendorReply ? 1 : 0) - (a.hasVendorReply ? 1 : 0);
-            if (byReply != 0) return byReply;
-            return b.eventDate.compareTo(a.eventDate);
-          });
-        final shown = items.take(6).toList();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _SectionHeader(
-                title: 'حجوزاتي',
-                emoji: '🗓️',
-                onSeeAll: _openAll,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 132,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: shown.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (_, i) =>
-                    _BookingMiniCard(booking: shown[i], onTap: _openAll),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Compact booking card for the home row.
-class _BookingMiniCard extends StatelessWidget {
-  const _BookingMiniCard({required this.booking, required this.onTap});
-
-  final BookingModel booking;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final b = booking;
-    final style = BookingStatusStyle.of(b.status);
-    final reason = (b.cancellationReason ?? '').trim();
-    final df = DateFormat('d MMMM y', 'ar');
-
-    return SizedBox(
-      width: 252,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              // A shop reply is tinted in its own colour so a confirmation or a
-              // rejection is readable at a glance, without opening anything.
-              border: Border.all(
-                color: b.hasVendorReply
-                    ? style.color.withValues(alpha: .35)
-                    : AppColors.primaryLight,
-                width: b.hasVendorReply ? 1.4 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        b.service?.title ?? 'حجز',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    const Icon(Icons.storefront_rounded,
-                        size: 12, color: AppColors.textMuted),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        b.vendor?.name ?? '—',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11.5, color: AppColors.textMuted),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.event_rounded,
-                        size: 12, color: AppColors.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      df.format(b.eventDate),
-                      style: const TextStyle(
-                          fontSize: 11.5, color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                if (reason.isNotEmpty)
-                  Text(
-                    '«$reason»',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                      color: style.color,
-                    ),
-                  ),
-                const SizedBox(height: 6),
-                BookingStatusChip(status: b.status, compact: true),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Home-page showcase for electronic invitations. The card runs one of the
-/// real invitation themes behind it, so the feature sells itself: what you see
-/// moving here is exactly what the finished invitation looks like.
 class _InvitationPromoCard extends StatefulWidget {
   const _InvitationPromoCard();
 

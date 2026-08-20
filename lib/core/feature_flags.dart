@@ -12,3 +12,14 @@ library;
 /// or build with `--dart-define=SHOW_POINTS=true`.
 const bool kShowPointsSystem =
     bool.fromEnvironment('SHOW_POINTS', defaultValue: false);
+
+/// Whether the reach-statistics band ("14 مدينة · 23.0K مستخدم · …") appears
+/// at the bottom of the home page.
+///
+/// Hidden. The numbers are still collected and still shown in the dashboard;
+/// this only decides whether the home page carries them.
+///
+/// To bring it back, flip the default below or build with
+/// `--dart-define=SHOW_HOME_STATS=true`.
+const bool kShowHomeStats =
+    bool.fromEnvironment('SHOW_HOME_STATS', defaultValue: false);

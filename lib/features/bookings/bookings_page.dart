@@ -404,7 +404,7 @@ class _BookingsPageState extends State<BookingsPage> {
     final session = context.watch<SessionController>();
     if (!session.isSignedIn) {
       return AppScaffold(
-        // The page is always pushed (from the home card or the account menu),
+          // The page is always pushed (from the home card or the account menu),
         // so it needs a way back. PinkAppBar hides the arrow by itself when
         // there is nothing to pop.
         appBar: const PinkAppBar(title: 'مناسباتي'),
@@ -438,6 +438,7 @@ class _BookingsPageState extends State<BookingsPage> {
     final hasInbox = _hasInbox(session);
 
     return AppScaffold(
+
       appBar: const PinkAppBar(title: 'مناسباتي'),
       body: Column(
         children: [

@@ -14,6 +14,7 @@ import '../../widgets/tier_badge.dart';
 class CustomerHeroCard extends StatefulWidget {
   const CustomerHeroCard({
     super.key,
+    this.showLevel = true,
     required this.user,
     required this.onEditProfile,
     required this.onOpenPoints,
@@ -22,6 +23,10 @@ class CustomerHeroCard extends StatefulWidget {
   final UserModel user;
   final VoidCallback onEditProfile;
   final VoidCallback onOpenPoints;
+
+  /// Whether the rewards-ladder strip is part of the card. On for حسابي, off
+  /// on the home page.
+  final bool showLevel;
 
   @override
   State<CustomerHeroCard> createState() => _CustomerHeroCardState();
@@ -163,11 +168,16 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
           // The level, and the distance left to the next 50 ₪. The card used
           // to show the balance as a bare number: 6 points says nothing on its
           // own, «باقي 94 نقطة على 50 شيكل» says what it is for.
-          TierProgressStrip(
-            balance: u.pointsBalance,
-            rewardsTaken: u.rewardsTaken,
-            onTap: widget.onOpenPoints,
-          ),
+          //
+          // Shown on حسابي, left off the home page: there it sat between the
+          // shops and the offers, one more thing to read on a screen that is
+          // already a long scroll of them.
+          if (widget.showLevel)
+            TierProgressStrip(
+              balance: u.pointsBalance,
+              rewardsTaken: u.rewardsTaken,
+              onTap: widget.onOpenPoints,
+            ),
           const SizedBox(height: 12),
           Row(
             children: [

@@ -82,7 +82,7 @@ class _PointsPageState extends State<PointsPage> {
     final session = context.watch<SessionController>();
     if (!session.isSignedIn) {
       return AppScaffold(
-        appBar: const PinkAppBar(title: 'نقاطي'),
+          appBar: const PinkAppBar(title: 'نقاطي'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -109,6 +109,7 @@ class _PointsPageState extends State<PointsPage> {
     }
 
     return AppScaffold(
+
       appBar: const PinkAppBar(title: 'نقاطي'),
       body: FutureBuilder<PointsSummary>(
         future: _future,
@@ -128,17 +129,20 @@ class _PointsPageState extends State<PointsPage> {
               await _future;
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 _balanceCard(s),
+                const SizedBox(height: 16),
+                // First of the cards, not buried below the meters: an invite
+                // is the fastest points in the programme and the only one
+                // that needs someone else, so it has to be seen to happen.
+                _inviteCard(s),
                 const SizedBox(height: 16),
                 _ladderCard(s),
                 const SizedBox(height: 16),
                 _dailyCard(s),
                 const SizedBox(height: 16),
                 _progressSection(s),
-                const SizedBox(height: 16),
-                _inviteCard(s),
                 if (s.rewards.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _rewardsSection(s),
@@ -371,7 +375,7 @@ class _PointsPageState extends State<PointsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('المواظبة اليومية',
+                    const Text('نقاط الولاء اليومية',
                         style: TextStyle(
                             color: AppColors.textDark,
                             fontWeight: FontWeight.w800)),
@@ -379,7 +383,7 @@ class _PointsPageState extends State<PointsPage> {
                     Text(
                       s.streakDays >= s.streakNeeded
                           ? 'أتممت الشهر كاملاً! ${s.streakAward} نقطة في طريقها إليك.'
-                          : 'افتح التطبيق ${s.streakNeeded} يوماً متتالياً لتنال'
+                          : 'افتح التطبيق ${s.streakNeeded} يوماً متتالياً لتحصل على'
                               ' ${s.streakAward} نقطة دفعة واحدة (3 نقاط عن كل يوم).',
                       style: const TextStyle(
                           color: AppColors.textMuted,
@@ -469,8 +473,8 @@ class _PointsPageState extends State<PointsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            'كل صديق يسجّل بكودك = ${arabicPoints(s.invitePoints)} فوراً، بلا حدّ يومي.'
-            ' أسرع طريق للمستوى التالي.',
+            'أرسل الكود إلى أصدقائك واجعلهم يستخدمونه عند إنشاء حسابهم'
+            ' في التطبيق لتحصل على ${arabicPoints(s.invitePoints)} فوراً.',
             style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 10),
@@ -707,8 +711,8 @@ class _PointsPageState extends State<PointsPage> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'يمكنك أيضاً استبدال ${s.redeemCost} نقطة لدى أي معلن مقابل خصم '
-              '${s.redeemDiscount}% — مرة كل 24 ساعة لكل معلن. تُخصم من الرصيد نفسه، '
+              'يمكنك استبدال ${s.redeemCost} نقطة لدى أي معلن مقابل خصم يحدده '
+              'صاحب المحل — مرة كل 24 ساعة لكل معلن. تُخصم من الرصيد نفسه، '
               'فتبتعد قليلاً عن مكافأة الـ${s.rewardIls} شيكل.',
               style: const TextStyle(
                   color: AppColors.textDark, fontSize: 13, height: 1.4),

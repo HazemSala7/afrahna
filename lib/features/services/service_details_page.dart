@@ -5,6 +5,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../bookings/booking_create_page.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 class ServiceDetailsPage extends StatefulWidget {
   const ServiceDetailsPage({
@@ -32,6 +33,7 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: AppColors.background,
       body: FutureBuilder<ServiceModel>(
         future: _future,

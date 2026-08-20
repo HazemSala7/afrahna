@@ -4,6 +4,7 @@ import '../../core/models/models.dart';
 import '../../core/services/accounts_services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// Account statement (كشف حساب) for a vendor: their subscriptions, payments
 /// made, and outstanding balances.
@@ -55,6 +56,7 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: const Color(0xFFFCF8F3),
       appBar: PinkAppBar(title: 'كشف حساب'),
       body: SafeArea(

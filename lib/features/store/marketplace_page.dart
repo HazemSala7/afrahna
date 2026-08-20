@@ -278,6 +278,9 @@ class _MarketplacePageState extends State<MarketplacePage> {
     final items = _visible;
 
     return AppScaffold(
+      // Already a tab inside the shell, which draws the bar itself — a second
+      // one here would stack two bars on top of each other.
+      showShellNav: false,
       appBar: const PinkAppBar(
         title: 'المتجر',
         subtitle: 'منتجات كل المحلات',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// Static definition of the 3 subscription tiers (prices + features) shown both
 /// as a selectable picker (delegate/admin) and a read-only view (vendor).
@@ -314,6 +315,7 @@ class SubscriptionPlansPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       appBar: AppBar(title: const Text('أسعار الاشتراكات')),
       body: ListView(
         padding: const EdgeInsets.all(16),

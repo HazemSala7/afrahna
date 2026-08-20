@@ -251,6 +251,7 @@ class ImageUploadField extends StatefulWidget {
     required this.onChanged,
     this.height = 140,
     this.fallbackIcon = Icons.image_outlined,
+    this.circular = false,
   });
 
   final String label;
@@ -266,6 +267,14 @@ class ImageUploadField extends StatefulWidget {
 
   final double height;
   final IconData fallbackIcon;
+
+  /// A round frame of [height] across, with the picture fitted whole inside
+  /// it instead of filled and cropped.
+  ///
+  /// A profile picture is usually a logo or a face — something with edges that
+  /// mean something. The rectangular field crops to fill, which cut «أفراحنا»
+  /// in half. Round and contained shows all of it and reads as an avatar.
+  final bool circular;
 
   @override
   State<ImageUploadField> createState() => _ImageUploadFieldState();
@@ -344,6 +353,9 @@ class _ImageUploadFieldState extends State<ImageUploadField> {
     );
   }
 
+  /// Whole, not cropped, when the frame is round.
+  BoxFit get _fit => widget.circular ? BoxFit.contain : BoxFit.cover;
+
   @override
   Widget build(BuildContext context) {
     final hasImage = (_localPath != null) ||
@@ -351,7 +363,9 @@ class _ImageUploadFieldState extends State<ImageUploadField> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: widget.circular
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
           Text(widget.label,
               style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -360,23 +374,46 @@ class _ImageUploadFieldState extends State<ImageUploadField> {
             onTap: _uploading ? null : _showSourceSheet,
             child: Container(
               height: widget.height,
-              width: double.infinity,
+              width: widget.circular ? widget.height : double.infinity,
+              alignment: widget.circular ? Alignment.center : null,
               decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: .3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primaryLight),
+                color: widget.circular
+                    ? Colors.white
+                    : AppColors.primaryLight.withValues(alpha: .3),
+                shape: widget.circular ? BoxShape.circle : BoxShape.rectangle,
+                borderRadius:
+                    widget.circular ? null : BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primaryLight,
+                  width: widget.circular ? 2 : 1,
+                ),
+                boxShadow: widget.circular
+                    ? [
+                        BoxShadow(
+                          color: AppColors.cardShadow,
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : null,
               ),
               clipBehavior: Clip.antiAlias,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   if (_localPath != null)
-                    Image.file(File(_localPath!), fit: BoxFit.cover)
+                    Padding(
+                      padding: EdgeInsets.all(widget.circular ? 10 : 0),
+                      child: Image.file(File(_localPath!), fit: _fit),
+                    )
                   else if (hasImage)
-                    AppNetworkImage(
-                      url: widget.url,
-                      fit: BoxFit.cover,
-                      fallbackIcon: widget.fallbackIcon,
+                    Padding(
+                      padding: EdgeInsets.all(widget.circular ? 10 : 0),
+                      child: AppNetworkImage(
+                        url: widget.url,
+                        fit: _fit,
+                        fallbackIcon: widget.fallbackIcon,
+                      ),
                     )
                   else
                     Center(
@@ -400,8 +437,8 @@ class _ImageUploadFieldState extends State<ImageUploadField> {
                     ),
                   if (hasImage && !_uploading)
                     Positioned(
-                      bottom: 8,
-                      left: 8,
+                      bottom: widget.circular ? 2 : 8,
+                      left: widget.circular ? 12 : 8,
                       child: Material(
                         color: Colors.black54,
                         shape: const CircleBorder(),

@@ -5,6 +5,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/story_viewer_page.dart';
+import '../../widgets/shell_bottom_nav.dart';
 
 /// App-wide stories screen: every vendor that has active stories, shown as
 /// Instagram-style rings. Tapping a ring opens that vendor's stories in the
@@ -57,6 +58,7 @@ class _AllStoriesPageState extends State<AllStoriesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const ShellBottomNav(),
       backgroundColor: AppColors.background,
       appBar: const PinkAppBar(title: 'القصص', showBack: false),
       body: FutureBuilder<List<_VendorStories>>(

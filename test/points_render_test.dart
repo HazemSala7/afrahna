@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:afrahna/core/api/api_client.dart';
 import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/points/points_page.dart';
+import 'package:afrahna/widgets/shell_bottom_nav.dart';
 
 /// Renders «نقاطي» against a canned summary so the rewards ladder can be
 /// looked at, not just compiled. Run with `--update-goldens` to refresh.
@@ -136,6 +137,8 @@ void main() {
       expect(find.text(name), findsWidgets, reason: 'rung $name missing');
     }
     expect(find.textContaining('باقي 137 نقطة'), findsOneWidget);
+    // The screen is pushed on top of the shell, so it carries the bar itself.
+    expect(find.byType(ShellBottomNav), findsOneWidget);
 
     await expectLater(
       find.byType(PointsPage),
@@ -149,7 +152,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     await _pumpPage(tester, _summary());
-    await tester.drag(find.byType(ListView), const Offset(0, -820));
+    await tester.drag(find.byType(ListView), const Offset(0, -1500));
     await tester.pump(const Duration(milliseconds: 900));
 
     await expectLater(
