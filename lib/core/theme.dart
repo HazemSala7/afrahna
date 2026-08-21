@@ -48,9 +48,20 @@ class AppAssets {
 class AppTheme {
   static ThemeData light() {
     final base = ThemeData.light(useMaterial3: true);
+    // google_fonts hands every style fontFamily 'Tajawal_regular' with
+    // fontFamilyFallback ['Tajawal'] — both the same face, neither carrying
+    // emoji glyphs, so the shaper has nothing to fall back to and every emoji
+    // in the UI (the section-header 📝 / ✨) shapes as tofu. Keep 'Tajawal' at
+    // the head of the chain and append the platform emoji faces behind it; a
+    // family the platform lacks is skipped, so naming both is safe.
     final textTheme = GoogleFonts.tajawalTextTheme(base.textTheme).apply(
       bodyColor: AppColors.textDark,
       displayColor: AppColors.textDark,
+      fontFamilyFallback: const [
+        'Tajawal',
+        'Apple Color Emoji',
+        'Noto Color Emoji',
+      ],
     );
 
     return base.copyWith(

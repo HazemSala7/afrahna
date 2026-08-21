@@ -28,6 +28,12 @@
 	<string>نحتاج إلى معرض الصور لاختيار صور الشعار والغلاف للمعلن.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>نستخدم موقعك لتحديد موقع المحل على الخريطة.</string>
+	<!-- The app only ever asks for "when in use" (Geolocator.requestPermission
+	     with no always-authorization call). Apple's static scan still flags the
+	     binary because the geolocator SDK links requestAlwaysAuthorization, and
+	     rejects the upload with ITMS-90683 unless this key is present. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>نستخدم موقعك أثناء استخدام التطبيق فقط لعرض المحلات والخدمات القريبة منك وتحديد موقع المحل على الخريطة.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -92,8 +98,6 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone to enable voice input for our AI chat assistant. Your voice data is used only for speech recognition during your chat sessions.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera for video chat and media features in the app. Camera access is only used when you explicitly enable it.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We need access to speech recognition to convert your voice input into text for the AI chat assistant.</string>
 </dict>
