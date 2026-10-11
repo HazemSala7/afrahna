@@ -8,6 +8,11 @@ import '../rewards_ladder.dart';
 T? _readT<T>(Map<String, dynamic> json, String key) =>
     json[key] is T ? json[key] as T : null;
 
+/// A per-shop switch from the server. Absent (an older server, or a list
+/// that does not carry it) means on: nothing a shop could do is hidden by a
+/// missing key.
+bool _flagOn(dynamic v) => v == null || v == true || v == 1 || v == '1';
+
 int? _toInt(dynamic v) {
   if (v == null) return null;
   if (v is int) return v;
@@ -169,100 +174,106 @@ class UserModel {
   int get tierGoal => RewardsLadder.goalFor(rewardsTaken);
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: _toInt(json['id']) ?? 0,
-        name: (json['name'] ?? '').toString(),
-        phone: (json['phone'] ?? '').toString(),
-        email: _readT<String>(json, 'email'),
-        role: _readT<String>(json, 'role'),
-        avatar: _readT<String>(json, 'avatar'),
-        isActive: json['is_active'] == null
-            ? true
-            : (json['is_active'] == true || json['is_active'] == 1),
-        delegateId: _toInt(json['delegate_id']),
-        workField: _readT<String>(json, 'work_field'),
-        cityId: _toInt(json['city_id']),
-        commissionPerSubscription: _toDouble(json['commission_per_subscription']),
-        permissions: json['permissions'] is Map
-            ? Map<String, dynamic>.from(json['permissions'] as Map)
-            : const {},
-        vendorName: json['vendor'] is Map
-            ? (_readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
-                _readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
-            : null,
-        vendorLogo: json['vendor'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
-            : null,
-        activePlan: _readT<String>(json, 'active_plan'),
-        notificationsEnabled: json['notifications_enabled'] == null
-            ? true
-            : (json['notifications_enabled'] == true ||
-                json['notifications_enabled'] == 1),
-        pointsBalance: _toInt(json['points_balance']) ?? 0,
-        pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
-        rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
-        referralCode: _readT<String>(json, 'referral_code'),
-        whatsapp: _readT<String>(json, 'whatsapp'),
-        instagram: _readT<String>(json, 'instagram'),
-        facebook: _readT<String>(json, 'facebook'),
-        tiktok: _readT<String>(json, 'tiktok'),
-        snapchat: _readT<String>(json, 'snapchat'),
-        createdAt: _toDate(json['created_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    name: (json['name'] ?? '').toString(),
+    phone: (json['phone'] ?? '').toString(),
+    email: _readT<String>(json, 'email'),
+    role: _readT<String>(json, 'role'),
+    avatar: _readT<String>(json, 'avatar'),
+    isActive: json['is_active'] == null
+        ? true
+        : (json['is_active'] == true || json['is_active'] == 1),
+    delegateId: _toInt(json['delegate_id']),
+    workField: _readT<String>(json, 'work_field'),
+    cityId: _toInt(json['city_id']),
+    commissionPerSubscription: _toDouble(json['commission_per_subscription']),
+    permissions: json['permissions'] is Map
+        ? Map<String, dynamic>.from(json['permissions'] as Map)
+        : const {},
+    vendorName: json['vendor'] is Map
+        ? (_readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_ar',
+              ) ??
+              _readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_en',
+              ))
+        : null,
+    vendorLogo: json['vendor'] is Map
+        ? _readT<String>(
+            Map<String, dynamic>.from(json['vendor'] as Map),
+            'logo',
+          )
+        : null,
+    activePlan: _readT<String>(json, 'active_plan'),
+    notificationsEnabled: json['notifications_enabled'] == null
+        ? true
+        : (json['notifications_enabled'] == true ||
+              json['notifications_enabled'] == 1),
+    pointsBalance: _toInt(json['points_balance']) ?? 0,
+    pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
+    rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
+    referralCode: _readT<String>(json, 'referral_code'),
+    whatsapp: _readT<String>(json, 'whatsapp'),
+    instagram: _readT<String>(json, 'instagram'),
+    facebook: _readT<String>(json, 'facebook'),
+    tiktok: _readT<String>(json, 'tiktok'),
+    snapchat: _readT<String>(json, 'snapchat'),
+    createdAt: _toDate(json['created_at']),
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'role': role,
-        'avatar': avatar,
-        'is_active': isActive,
-        'delegate_id': delegateId,
-        'work_field': workField,
-        'city_id': cityId,
-        'commission_per_subscription': commissionPerSubscription,
-        'permissions': permissions,
-        'notifications_enabled': notificationsEnabled,
-        'points_balance': pointsBalance,
-        'points_per_shekel': pointsPerShekel,
-        'rewards_taken': rewardsTaken,
-        'referral_code': referralCode,
-      };
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'email': email,
+    'role': role,
+    'avatar': avatar,
+    'is_active': isActive,
+    'delegate_id': delegateId,
+    'work_field': workField,
+    'city_id': cityId,
+    'commission_per_subscription': commissionPerSubscription,
+    'permissions': permissions,
+    'notifications_enabled': notificationsEnabled,
+    'points_balance': pointsBalance,
+    'points_per_shekel': pointsPerShekel,
+    'rewards_taken': rewardsTaken,
+    'referral_code': referralCode,
+  };
 
   UserModel copyWith({bool? notificationsEnabled}) => UserModel(
-        id: id,
-        name: name,
-        phone: phone,
-        email: email,
-        role: role,
-        avatar: avatar,
-        isActive: isActive,
-        delegateId: delegateId,
-        workField: workField,
-        cityId: cityId,
-        commissionPerSubscription: commissionPerSubscription,
-        permissions: permissions,
-        vendorName: vendorName,
-        vendorLogo: vendorLogo,
-        activePlan: activePlan,
-        notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
-        pointsBalance: pointsBalance,
-        pointsPerShekel: pointsPerShekel,
-        rewardsTaken: rewardsTaken,
-        referralCode: referralCode,
-        whatsapp: whatsapp,
-        instagram: instagram,
-        facebook: facebook,
-        tiktok: tiktok,
-        snapchat: snapchat,
-        createdAt: createdAt,
-      );
+    id: id,
+    name: name,
+    phone: phone,
+    email: email,
+    role: role,
+    avatar: avatar,
+    isActive: isActive,
+    delegateId: delegateId,
+    workField: workField,
+    cityId: cityId,
+    commissionPerSubscription: commissionPerSubscription,
+    permissions: permissions,
+    vendorName: vendorName,
+    vendorLogo: vendorLogo,
+    activePlan: activePlan,
+    notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+    pointsBalance: pointsBalance,
+    pointsPerShekel: pointsPerShekel,
+    rewardsTaken: rewardsTaken,
+    referralCode: referralCode,
+    whatsapp: whatsapp,
+    instagram: instagram,
+    facebook: facebook,
+    tiktok: tiktok,
+    snapchat: snapchat,
+    createdAt: createdAt,
+  );
 
-  bool get isVendor   => role == 'vendor';
-  bool get isAdmin    => role == 'admin';
+  bool get isVendor => role == 'vendor';
+  bool get isAdmin => role == 'admin';
   bool get isCustomer => role == 'customer';
   bool get isDelegate => role == 'delegate';
 
@@ -288,10 +299,10 @@ class CityModel {
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
 
   factory CityModel.fromJson(Map<String, dynamic> json) => CityModel(
-        id: _toInt(json['id']) ?? 0,
-        nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
-        nameEn: (json['name_en'] ?? '').toString(),
-      );
+    id: _toInt(json['id']) ?? 0,
+    nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
+    nameEn: (json['name_en'] ?? '').toString(),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -321,19 +332,19 @@ class CategoryModel {
   bool get hasChildren => children.isNotEmpty;
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) => CategoryModel(
-        id: _toInt(json['id']) ?? 0,
-        nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
-        nameEn: (json['name_en'] ?? '').toString(),
-        icon: _readT<String>(json, 'icon'),
-        slug: _readT<String>(json, 'slug'),
-        parentId: _toInt(json['parent_id']),
-        children: (json['children'] is List)
-            ? (json['children'] as List)
-                .whereType<Map>()
-                .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
-      );
+    id: _toInt(json['id']) ?? 0,
+    nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
+    nameEn: (json['name_en'] ?? '').toString(),
+    icon: _readT<String>(json, 'icon'),
+    slug: _readT<String>(json, 'slug'),
+    parentId: _toInt(json['parent_id']),
+    children: (json['children'] is List)
+        ? (json['children'] as List)
+              .whereType<Map>()
+              .map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+        : const [],
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +375,10 @@ class VendorModel {
     this.snapchat,
     this.facebook,
     this.website,
+    this.workingHours,
+    this.deliveryNote,
+    this.photosCount = 0,
+    this.videosCount = 0,
     this.latitude,
     this.longitude,
     this.minPrice,
@@ -379,6 +394,11 @@ class VendorModel {
     this.isPremium = false,
     this.isActive = true,
     this.isStore = false,
+    this.allowReels = true,
+    this.allowStories = true,
+    this.allowPosts = true,
+    this.allowOffers = true,
+    this.allowBookings = true,
     this.delegateName,
     this.ownerId,
     this.ownerName,
@@ -410,6 +430,17 @@ class VendorModel {
   final String? snapchat;
   final String? facebook;
   final String? website;
+
+  /// When the shop is open and whether it delivers, in the shop's own words.
+  /// Shown at the foot of its page beside the address; null hides the tile.
+  final String? workingHours;
+  final String? deliveryNote;
+
+  /// Photographs and videos the shop has put up, counted by the server for
+  /// the strip of numbers at the top of its page. Zero on list responses,
+  /// which do not carry them.
+  final int photosCount;
+  final int videosCount;
   final double? latitude;
   final double? longitude;
   final double? minPrice;
@@ -442,6 +473,15 @@ class VendorModel {
   /// Whether this vendor is a store (products + cart + orders enabled).
   final bool isStore;
 
+  /// The shop's switches, set by an admin. Off hides the feature in the
+  /// shop's own account and, for bookings, the button on its public page;
+  /// the server refuses the creation as well.
+  final bool allowReels;
+  final bool allowStories;
+  final bool allowPosts;
+  final bool allowOffers;
+  final bool allowBookings;
+
   /// Name of the delegate responsible for this shop's owner account.
   /// Only populated for admin requests (`/vendors` eager-loads it).
   final String? delegateName;
@@ -465,8 +505,9 @@ class VendorModel {
   final DateTime? createdAt;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
-  String get description =>
-      (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+  String get description => (descriptionAr?.isNotEmpty ?? false)
+      ? descriptionAr!
+      : (descriptionEn ?? '');
 
   /// Highest active subscription tier (vip > featured > normal), or null.
   String? get activePlan {
@@ -491,79 +532,92 @@ class VendorModel {
   }
 
   factory VendorModel.fromJson(Map<String, dynamic> json) => VendorModel(
-        id: _toInt(json['id']) ?? 0,
-        nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
-        nameEn: (json['name_en'] ?? '').toString(),
-        descriptionAr: _readT<String>(json, 'description_ar'),
-        descriptionEn: _readT<String>(json, 'description_en'),
-        logo: _readT<String>(json, 'logo'),
-        cover: _readT<String>(json, 'cover_image') ?? _readT<String>(json, 'cover'),
-        cityId: _toInt(json['city_id']),
-        categoryId: _toInt(json['category_id']),
-        city: json['city'] is Map
-            ? CityModel.fromJson(Map<String, dynamic>.from(json['city'] as Map))
-            : null,
-        category: json['category'] is Map
-            ? CategoryModel.fromJson(
-                Map<String, dynamic>.from(json['category'] as Map))
-            : null,
-        rating: _toDouble(json['rating']),
-        reviewsCount: _toInt(json['reviews_count']),
-        viewsCount: _toInt(json['views_count']) ?? 0,
-        phone: _readT<String>(json, 'phone'),
-        address: _readT<String>(json, 'address'),
-        whatsapp: _readT<String>(json, 'whatsapp'),
-        instagram: _readT<String>(json, 'instagram'),
-        tiktok: _readT<String>(json, 'tiktok'),
-        snapchat: _readT<String>(json, 'snapchat'),
-        facebook: _readT<String>(json, 'facebook'),
-        website: _readT<String>(json, 'website'),
-        latitude: _toDouble(json['latitude']),
-        longitude: _toDouble(json['longitude']),
-        minPrice: _toDouble(json['min_price']),
-        maxPrice: _toDouble(json['max_price']),
-        isFeatured: json['is_featured'] == true || json['is_featured'] == 1,
-        isVip: json['is_vip'] == true || json['is_vip'] == 1,
-        // VIP subscription also grants the verified badge.
-        isVerified: json['is_verified'] == true ||
-            json['is_verified'] == 1 ||
-            json['is_vip'] == true ||
-            json['is_vip'] == 1,
-        isFavorite: json['is_favorite'] == true,
-        isFollowing: json['is_following'] == true || json['is_following'] == 1,
-        followersCount: _toInt(json['followers_count']) ?? 0,
-        activePlans: (json['active_plans'] is List)
-            ? List<String>.from(
-                (json['active_plans'] as List).map((e) => e.toString()))
-            : const <String>[],
-        inSlider: json['in_slider'] == true || json['in_slider'] == 1,
-        isPremium: json['is_premium'] == true || json['is_premium'] == 1,
-        isActive: json['is_active'] == null
-            ? true
-            : (json['is_active'] == true || json['is_active'] == 1),
-        isStore: json['is_store'] == true || json['is_store'] == 1,
-        delegateName: json['user'] is Map &&
-                (json['user'] as Map)['delegate'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(
-                    (json['user'] as Map)['delegate'] as Map),
-                'name')
-            : null,
-        ownerId: json['user'] is Map
-            ? _toInt((json['user'] as Map)['id'])
-            : _toInt(json['user_id']),
-        ownerName: json['user'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(json['user'] as Map), 'name')
-            : null,
-        ownerPhone: json['user'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(json['user'] as Map), 'phone')
-            : null,
-        pointsBalance: _toInt(json['points_balance']) ?? 0,
-        beneficiariesCount: _toInt(json['beneficiaries_count']) ?? 0,
-        createdAt: _toDate(json['created_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
+    nameEn: (json['name_en'] ?? '').toString(),
+    descriptionAr: _readT<String>(json, 'description_ar'),
+    descriptionEn: _readT<String>(json, 'description_en'),
+    logo: _readT<String>(json, 'logo'),
+    cover: _readT<String>(json, 'cover_image') ?? _readT<String>(json, 'cover'),
+    cityId: _toInt(json['city_id']),
+    categoryId: _toInt(json['category_id']),
+    city: json['city'] is Map
+        ? CityModel.fromJson(Map<String, dynamic>.from(json['city'] as Map))
+        : null,
+    category: json['category'] is Map
+        ? CategoryModel.fromJson(
+            Map<String, dynamic>.from(json['category'] as Map),
+          )
+        : null,
+    rating: _toDouble(json['rating']),
+    reviewsCount: _toInt(json['reviews_count']),
+    viewsCount: _toInt(json['views_count']) ?? 0,
+    phone: _readT<String>(json, 'phone'),
+    address: _readT<String>(json, 'address'),
+    whatsapp: _readT<String>(json, 'whatsapp'),
+    instagram: _readT<String>(json, 'instagram'),
+    tiktok: _readT<String>(json, 'tiktok'),
+    snapchat: _readT<String>(json, 'snapchat'),
+    facebook: _readT<String>(json, 'facebook'),
+    website: _readT<String>(json, 'website'),
+    workingHours: _readT<String>(json, 'working_hours'),
+    deliveryNote: _readT<String>(json, 'delivery_note'),
+    photosCount: _toInt(json['photos_count']) ?? 0,
+    videosCount: _toInt(json['videos_count']) ?? 0,
+    latitude: _toDouble(json['latitude']),
+    longitude: _toDouble(json['longitude']),
+    minPrice: _toDouble(json['min_price']),
+    maxPrice: _toDouble(json['max_price']),
+    isFeatured: json['is_featured'] == true || json['is_featured'] == 1,
+    isVip: json['is_vip'] == true || json['is_vip'] == 1,
+    // VIP subscription also grants the verified badge.
+    isVerified:
+        json['is_verified'] == true ||
+        json['is_verified'] == 1 ||
+        json['is_vip'] == true ||
+        json['is_vip'] == 1,
+    isFavorite: json['is_favorite'] == true,
+    isFollowing: json['is_following'] == true || json['is_following'] == 1,
+    followersCount: _toInt(json['followers_count']) ?? 0,
+    activePlans: (json['active_plans'] is List)
+        ? List<String>.from(
+            (json['active_plans'] as List).map((e) => e.toString()),
+          )
+        : const <String>[],
+    inSlider: json['in_slider'] == true || json['in_slider'] == 1,
+    isPremium: json['is_premium'] == true || json['is_premium'] == 1,
+    isActive: json['is_active'] == null
+        ? true
+        : (json['is_active'] == true || json['is_active'] == 1),
+    isStore: json['is_store'] == true || json['is_store'] == 1,
+    allowReels: _flagOn(json['allow_reels']),
+    allowStories: _flagOn(json['allow_stories']),
+    allowPosts: _flagOn(json['allow_posts']),
+    allowOffers: _flagOn(json['allow_offers']),
+    allowBookings: _flagOn(json['allow_bookings']),
+    delegateName:
+        json['user'] is Map && (json['user'] as Map)['delegate'] is Map
+        ? _readT<String>(
+            Map<String, dynamic>.from((json['user'] as Map)['delegate'] as Map),
+            'name',
+          )
+        : null,
+    ownerId: json['user'] is Map
+        ? _toInt((json['user'] as Map)['id'])
+        : _toInt(json['user_id']),
+    ownerName: json['user'] is Map
+        ? _readT<String>(Map<String, dynamic>.from(json['user'] as Map), 'name')
+        : null,
+    ownerPhone: json['user'] is Map
+        ? _readT<String>(
+            Map<String, dynamic>.from(json['user'] as Map),
+            'phone',
+          )
+        : null,
+    pointsBalance: _toInt(json['points_balance']) ?? 0,
+    beneficiariesCount: _toInt(json['beneficiaries_count']) ?? 0,
+    createdAt: _toDate(json['created_at']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -596,8 +650,9 @@ class ServiceModel {
   final VendorModel? vendor;
 
   String get title => titleAr.isNotEmpty ? titleAr : titleEn;
-  String get description =>
-      (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+  String get description => (descriptionAr?.isNotEmpty ?? false)
+      ? descriptionAr!
+      : (descriptionEn ?? '');
 
   /// True when a valid discount (less than the base price) is set.
   bool get hasDiscount =>
@@ -614,21 +669,20 @@ class ServiceModel {
       hasDiscount ? (((price! - discountPrice!) / price!) * 100).round() : 0;
 
   factory ServiceModel.fromJson(Map<String, dynamic> json) => ServiceModel(
-        id: _toInt(json['id']) ?? 0,
-        titleAr: (json['title_ar'] ?? json['name_ar'] ?? json['title'] ?? '')
-            .toString(),
-        titleEn: (json['title_en'] ?? json['name_en'] ?? '').toString(),
-        descriptionAr: _readT<String>(json, 'description_ar'),
-        descriptionEn: _readT<String>(json, 'description_en'),
-        price: _toDouble(json['price']),
-        discountPrice: _toDouble(json['discount_price']),
-        image: _readT<String>(json, 'image'),
-        vendorId: _toInt(json['vendor_id']),
-        vendor: json['vendor'] is Map
-            ? VendorModel.fromJson(
-                Map<String, dynamic>.from(json['vendor'] as Map))
-            : null,
-      );
+    id: _toInt(json['id']) ?? 0,
+    titleAr: (json['title_ar'] ?? json['name_ar'] ?? json['title'] ?? '')
+        .toString(),
+    titleEn: (json['title_en'] ?? json['name_en'] ?? '').toString(),
+    descriptionAr: _readT<String>(json, 'description_ar'),
+    descriptionEn: _readT<String>(json, 'description_en'),
+    price: _toDouble(json['price']),
+    discountPrice: _toDouble(json['discount_price']),
+    image: _readT<String>(json, 'image'),
+    vendorId: _toInt(json['vendor_id']),
+    vendor: json['vendor'] is Map
+        ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
+        : null,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -651,6 +705,7 @@ class BookingModel {
     this.customer,
     this.eventTime,
     this.guestsCount,
+    this.statusLog = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -688,34 +743,37 @@ class BookingModel {
   final String? eventTime;
   final int? guestsCount;
 
+  /// Every change of status, oldest first — what the customer follows.
+  final List<StatusEvent> statusLog;
+
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
-        id: _toInt(json['id']) ?? 0,
-        eventDate:
-            _toDate(json['event_date']) ?? _toDate(json['date']) ?? DateTime.now(),
-        reference: _readT<String>(json, 'reference'),
-        status: _readT<String>(json, 'status'),
-        notes: _readT<String>(json, 'notes'),
-        cancellationReason: _readT<String>(json, 'cancellation_reason'),
-        totalPrice: _toDouble(json['total_price']),
-        serviceId: _toInt(json['service_id']),
-        vendorId: _toInt(json['vendor_id']),
-        service: json['service'] is Map
-            ? ServiceModel.fromJson(
-                Map<String, dynamic>.from(json['service'] as Map))
-            : null,
-        vendor: json['vendor'] is Map
-            ? VendorModel.fromJson(
-                Map<String, dynamic>.from(json['vendor'] as Map))
-            : null,
-        customer: json['user'] is Map
-            ? UserModel.fromJson(
-                Map<String, dynamic>.from(json['user'] as Map))
-            : null,
-        eventTime: _readT<String>(json, 'event_time'),
-        guestsCount: _toInt(json['guests_count']),
-        createdAt: _toDate(json['created_at']),
-        updatedAt: _toDate(json['updated_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    eventDate:
+        _toDate(json['event_date']) ?? _toDate(json['date']) ?? DateTime.now(),
+    reference: _readT<String>(json, 'reference'),
+    status: _readT<String>(json, 'status'),
+    notes: _readT<String>(json, 'notes'),
+    cancellationReason: _readT<String>(json, 'cancellation_reason'),
+    statusLog: StatusEvent.listFrom(json['status_log']),
+    totalPrice: _toDouble(json['total_price']),
+    serviceId: _toInt(json['service_id']),
+    vendorId: _toInt(json['vendor_id']),
+    service: json['service'] is Map
+        ? ServiceModel.fromJson(
+            Map<String, dynamic>.from(json['service'] as Map),
+          )
+        : null,
+    vendor: json['vendor'] is Map
+        ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
+        : null,
+    customer: json['user'] is Map
+        ? UserModel.fromJson(Map<String, dynamic>.from(json['user'] as Map))
+        : null,
+    eventTime: _readT<String>(json, 'event_time'),
+    guestsCount: _toInt(json['guests_count']),
+    createdAt: _toDate(json['created_at']),
+    updatedAt: _toDate(json['updated_at']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -748,17 +806,16 @@ class ReviewModel {
       (user?.name.isNotEmpty ?? false) ? user!.name : (guestName ?? 'مستخدم');
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) => ReviewModel(
-        id: _toInt(json['id']) ?? 0,
-        rating: _toDouble(json['rating']) ?? 0,
-        comment: _readT<String>(json, 'comment'),
-        user: json['user'] is Map
-            ? UserModel.fromJson(
-                Map<String, dynamic>.from(json['user'] as Map))
-            : null,
-        guestName: _readT<String>(json, 'guest_name'),
-        vendorId: _toInt(json['vendor_id']),
-        createdAt: _toDate(json['created_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    rating: _toDouble(json['rating']) ?? 0,
+    comment: _readT<String>(json, 'comment'),
+    user: json['user'] is Map
+        ? UserModel.fromJson(Map<String, dynamic>.from(json['user'] as Map))
+        : null,
+    guestName: _readT<String>(json, 'guest_name'),
+    vendorId: _toInt(json['vendor_id']),
+    createdAt: _toDate(json['created_at']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -792,6 +849,7 @@ class PromotionModel {
   final String? descriptionAr;
   final String? descriptionEn;
   final String? image;
+
   /// Gallery of full-quality images (cover first). Falls back to [image].
   final List<String> images;
   final double? discountPercent;
@@ -807,8 +865,9 @@ class PromotionModel {
   final VendorModel? vendor;
 
   String get title => titleAr.isNotEmpty ? titleAr : titleEn;
-  String get description =>
-      (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+  String get description => (descriptionAr?.isNotEmpty ?? false)
+      ? descriptionAr!
+      : (descriptionEn ?? '');
 
   /// All displayable images: the gallery if present, otherwise the cover.
   List<String> get gallery {
@@ -821,34 +880,35 @@ class PromotionModel {
   String get discountLabel {
     final v = discountValue ?? discountPercent;
     if (v == null || v <= 0) return '';
-    final n = v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    final n = v == v.roundToDouble()
+        ? v.toStringAsFixed(0)
+        : v.toStringAsFixed(2);
     return discountType == 'fixed' ? '$n ₪' : '$n%';
   }
 
   factory PromotionModel.fromJson(Map<String, dynamic> json) => PromotionModel(
-        id: _toInt(json['id']) ?? 0,
-        titleAr: (json['title_ar'] ?? json['title'] ?? '').toString(),
-        titleEn: (json['title_en'] ?? '').toString(),
-        descriptionAr: _readT<String>(json, 'description_ar'),
-        descriptionEn: _readT<String>(json, 'description_en'),
-        image: _readT<String>(json, 'image'),
-        images: _toStringList(json['images']),
-        discountPercent: _toDouble(json['discount_percent']),
-        discountType: _readT<String>(json, 'discount_type'),
-        discountValue: _toDouble(json['discount_value']),
-        startsAt: _toDate(json['starts_at']),
-        endsAt: _toDate(json['ends_at']),
-        startDate: _toDate(json['start_date']),
-        endDate: _toDate(json['end_date']),
-        isActive: json['is_active'] == null
-            ? true
-            : (json['is_active'] == true || json['is_active'] == 1),
-        vendorId: _toInt(json['vendor_id']),
-        vendor: json['vendor'] is Map
-            ? VendorModel.fromJson(
-                Map<String, dynamic>.from(json['vendor'] as Map))
-            : null,
-      );
+    id: _toInt(json['id']) ?? 0,
+    titleAr: (json['title_ar'] ?? json['title'] ?? '').toString(),
+    titleEn: (json['title_en'] ?? '').toString(),
+    descriptionAr: _readT<String>(json, 'description_ar'),
+    descriptionEn: _readT<String>(json, 'description_en'),
+    image: _readT<String>(json, 'image'),
+    images: _toStringList(json['images']),
+    discountPercent: _toDouble(json['discount_percent']),
+    discountType: _readT<String>(json, 'discount_type'),
+    discountValue: _toDouble(json['discount_value']),
+    startsAt: _toDate(json['starts_at']),
+    endsAt: _toDate(json['ends_at']),
+    startDate: _toDate(json['start_date']),
+    endDate: _toDate(json['end_date']),
+    isActive: json['is_active'] == null
+        ? true
+        : (json['is_active'] == true || json['is_active'] == 1),
+    vendorId: _toInt(json['vendor_id']),
+    vendor: json['vendor'] is Map
+        ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
+        : null,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -888,22 +948,21 @@ class StoryModel {
       (captionAr?.isNotEmpty ?? false) ? captionAr! : (captionEn ?? '');
 
   factory StoryModel.fromJson(Map<String, dynamic> json) => StoryModel(
-        id: _toInt(json['id']) ?? 0,
-        image: (json['image'] ?? '').toString(),
-        captionAr: _readT<String>(json, 'caption_ar'),
-        captionEn: _readT<String>(json, 'caption_en'),
-        vendorId: _toInt(json['vendor_id']),
-        vendor: json['vendor'] is Map
-            ? VendorModel.fromJson(
-                Map<String, dynamic>.from(json['vendor'] as Map))
-            : null,
-        createdAt: _toDate(json['created_at']),
-        expiresAt: _toDate(json['expires_at']),
-        isApproved: json['is_approved'] == null
-            ? true
-            : (json['is_approved'] == true || json['is_approved'] == 1),
-        viewsCount: _toInt(json['views_count']) ?? 0,
-      );
+    id: _toInt(json['id']) ?? 0,
+    image: (json['image'] ?? '').toString(),
+    captionAr: _readT<String>(json, 'caption_ar'),
+    captionEn: _readT<String>(json, 'caption_en'),
+    vendorId: _toInt(json['vendor_id']),
+    vendor: json['vendor'] is Map
+        ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
+        : null,
+    createdAt: _toDate(json['created_at']),
+    expiresAt: _toDate(json['expires_at']),
+    isApproved: json['is_approved'] == null
+        ? true
+        : (json['is_approved'] == true || json['is_approved'] == 1),
+    viewsCount: _toInt(json['views_count']) ?? 0,
+  );
 }
 
 class VendorStoriesGroup {
@@ -917,10 +976,7 @@ class VendorStoriesGroup {
         .whereType<Map>()
         .map((m) => StoryModel.fromJson(Map<String, dynamic>.from(m)))
         .toList();
-    return VendorStoriesGroup(
-      vendor: VendorModel.fromJson(v),
-      stories: list,
-    );
+    return VendorStoriesGroup(vendor: VendorModel.fromJson(v), stories: list);
   }
 }
 
@@ -983,18 +1039,17 @@ class HighlightModel {
       : (items.isNotEmpty ? items.first.mediaUrl : null);
 
   factory HighlightModel.fromJson(Map<String, dynamic> json) => HighlightModel(
-        id: _toInt(json['id']) ?? 0,
-        title: (json['title'] ?? '').toString(),
-        coverImage: _readT<String>(json, 'cover_image'),
-        vendorId: _toInt(json['vendor_id']),
-        sortOrder: _toInt(json['sort_order']) ?? 0,
-        isActive: json['is_active'] == true || json['is_active'] == 1,
-        items: (json['items'] as List? ?? const [])
-            .whereType<Map>()
-            .map((m) =>
-                HighlightItemModel.fromJson(Map<String, dynamic>.from(m)))
-            .toList(),
-      );
+    id: _toInt(json['id']) ?? 0,
+    title: (json['title'] ?? '').toString(),
+    coverImage: _readT<String>(json, 'cover_image'),
+    vendorId: _toInt(json['vendor_id']),
+    sortOrder: _toInt(json['sort_order']) ?? 0,
+    isActive: json['is_active'] == true || json['is_active'] == 1,
+    items: (json['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((m) => HighlightItemModel.fromJson(Map<String, dynamic>.from(m)))
+        .toList(),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1038,26 +1093,25 @@ class SliderModel {
       (titleAr?.isNotEmpty ?? false) ? titleAr! : (titleEn ?? '');
   String get subtitle =>
       (subtitleAr?.isNotEmpty ?? false) ? subtitleAr! : (subtitleEn ?? '');
-  String get cta =>
-      (ctaAr?.isNotEmpty ?? false) ? ctaAr! : (ctaEn ?? '');
+  String get cta => (ctaAr?.isNotEmpty ?? false) ? ctaAr! : (ctaEn ?? '');
   String get badge =>
       (badgeAr?.isNotEmpty ?? false) ? badgeAr! : (badgeEn ?? '');
 
   factory SliderModel.fromJson(Map<String, dynamic> json) => SliderModel(
-        id: _toInt(json['id']) ?? 0,
-        image: (json['image'] ?? '').toString(),
-        titleAr: _readT<String>(json, 'title_ar'),
-        titleEn: _readT<String>(json, 'title_en'),
-        subtitleAr: _readT<String>(json, 'subtitle_ar'),
-        subtitleEn: _readT<String>(json, 'subtitle_en'),
-        ctaAr: _readT<String>(json, 'cta_ar'),
-        ctaEn: _readT<String>(json, 'cta_en'),
-        badgeAr: _readT<String>(json, 'badge_ar'),
-        badgeEn: _readT<String>(json, 'badge_en'),
-        link: _readT<String>(json, 'link'),
-        vendorId: _toInt(json['vendor_id']),
-        sortOrder: _toInt(json['sort_order']) ?? 0,
-      );
+    id: _toInt(json['id']) ?? 0,
+    image: (json['image'] ?? '').toString(),
+    titleAr: _readT<String>(json, 'title_ar'),
+    titleEn: _readT<String>(json, 'title_en'),
+    subtitleAr: _readT<String>(json, 'subtitle_ar'),
+    subtitleEn: _readT<String>(json, 'subtitle_en'),
+    ctaAr: _readT<String>(json, 'cta_ar'),
+    ctaEn: _readT<String>(json, 'cta_en'),
+    badgeAr: _readT<String>(json, 'badge_ar'),
+    badgeEn: _readT<String>(json, 'badge_en'),
+    link: _readT<String>(json, 'link'),
+    vendorId: _toInt(json['vendor_id']),
+    sortOrder: _toInt(json['sort_order']) ?? 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1096,22 +1150,21 @@ class NotificationModel {
 
   String get title =>
       (titleAr?.isNotEmpty ?? false) ? titleAr! : (titleEn ?? '');
-  String get body =>
-      (bodyAr?.isNotEmpty ?? false) ? bodyAr! : (bodyEn ?? '');
+  String get body => (bodyAr?.isNotEmpty ?? false) ? bodyAr! : (bodyEn ?? '');
 
   NotificationModel copyWith({DateTime? readAt}) => NotificationModel(
-        id: id,
-        userId: userId,
-        titleAr: titleAr,
-        titleEn: titleEn,
-        bodyAr: bodyAr,
-        bodyEn: bodyEn,
-        type: type,
-        image: image,
-        link: link,
-        readAt: readAt ?? this.readAt,
-        createdAt: createdAt,
-      );
+    id: id,
+    userId: userId,
+    titleAr: titleAr,
+    titleEn: titleEn,
+    bodyAr: bodyAr,
+    bodyEn: bodyEn,
+    type: type,
+    image: image,
+    link: link,
+    readAt: readAt ?? this.readAt,
+    createdAt: createdAt,
+  );
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
@@ -1138,7 +1191,6 @@ class NotificationModel {
     );
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // SUBSCRIPTION
@@ -1197,36 +1249,43 @@ class SubscriptionModel {
 
   bool get isFullyPaid => remaining <= 0;
 
-  factory SubscriptionModel.fromJson(Map<String, dynamic> json) => SubscriptionModel(
-        id: _toInt(json['id']) ?? 0,
-        userId: _toInt(json['user_id']) ?? 0,
-        delegateId: _toInt(json['delegate_id']),
-        cityId: _toInt(json['city_id']),
-        clientName: (json['client_name'] ?? '').toString(),
-        clientPhone: (json['client_phone'] ?? '').toString(),
-        workField: _readT<String>(json, 'work_field'),
-        planName: (json['plan_name'] ?? 'standard').toString(),
-        amountPaid: _toDouble(json['amount_paid']) ?? 0,
-        totalAmount: _toDouble(json['total_amount']) ?? (_toDouble(json['amount_paid']) ?? 0),
-        commissionAmount: _toDouble(json['commission_amount']) ?? 0,
-        commissionPaid: json['commission_paid'] == true || json['commission_paid'] == 1,
-        paymentMethod: _readT<String>(json, 'payment_method'),
-        startDate: _toDate(json['start_date']) ?? DateTime.now(),
-        endDate: _toDate(json['end_date']) ?? DateTime.now(),
-        status: (json['status'] ?? 'active').toString(),
-        notes: _readT<String>(json, 'notes'),
-        client: json['client'] is Map
-            ? UserModel.fromJson(Map<String, dynamic>.from(json['client'] as Map))
-            : null,
-        delegate: json['delegate'] is Map
-            ? UserModel.fromJson(Map<String, dynamic>.from(json['delegate'] as Map))
-            : null,
-        payments: (json['payments'] as List? ?? const [])
-            .whereType<Map>()
-            .map((m) =>
-                SubscriptionPaymentModel.fromJson(Map<String, dynamic>.from(m)))
-            .toList(),
-      );
+  factory SubscriptionModel.fromJson(
+    Map<String, dynamic> json,
+  ) => SubscriptionModel(
+    id: _toInt(json['id']) ?? 0,
+    userId: _toInt(json['user_id']) ?? 0,
+    delegateId: _toInt(json['delegate_id']),
+    cityId: _toInt(json['city_id']),
+    clientName: (json['client_name'] ?? '').toString(),
+    clientPhone: (json['client_phone'] ?? '').toString(),
+    workField: _readT<String>(json, 'work_field'),
+    planName: (json['plan_name'] ?? 'standard').toString(),
+    amountPaid: _toDouble(json['amount_paid']) ?? 0,
+    totalAmount:
+        _toDouble(json['total_amount']) ??
+        (_toDouble(json['amount_paid']) ?? 0),
+    commissionAmount: _toDouble(json['commission_amount']) ?? 0,
+    commissionPaid:
+        json['commission_paid'] == true || json['commission_paid'] == 1,
+    paymentMethod: _readT<String>(json, 'payment_method'),
+    startDate: _toDate(json['start_date']) ?? DateTime.now(),
+    endDate: _toDate(json['end_date']) ?? DateTime.now(),
+    status: (json['status'] ?? 'active').toString(),
+    notes: _readT<String>(json, 'notes'),
+    client: json['client'] is Map
+        ? UserModel.fromJson(Map<String, dynamic>.from(json['client'] as Map))
+        : null,
+    delegate: json['delegate'] is Map
+        ? UserModel.fromJson(Map<String, dynamic>.from(json['delegate'] as Map))
+        : null,
+    payments: (json['payments'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (m) =>
+              SubscriptionPaymentModel.fromJson(Map<String, dynamic>.from(m)),
+        )
+        .toList(),
+  );
 
   bool get isActive => status == 'active';
 }
@@ -1264,17 +1323,23 @@ enum PostType { post, reel, course }
 
 PostType postTypeFrom(String s) {
   switch (s) {
-    case 'reel':   return PostType.reel;
-    case 'course': return PostType.course;
-    default:       return PostType.post;
+    case 'reel':
+      return PostType.reel;
+    case 'course':
+      return PostType.course;
+    default:
+      return PostType.post;
   }
 }
 
 String postTypeTo(PostType t) {
   switch (t) {
-    case PostType.reel:   return 'reel';
-    case PostType.course: return 'course';
-    case PostType.post:   return 'post';
+    case PostType.reel:
+      return 'reel';
+    case PostType.course:
+      return 'course';
+    case PostType.post:
+      return 'post';
   }
 }
 
@@ -1316,6 +1381,7 @@ class PostModel {
     final m = mediaUrl;
     return (m != null && m.isNotEmpty) ? [m] : const [];
   }
+
   final double? price;
   final String? duration;
   final int likesCount;
@@ -1327,27 +1393,27 @@ class PostModel {
   final DateTime? createdAt;
 
   factory PostModel.fromJson(Map<String, dynamic> json) => PostModel(
-        id: _toInt(json['id']) ?? 0,
-        vendorId: _toInt(json['vendor_id']) ?? 0,
-        userId: _toInt(json['user_id']) ?? 0,
-        type: postTypeFrom((json['type'] ?? 'post').toString()),
-        title: _readT<String>(json, 'title'),
-        body: _readT<String>(json, 'body'),
-        mediaUrl: _readT<String>(json, 'media_url'),
-        thumbnail: _readT<String>(json, 'thumbnail'),
-        images: _toStringList(json['images']),
-        price: _toDouble(json['price']),
-        duration: _readT<String>(json, 'duration'),
-        likesCount: _toInt(json['likes_count']) ?? 0,
-        viewsCount: _toInt(json['views_count']) ?? 0,
-        commentsCount: _toInt(json['comments_count']) ?? 0,
-        isPublished: json['is_published'] == true || json['is_published'] == 1,
-        isLiked: json['is_liked'] == true || json['is_liked'] == 1,
-        vendor: json['vendor'] is Map
-            ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
-            : null,
-        createdAt: _toDate(json['created_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    vendorId: _toInt(json['vendor_id']) ?? 0,
+    userId: _toInt(json['user_id']) ?? 0,
+    type: postTypeFrom((json['type'] ?? 'post').toString()),
+    title: _readT<String>(json, 'title'),
+    body: _readT<String>(json, 'body'),
+    mediaUrl: _readT<String>(json, 'media_url'),
+    thumbnail: _readT<String>(json, 'thumbnail'),
+    images: _toStringList(json['images']),
+    price: _toDouble(json['price']),
+    duration: _readT<String>(json, 'duration'),
+    likesCount: _toInt(json['likes_count']) ?? 0,
+    viewsCount: _toInt(json['views_count']) ?? 0,
+    commentsCount: _toInt(json['comments_count']) ?? 0,
+    isPublished: json['is_published'] == true || json['is_published'] == 1,
+    isLiked: json['is_liked'] == true || json['is_liked'] == 1,
+    vendor: json['vendor'] is Map
+        ? VendorModel.fromJson(Map<String, dynamic>.from(json['vendor'] as Map))
+        : null,
+    createdAt: _toDate(json['created_at']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1381,7 +1447,8 @@ class PostCommentModel {
   String get displayName =>
       (user?.name.isNotEmpty ?? false) ? user!.name : (guestName ?? 'مستخدم');
 
-  factory PostCommentModel.fromJson(Map<String, dynamic> json) => PostCommentModel(
+  factory PostCommentModel.fromJson(Map<String, dynamic> json) =>
+      PostCommentModel(
         id: _toInt(json['id']) ?? 0,
         postId: _toInt(json['post_id']) ?? 0,
         userId: _toInt(json['user_id']) ?? 0,
@@ -1414,7 +1481,8 @@ class CommissionsTotals {
   final double unpaidCommission;
   final int count;
 
-  factory CommissionsTotals.fromJson(Map<String, dynamic> json) => CommissionsTotals(
+  factory CommissionsTotals.fromJson(Map<String, dynamic> json) =>
+      CommissionsTotals(
         totalCollected: _toDouble(json['total_collected']) ?? 0,
         totalCommission: _toDouble(json['total_commission']) ?? 0,
         paidCommission: _toDouble(json['paid_commission']) ?? 0,
@@ -1473,14 +1541,16 @@ class ProductModel {
   final int? vendorReviewsCount;
 
   String get name => nameAr.isNotEmpty ? nameAr : nameEn;
-  String get description =>
-      (descriptionAr?.isNotEmpty ?? false) ? descriptionAr! : (descriptionEn ?? '');
+  String get description => (descriptionAr?.isNotEmpty ?? false)
+      ? descriptionAr!
+      : (descriptionEn ?? '');
 
   /// The price a customer actually pays (discount when present).
   double get effectivePrice =>
       (discountPrice != null && discountPrice! > 0) ? discountPrice! : price;
 
-  bool get hasDiscount => discountPrice != null && discountPrice! > 0 && discountPrice! < price;
+  bool get hasDiscount =>
+      discountPrice != null && discountPrice! > 0 && discountPrice! < price;
 
   /// All displayable images: gallery if present, otherwise the cover.
   List<String> get gallery {
@@ -1490,38 +1560,44 @@ class ProductModel {
   }
 
   factory ProductModel.fromJson(Map<String, dynamic> json) => ProductModel(
-        id: _toInt(json['id']) ?? 0,
-        vendorId: _toInt(json['vendor_id']) ?? 0,
-        sectionId: _toInt(json['section_id']),
-        nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
-        nameEn: (json['name_en'] ?? '').toString(),
-        descriptionAr: _readT<String>(json, 'description_ar'),
-        descriptionEn: _readT<String>(json, 'description_en'),
-        image: _readT<String>(json, 'image'),
-        images: _toStringList(json['images']),
-        price: _toDouble(json['price']) ?? 0,
-        discountPrice: _toDouble(json['discount_price']),
-        isAvailable: json['is_available'] == null
-            ? true
-            : (json['is_available'] == true || json['is_available'] == 1),
-        sort: _toInt(json['sort']) ?? 0,
-        vendorName: json['vendor'] is Map
-            ? (_readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
-                _readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
-            : null,
-        vendorLogo: json['vendor'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(json['vendor'] as Map), 'logo')
-            : null,
-        vendorRating: json['vendor'] is Map
-            ? _toDouble((json['vendor'] as Map)['rating'])
-            : null,
-        vendorReviewsCount: json['vendor'] is Map
-            ? _toInt((json['vendor'] as Map)['reviews_count'])
-            : null,
-      );
+    id: _toInt(json['id']) ?? 0,
+    vendorId: _toInt(json['vendor_id']) ?? 0,
+    sectionId: _toInt(json['section_id']),
+    nameAr: (json['name_ar'] ?? json['name'] ?? '').toString(),
+    nameEn: (json['name_en'] ?? '').toString(),
+    descriptionAr: _readT<String>(json, 'description_ar'),
+    descriptionEn: _readT<String>(json, 'description_en'),
+    image: _readT<String>(json, 'image'),
+    images: _toStringList(json['images']),
+    price: _toDouble(json['price']) ?? 0,
+    discountPrice: _toDouble(json['discount_price']),
+    isAvailable: json['is_available'] == null
+        ? true
+        : (json['is_available'] == true || json['is_available'] == 1),
+    sort: _toInt(json['sort']) ?? 0,
+    vendorName: json['vendor'] is Map
+        ? (_readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_ar',
+              ) ??
+              _readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_en',
+              ))
+        : null,
+    vendorLogo: json['vendor'] is Map
+        ? _readT<String>(
+            Map<String, dynamic>.from(json['vendor'] as Map),
+            'logo',
+          )
+        : null,
+    vendorRating: json['vendor'] is Map
+        ? _toDouble((json['vendor'] as Map)['rating'])
+        : null,
+    vendorReviewsCount: json['vendor'] is Map
+        ? _toInt((json['vendor'] as Map)['reviews_count'])
+        : null,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1562,6 +1638,41 @@ class ProductSectionModel {
 // STORE ORDER (invoice)
 // ---------------------------------------------------------------------------
 
+/// One step in the life of an order or a booking, as the API records it:
+/// the status reached, who moved it (`customer`, `vendor` or `admin`), when,
+/// and the reason they gave, if any.
+class StatusEvent {
+  const StatusEvent({
+    required this.status,
+    required this.by,
+    this.at,
+    this.note,
+  });
+
+  final String status;
+  final String by;
+  final DateTime? at;
+  final String? note;
+
+  factory StatusEvent.fromJson(Map<String, dynamic> json) => StatusEvent(
+    status: (json['status'] ?? '').toString(),
+    by: (json['by'] ?? '').toString(),
+    at: _toDate(json['at'])?.toLocal(),
+    note: _readT<String>(json, 'note'),
+  );
+
+  /// The `status_log` array, oldest first. Rows from before the API kept a
+  /// history have none, and read as empty.
+  static List<StatusEvent> listFrom(dynamic v) {
+    if (v is! List) return const [];
+    return v
+        .whereType<Map>()
+        .map((e) => StatusEvent.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.status.isNotEmpty)
+        .toList();
+  }
+}
+
 class OrderItemModel {
   OrderItemModel({
     required this.productId,
@@ -1580,12 +1691,12 @@ class OrderItemModel {
   double get subtotal => price * quantity;
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) => OrderItemModel(
-        productId: _toInt(json['product_id']) ?? 0,
-        name: (json['name'] ?? '').toString(),
-        image: _readT<String>(json, 'image'),
-        price: _toDouble(json['price']) ?? 0,
-        quantity: _toInt(json['quantity']) ?? 1,
-      );
+    productId: _toInt(json['product_id']) ?? 0,
+    name: (json['name'] ?? '').toString(),
+    image: _readT<String>(json, 'image'),
+    price: _toDouble(json['price']) ?? 0,
+    quantity: _toInt(json['quantity']) ?? 1,
+  );
 }
 
 class OrderModel {
@@ -1603,7 +1714,9 @@ class OrderModel {
     this.items = const [],
     required this.total,
     this.status = 'pending',
+    this.statusLog = const [],
     this.createdAt,
+    this.updatedAt,
   });
 
   final int id;
@@ -1627,7 +1740,11 @@ class OrderModel {
   final List<OrderItemModel> items;
   final double total;
   final String status;
+
+  /// Every change of status, oldest first — what the customer follows.
+  final List<StatusEvent> statusLog;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   /// One-line address, e.g. «الخليل — وادي الهرية، بالقرب من مسجد الرحمة».
   String get addressLine {
@@ -1645,34 +1762,42 @@ class OrderModel {
   }
 
   factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
-        id: _toInt(json['id']) ?? 0,
-        vendorId: _toInt(json['vendor_id']) ?? 0,
-        vendorName: json['vendor'] is Map
-            ? (_readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_ar') ??
-                _readT<String>(
-                    Map<String, dynamic>.from(json['vendor'] as Map), 'name_en'))
-            : null,
-        customerName: _readT<String>(json, 'customer_name'),
-        customerPhone: _readT<String>(json, 'customer_phone'),
-        cityId: _toInt(json['city_id']),
-        cityName: json['city'] is Map
-            ? _readT<String>(
-                Map<String, dynamic>.from(json['city'] as Map), 'name_ar')
-            : null,
-        area: _readT<String>(json, 'area'),
-        landmark: _readT<String>(json, 'landmark'),
-        note: _readT<String>(json, 'note'),
-        items: json['items'] is List
-            ? (json['items'] as List)
-                .whereType<Map>()
-                .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
-        total: _toDouble(json['total']) ?? 0,
-        status: (json['status'] ?? 'pending').toString(),
-        createdAt: _toDate(json['created_at']),
-      );
+    id: _toInt(json['id']) ?? 0,
+    vendorId: _toInt(json['vendor_id']) ?? 0,
+    vendorName: json['vendor'] is Map
+        ? (_readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_ar',
+              ) ??
+              _readT<String>(
+                Map<String, dynamic>.from(json['vendor'] as Map),
+                'name_en',
+              ))
+        : null,
+    customerName: _readT<String>(json, 'customer_name'),
+    customerPhone: _readT<String>(json, 'customer_phone'),
+    cityId: _toInt(json['city_id']),
+    cityName: json['city'] is Map
+        ? _readT<String>(
+            Map<String, dynamic>.from(json['city'] as Map),
+            'name_ar',
+          )
+        : null,
+    area: _readT<String>(json, 'area'),
+    landmark: _readT<String>(json, 'landmark'),
+    note: _readT<String>(json, 'note'),
+    items: json['items'] is List
+        ? (json['items'] as List)
+              .whereType<Map>()
+              .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+        : const [],
+    total: _toDouble(json['total']) ?? 0,
+    status: (json['status'] ?? 'pending').toString(),
+    statusLog: StatusEvent.listFrom(json['status_log']),
+    createdAt: _toDate(json['created_at']),
+    updatedAt: _toDate(json['updated_at']),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1721,7 +1846,8 @@ class CompetitionModel {
         description: _readT<String>(json, 'description'),
         sponsor: json['sponsor'] is Map
             ? VendorModel.fromJson(
-                Map<String, dynamic>.from(json['sponsor'] as Map))
+                Map<String, dynamic>.from(json['sponsor'] as Map),
+              )
             : null,
         teamAName: (json['team_a_name'] ?? '').toString(),
         teamAFlag: _readT<String>(json, 'team_a_flag'),
@@ -1749,7 +1875,8 @@ class PredictionModel {
   final String winner;
   final String? score;
 
-  factory PredictionModel.fromJson(Map<String, dynamic> json) => PredictionModel(
+  factory PredictionModel.fromJson(Map<String, dynamic> json) =>
+      PredictionModel(
         id: _toInt(json['id']) ?? 0,
         competitionId: _toInt(json['competition_id']) ?? 0,
         winner: (json['winner'] ?? '').toString(),
@@ -1818,13 +1945,30 @@ class PointRewardModel {
   final DateTime? createdAt;
 
   factory PointRewardModel.fromJson(Map<String, dynamic> j) => PointRewardModel(
-        id: _toInt(j['id']) ?? 0,
-        points: _toInt(j['points']) ?? 0,
-        amountIls: _toInt(j['amount_ils']) ?? 0,
-        tier: (j['tier'] ?? '').toString(),
-        level: _toInt(j['level']) ?? 1,
-        createdAt: DateTime.tryParse(j['created_at']?.toString() ?? ''),
-      );
+    id: _toInt(j['id']) ?? 0,
+    points: _toInt(j['points']) ?? 0,
+    amountIls: _toInt(j['amount_ils']) ?? 0,
+    tier: (j['tier'] ?? '').toString(),
+    level: _toInt(j['level']) ?? 1,
+    createdAt: DateTime.tryParse(j['created_at']?.toString() ?? ''),
+  );
+}
+
+/// A friend who joined from this member's invitation.
+///
+/// Name and date only. See `PointsService.invitees`.
+class Invitee {
+  const Invitee({required this.id, required this.name, this.joinedAt});
+
+  final int id;
+  final String name;
+  final DateTime? joinedAt;
+
+  factory Invitee.fromJson(Map<String, dynamic> j) => Invitee(
+    id: (j['id'] as num?)?.toInt() ?? 0,
+    name: (j['name'] ?? '').toString(),
+    joinedAt: DateTime.tryParse(j['joined_at']?.toString() ?? ''),
+  );
 }
 
 class PointsSummary {
@@ -1913,44 +2057,49 @@ class PointsSummary {
   }
 
   factory PointsSummary.fromJson(Map<String, dynamic> json) => PointsSummary(
-        balance: _toInt(json['balance']) ?? 0,
-        breakdown: _intMap(json['breakdown']),
-        progress: _intMap(json['progress']),
-        redemptions: (json['redemptions'] is List)
-            ? (json['redemptions'] as List)
-                .whereType<Map>()
-                .map((e) =>
-                    PointRedemptionModel.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
-        referralCode: _readT<String>(json, 'referral_code'),
-        invitesCount: _toInt(json['invites_count']) ?? 0,
-        threshold: _toInt(json['threshold']) ?? 10,
-        tier: (json['tier'] ?? 'برونزي').toString(),
-        level: _toInt(json['level']) ?? 1,
-        goal: _toInt(json['goal']) ?? 100,
-        rewardIls: _toInt(json['reward_ils']) ?? 50,
-        canClaim: json['can_claim'] == true,
-        rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
-        dailyCap: _toInt(json['daily_cap']) ?? 3,
-        dailyUsed: _toInt(json['daily_used']) ?? 0,
-        streakDays: _toInt(json['streak_days']) ?? 0,
-        streakNeeded: _toInt(json['streak_needed']) ?? 30,
-        streakAward: _toInt(json['streak_award']) ?? 90,
-        invitePoints: _toInt(json['invite_points']) ?? 3,
-        rewards: (json['rewards'] is List)
-            ? (json['rewards'] as List)
-                .whereType<Map>()
-                .map((e) => PointRewardModel.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
-        redeemCost: _toInt(json['redeem_cost']) ?? 50,
-        redeemDiscount: _toInt(json['redeem_discount']) ?? 10,
-        pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
-        valueIls: _toDouble(json['value_ils']) ??
-            ((_toInt(json['balance']) ?? 0) /
-                ((_toInt(json['points_per_shekel']) ?? 10).clamp(1, 100000))),
-      );
+    balance: _toInt(json['balance']) ?? 0,
+    breakdown: _intMap(json['breakdown']),
+    progress: _intMap(json['progress']),
+    redemptions: (json['redemptions'] is List)
+        ? (json['redemptions'] as List)
+              .whereType<Map>()
+              .map(
+                (e) =>
+                    PointRedemptionModel.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .toList()
+        : const [],
+    referralCode: _readT<String>(json, 'referral_code'),
+    invitesCount: _toInt(json['invites_count']) ?? 0,
+    threshold: _toInt(json['threshold']) ?? 10,
+    tier: (json['tier'] ?? 'برونزي').toString(),
+    level: _toInt(json['level']) ?? 1,
+    goal: _toInt(json['goal']) ?? 100,
+    rewardIls: _toInt(json['reward_ils']) ?? 50,
+    canClaim: json['can_claim'] == true,
+    rewardsTaken: _toInt(json['rewards_taken']) ?? 0,
+    dailyCap: _toInt(json['daily_cap']) ?? 3,
+    dailyUsed: _toInt(json['daily_used']) ?? 0,
+    streakDays: _toInt(json['streak_days']) ?? 0,
+    streakNeeded: _toInt(json['streak_needed']) ?? 30,
+    streakAward: _toInt(json['streak_award']) ?? 90,
+    invitePoints: _toInt(json['invite_points']) ?? 3,
+    rewards: (json['rewards'] is List)
+        ? (json['rewards'] as List)
+              .whereType<Map>()
+              .map(
+                (e) => PointRewardModel.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .toList()
+        : const [],
+    redeemCost: _toInt(json['redeem_cost']) ?? 50,
+    redeemDiscount: _toInt(json['redeem_discount']) ?? 10,
+    pointsPerShekel: _toInt(json['points_per_shekel']) ?? 10,
+    valueIls:
+        _toDouble(json['value_ils']) ??
+        ((_toInt(json['balance']) ?? 0) /
+            ((_toInt(json['points_per_shekel']) ?? 10).clamp(1, 100000))),
+  );
 
   /// Money value formatted for display, e.g. «2.5 ₪» / «12 ₪».
   String get valueLabel {

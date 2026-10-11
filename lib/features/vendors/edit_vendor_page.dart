@@ -34,6 +34,10 @@ class _EditVendorPageState extends State<EditVendorPage> {
   final _facebook = TextEditingController();
   final _website = TextEditingController();
   final _address = TextEditingController();
+  // When the shop is open and whether it delivers: the two tiles beside the
+  // address at the foot of the shop's page.
+  final _hours = TextEditingController();
+  final _delivery = TextEditingController();
   final _minPrice = TextEditingController();
   final _maxPrice = TextEditingController();
 
@@ -60,6 +64,8 @@ class _EditVendorPageState extends State<EditVendorPage> {
     _facebook.text = v.facebook ?? '';
     _website.text = v.website ?? '';
     _address.text = v.address ?? '';
+    _hours.text = v.workingHours ?? '';
+    _delivery.text = v.deliveryNote ?? '';
     _minPrice.text = v.minPrice?.toString() ?? '';
     _maxPrice.text = v.maxPrice?.toString() ?? '';
     _logoUrl = v.logo;
@@ -73,7 +79,7 @@ class _EditVendorPageState extends State<EditVendorPage> {
     for (final c in [
       _nameAr, _nameEn, _descAr, _descEn, _phone, _email,
       _whatsapp, _instagram, _tiktok, _snapchat, _facebook, _website,
-      _address, _minPrice, _maxPrice,
+      _address, _hours, _delivery, _minPrice, _maxPrice,
     ]) {
       c.dispose();
     }
@@ -132,6 +138,8 @@ class _EditVendorPageState extends State<EditVendorPage> {
         if (_trim(_facebook) != null) 'facebook': _trim(_facebook),
         if (_trim(_website) != null) 'website': _trim(_website),
         if (_trim(_address) != null) 'address': _trim(_address),
+        if (_trim(_hours) != null) 'working_hours': _trim(_hours),
+        if (_trim(_delivery) != null) 'delivery_note': _trim(_delivery),
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
         if (_trim(_minPrice) != null) 'min_price': double.tryParse(_minPrice.text.trim()),
@@ -259,6 +267,8 @@ class _EditVendorPageState extends State<EditVendorPage> {
             const Divider(height: 24),
             _field(_address, 'العنوان'),
             _locationField(),
+            _field(_hours, 'ساعات العمل', hint: 'يومياً 8:00 ص - 11:00 م'),
+            _field(_delivery, 'التوصيل', hint: 'توصيل داخل الخليل والمناطق المجاورة'),
             _field(_minPrice, 'أقل سعر', type: TextInputType.number),
             _field(_maxPrice, 'أعلى سعر', type: TextInputType.number),
             const Divider(height: 24),

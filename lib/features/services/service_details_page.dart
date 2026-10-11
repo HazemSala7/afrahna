@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../bookings/booking_create_page.dart';
 import '../../widgets/shell_bottom_nav.dart';
+import '../../core/utils/held_future.dart';
 
 class ServiceDetailsPage extends StatefulWidget {
   const ServiceDetailsPage({
@@ -27,14 +28,14 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _future = ServiceService().show(widget.serviceId);
+    _future = held(ServiceService().show(widget.serviceId));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: FutureBuilder<ServiceModel>(
         future: _future,
         builder: (context, snap) {
@@ -45,7 +46,7 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
             return ErrorState(
               message: snap.error.toString(),
               onRetry: () => setState(() {
-                _future = ServiceService().show(widget.serviceId);
+                _future = held(ServiceService().show(widget.serviceId));
               }),
             );
           }
@@ -131,15 +132,9 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.cardShadow,
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: AppDecor.lift,
                           ),
                           child: Row(
                             children: [
@@ -203,6 +198,9 @@ class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
           final s = snap.data!;
           final vendor = widget.vendor ?? s.vendor;
           if (vendor == null) return const SizedBox.shrink();
+          // The shop's bookings are switched off: the service is still
+          // listed with its price, but it cannot be booked from here.
+          if (!vendor.allowBookings) return const SizedBox.shrink();
           return FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,

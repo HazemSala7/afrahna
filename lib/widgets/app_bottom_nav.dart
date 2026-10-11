@@ -1,16 +1,23 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import 'cosmos.dart';
 
-/// Reusable bottom navigation bar shared by the home shell and other
-/// full-screen pages (e.g. vendor profile) so the same bar is always visible.
+/// The app's five-tab dock, shared by the home shell and every screen pushed on
+/// top of it, so the same way out is always in the same place.
 ///
-/// Design: a floating, rounded bar with a real notch carved out of the top
-/// edge, and the centre "الرئيسية" tab lifted out into a glowing gradient
-/// circle that floats above the bar.
+/// A capsule of dark glass floating a hand's width above the bottom of the
+/// screen, the sky visible round it. The active tab lights its icon in gold
+/// and draws a pill of holographic light under it; the centre «الرئيسية» is a
+/// gold orb inside a slowly turning ring of holographic light, which breathes
+/// when home is the screen you are on.
 ///
 /// In an RTL Row the first child renders at the visual RIGHT, so the visual
-/// order left→right is: قصص | ريلز | الرئيسية | خطّطي | حسابي.
+/// order left→right is: المتجر | ريلز | الرئيسية | خطّطي | حسابي.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({super.key, required this.current, required this.onTap});
 
@@ -33,61 +40,48 @@ class AppBottomNav extends StatelessWidget {
   // Index of the highlighted centre tab.
   static const int _centerIndex = 2;
 
-  static const double _barHeight = 66;
+  static const double _barHeight = 64;
 
-  /// How far the home button rises above the bar's top edge. Kept small so the
-  /// raised button reads as a deliberate accent — NOT the full half-button
-  /// strip the old design reserved, which showed as an empty band.
-  static const double _poke = 16;
+  /// How far the home orb rises above the dock's top edge.
+  static const double _poke = 18;
 
-  /// Diameter of the raised centre button.
-  static const double _fabSize = 54;
+  /// Gap between the dock and the bottom of the screen: the dock floats.
+  static const double _float = 10;
 
-  /// Vertical space the bar occupies above the system gesture inset. Pages that
-  /// use `extendBody: true` reserve this much bottom padding so content clears
-  /// the bar (and the raised button).
-  static const double contentHeight = _barHeight + _poke;
+  /// Diameter of the centre orb, ring included.
+  static const double _orbSize = 62;
+
+  /// Vertical space the dock occupies above the system gesture inset. Pages
+  /// that use `extendBody: true` reserve this much bottom padding so content
+  /// clears the dock (and the raised orb).
+  static const double contentHeight = _barHeight + _poke + _float;
 
   @override
   Widget build(BuildContext context) {
-    // The bar itself extends under the system gesture inset for a clean edge.
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return MediaQuery.withClampedTextScaling(
-      // Keep the fixed-height bar from overflowing when the device uses a
+      // Keep the fixed-height dock from overflowing when the device uses a
       // large system font scale.
       maxScaleFactor: 1.15,
       child: SizedBox(
-        height: _barHeight + _poke + bottomInset,
+        height: contentHeight + bottomInset,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // ---- White bar, flush to the bottom, full width ----
+            // ---- the glass dock ----
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                height: _barHeight + bottomInset,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(26)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryDark.withValues(alpha: 0.20),
-                      blurRadius: 14,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.only(bottom: bottomInset),
+              left: 14,
+              right: 14,
+              bottom: _float + bottomInset,
+              height: _barHeight,
+              child: _GlassDock(
                 child: Row(
                   children: [
                     // RTL: first child = visual right.
                     _side(0),
                     _side(1),
-                    // Centre slot: just the label — the button floats above it.
+                    // Centre slot: just the label — the orb floats above it.
                     Expanded(
                       child: Align(
                         alignment: Alignment.bottomCenter,
@@ -99,7 +93,7 @@ class AppBottomNav extends StatelessWidget {
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
                               color: current == _centerIndex
-                                  ? AppColors.primary
+                                  ? AppColors.accent
                                   : AppColors.textMuted,
                             ),
                           ),
@@ -112,17 +106,17 @@ class AppBottomNav extends StatelessWidget {
                 ),
               ),
             ),
-            // ---- Raised home button, poking above only in the centre ----
+            // ---- the centre orb, rising out of the dock ----
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: Center(
-                child: _CenterFab(
+                child: _CenterOrb(
                   item: items[_centerIndex],
                   active: current == _centerIndex,
-                  size: _fabSize,
-                  onTap: () => onTap(_centerIndex),
+                  size: _orbSize,
+                  onTap: () => _tap(_centerIndex),
                 ),
               ),
             ),
@@ -132,11 +126,16 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 
+  void _tap(int i) {
+    HapticFeedback.selectionClick();
+    onTap(i);
+  }
+
   Widget _side(int i) => Expanded(
         child: _SideNavButton(
           item: items[i],
           active: current == i,
-          onTap: () => onTap(i),
+          onTap: () => _tap(i),
         ),
       );
 }
@@ -146,6 +145,84 @@ class AppNavItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
+}
+
+// ===========================================================================
+// THE DOCK
+// ===========================================================================
+
+/// Frosted dark glass with a holographic rim and a line of gold light along
+/// its top edge. The blur is paid for once, here — never per list item.
+class _GlassDock extends StatelessWidget {
+  const _GlassDock({required this.child});
+  final Widget child;
+
+  static const _radius = 30.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = BorderRadius.circular(_radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: r,
+        boxShadow: [
+          const BoxShadow(
+            color: Color(0x268E5F4A),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.13),
+            blurRadius: 30,
+            spreadRadius: -8,
+          ),
+        ],
+      ),
+      child: CustomPaint(
+        foregroundPainter:
+            const HoloBorderPainter(radius: _radius, width: 1.1),
+        child: ClipRRect(
+          borderRadius: r,
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.surface.withValues(alpha: 0.92),
+                    AppColors.surfaceHigh.withValues(alpha: 0.96),
+                  ],
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // The line of light along the top edge.
+                  Positioned(
+                    top: 0,
+                    left: 40,
+                    right: 40,
+                    height: 1.2,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [
+                          AppColors.accent.withValues(alpha: 0),
+                          AppColors.accent.withValues(alpha: 0.35),
+                          AppColors.accent.withValues(alpha: 0),
+                        ]),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(child: child),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ===========================================================================
@@ -166,70 +243,77 @@ class _SideNavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(22),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Active icon lifts slightly and brightens.
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              transform: Matrix4.translationValues(0, active ? -2 : 0, 0),
-              child: Icon(
-                active ? item.activeIcon : item.icon,
-                color: active ? AppColors.primary : AppColors.textMuted,
-                size: 24,
-              ),
+      splashColor: AppColors.accent.withValues(alpha: 0.14),
+      highlightColor: Colors.transparent,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // The active icon lifts, turns gold and glows.
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutBack,
+            transform: Matrix4.translationValues(0, active ? -2 : 0, 0),
+            child: Icon(
+              active ? item.activeIcon : item.icon,
+              color: active ? AppColors.accent : AppColors.textMuted,
+              size: 24,
+              shadows: active
+                  ? [
+                      Shadow(
+                        color: AppColors.accent.withValues(alpha: 0.8),
+                        blurRadius: 14,
+                      ),
+                    ]
+                  : null,
             ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? AppColors.primary : AppColors.textMuted,
-              ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              color: active ? AppColors.textDark : AppColors.textMuted,
             ),
-            const SizedBox(height: 3),
-            // A little glowing dot under the active tab.
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              width: active ? 6 : 0,
-              height: active ? 6 : 0,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary,
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                          blurRadius: 6,
-                        ),
-                      ]
-                    : null,
-              ),
+          ),
+          const SizedBox(height: 4),
+          // A pill of holographic light under the active tab.
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            width: active ? 18 : 0,
+            height: 3,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: const LinearGradient(colors: AppColors.holoStops),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: AppColors.holoLavender.withValues(alpha: 0.7),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // ===========================================================================
-// CENTRE FLOATING BUTTON
+// CENTRE ORB
 // ===========================================================================
 
-/// The raised centre "home" button that floats a little above the bar. A white
-/// ring separates it from the page behind so it reads as a deliberate accent.
-class _CenterFab extends StatelessWidget {
-  const _CenterFab({
+/// The raised home orb: gold at its core, held in a ring of holographic light
+/// that turns slowly — and breathes, when home is where you are.
+class _CenterOrb extends StatefulWidget {
+  const _CenterOrb({
     required this.item,
     required this.active,
     required this.size,
@@ -242,38 +326,135 @@ class _CenterFab extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_CenterOrb> createState() => _CenterOrbState();
+}
+
+class _CenterOrbState extends State<_CenterOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = widget.size;
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            colors: [AppColors.accent, AppColors.primary, AppColors.primaryDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          // Ring in the page background colour so the raised button separates
-          // cleanly from whatever content sits behind it.
-          border: Border.all(color: AppColors.background, width: 4),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: active ? 0.5 : 0.35),
-              blurRadius: active ? 16 : 11,
-              offset: const Offset(0, 4),
+      child: Semantics(
+        button: true,
+        selected: widget.active,
+        label: widget.item.label,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (_, _) {
+                // Seven breaths a turn when active; still otherwise.
+                final breath = widget.active
+                    ? 0.5 + 0.5 * math.sin(_c.value * math.pi * 14)
+                    : 0.0;
+                return CustomPaint(
+                  painter: _OrbRingPainter(_c.value, breath),
+                  child: Center(
+                    child: Container(
+                      width: size - 14,
+                      height: size - 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const RadialGradient(
+                          center: Alignment(-0.35, -0.45),
+                          radius: 1.05,
+                          colors: [
+                            AppColors.champagne,
+                            AppColors.primary,
+                            AppColors.goldDeep,
+                          ],
+                          stops: [0.0, 0.55, 1.0],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary
+                                .withValues(alpha: 0.45 + 0.25 * breath),
+                            blurRadius: 18 + 12 * breath,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        widget.item.activeIcon,
+                        color: AppColors.pearl,
+                        size: 25,
+                        shadows: const [
+                          Shadow(color: Color(0x66000000), blurRadius: 6),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
+          ),
         ),
-        child: Icon(item.activeIcon, color: Colors.white, size: 26),
       ),
     );
   }
 }
 
-/// Clips the bar into a rounded rectangle with a circular notch carved out of
-/// the centre of the top edge (where the floating button nests).
+class _OrbRingPainter extends CustomPainter {
+  _OrbRingPainter(this.t, this.breath);
+  final double t;
+  final double breath;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.shortestSide / 2 - 2;
+
+    // A gap between the orb and its ring, so the ring reads as separate. It
+    // is the page's own ground, so the ring looks cut out of the bar.
+    canvas.drawCircle(c, r - 1.5, Paint()..color = AppColors.background);
+
+    final rect = Rect.fromCircle(center: c, radius: r);
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..shader = SweepGradient(
+        colors: AppColors.holoStops,
+        transform: GradientRotation(t * math.pi * 2),
+      ).createShader(rect);
+    // Soft outer glow first, then the crisp ring on top of it.
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 4 + 3 * breath)
+        ..shader = ring.shader,
+    );
+    canvas.drawCircle(c, r, ring);
+  }
+
+  @override
+  bool shouldRepaint(_OrbRingPainter old) =>
+      old.t != t || old.breath != breath;
+}

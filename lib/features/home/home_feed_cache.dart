@@ -1,5 +1,6 @@
 import '../../core/models/models.dart';
 import '../../core/services/services.dart';
+import '../../core/utils/held_future.dart';
 
 /// Prefetches the home page's data during the splash screen so the home tab
 /// renders instantly (no spinners) on first show. The futures are handed to the
@@ -20,15 +21,22 @@ class HomeFeedCache {
 
   /// Kicks off all home network requests. Idempotent: safe to call repeatedly;
   /// only the first call per launch actually starts the requests.
+  ///
+  /// Every future is [held]: these are started on the splash and the home page
+  /// may not attach to them for seconds, and on a phone with no signal they
+  /// fail long before that — which Dart reports as an unhandled error.
   void prefetch() {
     if (isReady) return;
-    categories = CategoryService().list(tree: true);
-    promos = PromotionService().list();
-    topVendors = VendorService().list();
-    featuredVendors =
-        VendorService().list(featured: true, perPage: 1000).then((l) => l..shuffle());
-    sliders = loadSliders();
-    stats = StatsService().get();
+    categories = held(CategoryService().list(tree: true));
+    promos = held(PromotionService().list());
+    topVendors = held(VendorService().list());
+    featuredVendors = held(
+      VendorService()
+          .list(featured: true, perPage: 1000)
+          .then((l) => l..shuffle()),
+    );
+    sliders = held(loadSliders());
+    stats = held(StatsService().get());
   }
 
   /// Drops the cached futures so the next home load fetches fresh data.
@@ -57,14 +65,16 @@ class HomeFeedCache {
     } catch (_) {}
     final vipSlides = vips
         .where((v) => (v.cover ?? v.logo ?? '').isNotEmpty)
-        .map((v) => SliderModel(
-              id: -v.id, // negative id to avoid clashing with real slides
-              image: v.cover ?? v.logo ?? '',
-              titleAr: v.name,
-              subtitleAr: v.category?.name,
-              badgeAr: 'VIP ⭐',
-              vendorId: v.id,
-            ))
+        .map(
+          (v) => SliderModel(
+            id: -v.id, // negative id to avoid clashing with real slides
+            image: v.cover ?? v.logo ?? '',
+            titleAr: v.name,
+            subtitleAr: v.category?.name,
+            badgeAr: 'VIP ⭐',
+            vendorId: v.id,
+          ),
+        )
         .toList();
     final all = [...vipSlides, ...sliders]..shuffle();
     return all;

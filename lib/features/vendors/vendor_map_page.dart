@@ -191,7 +191,7 @@ class _VendorMapPageState extends State<VendorMapPage> {
             left: 12,
             right: 12,
             child: Card(
-              color: Colors.white,
+              color: AppColors.surface,
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

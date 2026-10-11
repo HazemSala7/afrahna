@@ -59,7 +59,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             label: const Text('الأقسام'),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryDark,
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           const SizedBox(width: 4),
@@ -275,7 +275,7 @@ class _ProductRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
           boxShadow: [
@@ -296,7 +296,7 @@ class _ProductRow extends StatelessWidget {
                   child: Container(
                     width: 92,
                     height: 92,
-                    color: const Color(0xFFF3EDE6),
+                    color: AppColors.surface,
                     child: AppNetworkImage(
                       url: product.image,
                       fit: BoxFit.cover,
@@ -332,7 +332,7 @@ class _ProductRow extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.55),
                         alignment: Alignment.center,
                         child: const Icon(Icons.block,
-                            color: Colors.black45, size: 26),
+                            color: AppColors.textDark, size: 26),
                       ),
                     ),
                   ),
@@ -694,7 +694,6 @@ class _EditProductPageState extends State<EditProductPage> {
             contentPadding: EdgeInsets.zero,
             title: const Text('متوفر للبيع'),
             value: _available,
-            activeThumbColor: AppColors.primary,
             onChanged: (v) => setState(() => _available = v),
           ),
           const SizedBox(height: 10),

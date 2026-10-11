@@ -5,6 +5,7 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/shell_bottom_nav.dart';
+import '../../core/utils/held_future.dart';
 
 /// Shows a vendor owner the list of users who follow their shop + the count.
 class VendorFollowersPage extends StatefulWidget {
@@ -25,7 +26,7 @@ class _VendorFollowersPageState extends State<VendorFollowersPage> {
   }
 
   void _reload() {
-    _future = VendorService().followers(widget.vendorId);
+    _future = held(VendorService().followers(widget.vendorId));
   }
 
   @override
@@ -93,7 +94,7 @@ class _CountHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: [AppColors.primary, AppColors.goldDeep],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
@@ -134,15 +135,9 @@ class _FollowerTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         children: [

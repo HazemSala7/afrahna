@@ -19,7 +19,7 @@ class _FilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = count > 0;
     return Material(
-      color: active ? AppColors.primary : Colors.white,
+      color: active ? AppColors.primary : AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -48,7 +48,7 @@ class _FilterButton extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.discount,
                       borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: Colors.white, width: 1.5),
+                      border: Border.all(color: AppColors.hairline, width: 1.5),
                     ),
                     child: Text(
                       '$count',

@@ -148,14 +148,14 @@ class _SectionsManagerListState extends State<SectionsManagerList> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryDark],
+                      colors: [AppColors.primary, AppColors.goldDeep],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
+                        color: AppColors.accent.withValues(alpha: 0.24),
                         blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
@@ -235,7 +235,7 @@ class _SectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
         boxShadow: [

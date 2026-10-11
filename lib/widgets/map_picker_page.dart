@@ -169,7 +169,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
             left: 16,
             child: FloatingActionButton.extended(
               heroTag: 'mapMyLocation',
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface,
               foregroundColor: AppColors.primary,
               icon: _locating
                   ? const SizedBox(
@@ -186,7 +186,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
             left: 12,
             right: 12,
             child: Card(
-              color: Colors.white,
+              color: AppColors.surface,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Text(

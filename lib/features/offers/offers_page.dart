@@ -5,6 +5,8 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import 'offer_details_page.dart';
+import '../../widgets/animations.dart';
+import '../../core/utils/held_future.dart';
 
 class OffersPage extends StatefulWidget {
   const OffersPage({super.key});
@@ -19,7 +21,7 @@ class _OffersPageState extends State<OffersPage> {
   @override
   void initState() {
     super.initState();
-    _future = PromotionService().list();
+    _future = held(PromotionService().list());
   }
 
   @override
@@ -49,7 +51,8 @@ class _OffersPageState extends State<OffersPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(height: 14),
-            itemBuilder: (_, i) => _PromoCard(promo: items[i]),
+            itemBuilder: (_, i) =>
+                StaggerIn(index: i, id: 'offers', child: _PromoCard(promo: items[i])),
           );
         },
       ),
@@ -73,15 +76,9 @@ class _PromoCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppDecor.lift,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -231,8 +228,8 @@ class _PromoGalleryState extends State<_PromoGallery> {
                         height: 6,
                         decoration: BoxDecoration(
                           color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.6),
+                              ? AppColors.surface
+                              : AppColors.surface.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );

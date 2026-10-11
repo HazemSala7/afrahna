@@ -12,6 +12,8 @@ import '../../widgets/app_widgets.dart';
 import '../../widgets/login_required_dialog.dart';
 import '../vendors/vendor_details_page.dart';
 import 'marketplace.dart';
+import 'my_orders_page.dart';
+import '../../widgets/celebration.dart';
 
 /// The cart and checkout. Everything here belongs to one shop — an order is
 /// placed against a single `vendor_id`, and [CartController] keeps it that way.
@@ -82,7 +84,7 @@ class _CartPageState extends State<CartPage> {
     }
     setState(() => _placing = true);
     try {
-      await OrderService().create(
+      final order = await OrderService().create(
         vendorId: vendorId,
         quantities: cart.quantities,
         cityId: _cityId,
@@ -94,22 +96,41 @@ class _CartPageState extends State<CartPage> {
       if (!mounted) return;
       cart.clear();
       setState(() => _placing = false);
-      await showDialog<void>(
+      // Their part is done and the shop has been told: worth marking.
+      CelebrationBurst.show(context);
+      final follow = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
-          icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.check_circle_rounded,
+              color: Color(0xFF34D17A), size: 48),
           title: const Text('تم إرسال طلبك'),
           content: const Text(
-              'وصلت طلبيتك إلى المتجر كفاتورة. سيتواصل معك المتجر لتأكيدها.'),
+            'وصلت طلبيتك إلى المتجر. سنُعلمك فور تأكيدها، وبكل خطوة بعدها '
+            'حتى تستلمها — ويمكنك متابعتها في أي وقت من «طلباتي».',
+          ),
           actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('حسناً'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.radar_rounded, size: 18),
+              label: const Text('تابع طلبيتك'),
             ),
           ],
         ),
       );
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      if (follow == true) {
+        // In place of the now-empty cart, so back returns to the shop.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => MyOrdersPage(highlightId: order.id)),
+        );
+      } else {
+        Navigator.pop(context);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _placing = false);
@@ -392,15 +413,9 @@ class _CartLineTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         children: [
@@ -527,7 +542,8 @@ class _CheckoutBar extends StatelessWidget {
         16, 12, 16, 12 + MediaQuery.of(context).viewPadding.bottom,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.hairline, width: 0.8),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(

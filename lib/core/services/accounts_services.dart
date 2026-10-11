@@ -688,18 +688,101 @@ class PostService {
   }
 
   /// Toggle the current user's like on a post (reel). Persisted server-side.
-  /// Returns the new liked state + the live like count.
-  Future<({bool liked, int likes})> toggleLike(int id) async {
+  ///
+  /// Returns the new liked state, the live like count, and — when the API
+  /// says so — what the like was worth in points: what it earned, how much of
+  /// today's allowance is used, and how many more interactions buy the next
+  /// point. [LikeReward] is null on an unlike, or on an older server.
+  Future<({bool liked, int likes, LikeReward? reward})> toggleLike(int id) async {
     try {
       final res = await _dio.post('/posts/$id/like');
       final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : {};
       return (
         liked: m['liked'] == true,
         likes: (m['likes_count'] is num) ? (m['likes_count'] as num).toInt() : 0,
+        reward: LikeReward.fromJson(m['points']),
       );
     } catch (e) {
       throw toApiException(e);
     }
+  }
+}
+
+/// Looking up an invite code: who it belongs to, if anyone.
+///
+/// Public, so it works before the friend has an account — which is the whole
+/// point: the code is checked while they are still filling the form.
+class ReferralService {
+  final _dio = ApiClient.instance.dio;
+
+  /// The inviter's name, or null when the code is unknown or unreachable.
+  Future<String?> ownerName(String code) async {
+    try {
+      final res = await _dio.get('/referral/${Uri.encodeComponent(code)}');
+      final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : {};
+      if (m['valid'] != true) return null;
+      final name = (m['name'] ?? '').toString().trim();
+      return name.isEmpty ? null : name;
+    } catch (_) {
+      // Offline or a bad code: the field is simply not pre-filled.
+      return null;
+    }
+  }
+}
+
+/// What one like was worth, as the API reports it.
+///
+/// Interactions are rate-limited and priced by the member's level, so a like
+/// often earns nothing at all. Before this, that was silent, and the rewards
+/// programme looked broken to anyone who tried it.
+class LikeReward {
+  const LikeReward({
+    required this.earned,
+    required this.dailyUsed,
+    required this.dailyCap,
+    required this.toNext,
+  });
+
+  /// Points this like added — usually zero.
+  final int earned;
+
+  /// Interactions counted today, and how many the day allows.
+  final int dailyUsed;
+  final int dailyCap;
+
+  /// Interactions still needed for the next point.
+  final int toNext;
+
+  bool get capReached => dailyUsed >= dailyCap;
+
+  static LikeReward? fromJson(dynamic v) {
+    if (v is! Map) return null;
+    final m = Map<String, dynamic>.from(v);
+    int n(String k) => (m[k] is num) ? (m[k] as num).toInt() : 0;
+    return LikeReward(
+      earned: n('earned'),
+      dailyUsed: n('daily_used'),
+      dailyCap: n('daily_cap'),
+      toNext: n('to_next'),
+    );
+  }
+
+  /// What to say about it, or null when there is nothing worth saying.
+  String? get message {
+    if (earned > 0) {
+      return earned == 1
+          ? 'ربحت نقطة! 🎉'
+          : 'ربحت $earned نقاط! 🎉';
+    }
+    if (capReached) {
+      return 'وصلت حدّك اليومي من التفاعلات — بكرة بتكمل تجميع النقاط';
+    }
+    if (toNext > 0) {
+      return toNext == 1
+          ? 'تفاعل واحد كمان وبتربح نقطة'
+          : 'باقي $toNext تفاعلات للنقطة الجاية';
+    }
+    return null;
   }
 }
 

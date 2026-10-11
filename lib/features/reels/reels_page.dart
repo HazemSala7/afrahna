@@ -523,6 +523,17 @@ class _ReelItemState extends State<_ReelItem> {
         _liked = res.liked;
         _likes = res.likes;
       });
+      final said = res.reward?.message;
+      if (said != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(said),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       // Revert on failure.

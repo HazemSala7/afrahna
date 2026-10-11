@@ -73,7 +73,7 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
         ),
         onSelected: (_) => setState(() => _selectedCityId = id),
         selectedColor: AppColors.primary,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         labelStyle: TextStyle(
           color: selected ? Colors.white : AppColors.textDark,
           fontWeight: FontWeight.w700,
@@ -145,15 +145,9 @@ class _CategoryTabsPageState extends State<CategoryTabsPage> {
                 Container(
                   margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.cardShadow,
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: AppDecor.lift,
                   ),
                   child: TabBar(
                     isScrollable: true,
@@ -366,15 +360,9 @@ class _VendorTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppDecor.lift,
         ),
         child: Row(
           children: [

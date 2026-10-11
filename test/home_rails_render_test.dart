@@ -12,6 +12,9 @@ import 'package:visibility_detector/visibility_detector.dart';
 import 'package:afrahna/core/api/api_client.dart';
 import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/home/home_page.dart';
+import 'package:afrahna/core/theme.dart';
+
+import 'cosmic_harness.dart';
 
 /// The top of the home page: the stories rail, the category row and the
 /// slider. All three were reworked for how they behave under a finger, so the
@@ -46,6 +49,7 @@ class _Home implements HttpClientAdapter {
 }
 
 void main() {
+  setUpAll(preloadCosmic);
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
     if (font.existsSync()) {
@@ -65,9 +69,11 @@ void main() {
 
     await tester.pumpWidget(MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => SessionController())],
-      child: const MaterialApp(
-        locale: Locale('ar'),
-        home: Directionality(
+      child: MaterialApp(
+        theme: AppTheme.cosmic(),
+        builder: cosmicBuilder,
+        locale: const Locale('ar'),
+        home: const Directionality(
           textDirection: TextDirection.rtl,
           child: HomePage(),
         ),

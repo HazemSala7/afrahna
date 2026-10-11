@@ -96,8 +96,8 @@ class _FollowButtonState extends State<FollowButton> {
     if (widget.compact) return _buildCompact();
     return FilledButton.icon(
       style: FilledButton.styleFrom(
-        backgroundColor: _following ? Colors.grey[200] : null,
-        foregroundColor: _following ? Colors.black87 : null,
+        backgroundColor: _following ? AppColors.surface : null,
+        foregroundColor: _following ? AppColors.textDark : null,
       ),
       onPressed: _busy ? null : _toggle,
       icon: Icon(_following ? Icons.notifications_active : Icons.notifications_none),

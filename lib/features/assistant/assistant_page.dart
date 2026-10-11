@@ -57,10 +57,14 @@ class _AssistantPageState extends State<AssistantPage>
   /// Best available Arabic locale id for speech recognition (resolved at init).
   String? _arLocaleId;
 
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  )..repeat(reverse: true);
+  // Made on first use (the listening bar). A `late final` here was first
+  // touched by dispose() when the mic was never used, building a controller
+  // on a widget already leaving the tree.
+  AnimationController? _pulseController;
+  AnimationController get _pulse => _pulseController ??= AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1100),
+      )..repeat(reverse: true);
 
   @override
   void initState() {
@@ -122,7 +126,7 @@ class _AssistantPageState extends State<AssistantPage>
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _pulseController?.dispose();
     _controller.dispose();
     _scrollController.dispose();
     _focus.dispose();
@@ -326,16 +330,16 @@ class _SuggestionsBlock extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.25),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.08),
+                          color: AppColors.accent.withValues(alpha: 0.06),
                           blurRadius: 8,
-                          offset: const Offset(0, 3),
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
@@ -403,11 +407,11 @@ class _Bubble extends StatelessWidget {
                               end: Alignment.bottomLeft,
                               colors: [
                                 AppColors.primary,
-                                AppColors.primaryDark,
+                                AppColors.goldDeep,
                               ],
                             )
                           : const LinearGradient(
-                              colors: [Colors.white, Color(0xFFFFF8EE)],
+                              colors: [AppColors.surface, AppColors.surface],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                             ),
@@ -426,9 +430,9 @@ class _Bubble extends StatelessWidget {
                             ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryDark.withValues(alpha: 0.10),
+                          color: AppColors.accent.withValues(alpha: 0.08),
                           blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
@@ -484,7 +488,7 @@ class _BotAvatar extends StatelessWidget {
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [Color(0xFFE6B450), AppColors.primaryDark],
+          colors: [Color(0xFFE6B450), AppColors.goldDeep],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
@@ -530,7 +534,7 @@ class _ThinkingBubble extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
             color: AppColors.primary.withValues(alpha: 0.18)),
@@ -581,7 +585,7 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
         height: 8,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.primaryDark,
+          color: AppColors.goldDeep,
         ),
       ),
     );
@@ -613,16 +617,16 @@ class _VendorResultCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: AppColors.primary.withValues(alpha: 0.22),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+                  color: AppColors.accent.withValues(alpha: 0.08),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
@@ -751,16 +755,16 @@ class _PlanSlotCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: AppColors.primary.withValues(alpha: 0.22),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+                  color: AppColors.accent.withValues(alpha: 0.08),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
@@ -914,7 +918,7 @@ class _ListeningBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFFE9C9), Color(0xFFFFD9A8)],
+          colors: [AppColors.surface, AppColors.surface],
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
@@ -981,10 +985,10 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + bottom),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.10),
+            color: AppColors.accent.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, -3),
           ),
@@ -1004,7 +1008,7 @@ class _InputBar extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: AppColors.surfaceHigh,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                     color: AppColors.primary.withValues(alpha: 0.20)),
@@ -1044,7 +1048,7 @@ class _InputBar extends StatelessWidget {
             background: AppColors.primary,
             onTap: busy ? () {} : onSend,
             gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryDark],
+              colors: [AppColors.primary, AppColors.goldDeep],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),
@@ -1085,9 +1089,9 @@ class _CircleButton extends StatelessWidget {
             gradient: gradient,
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.18),
+                color: AppColors.accent.withValues(alpha: 0.14),
                 blurRadius: 8,
-                offset: const Offset(0, 3),
+                offset: const Offset(0, 1),
               ),
             ],
           ),

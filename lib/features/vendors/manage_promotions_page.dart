@@ -140,15 +140,9 @@ class _PromotionCard extends StatelessWidget {
         promo.endDate!.isBefore(DateTime.now());
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppDecor.lift,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

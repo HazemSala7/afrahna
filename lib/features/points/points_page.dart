@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/arabic_counts.dart';
 import '../../core/models/models.dart';
@@ -12,9 +10,12 @@ import '../../core/rewards_ladder.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import 'accepted_invites_page.dart';
+import '../../widgets/invite_friends.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/tier_badge.dart';
 import '../auth/login_page.dart';
+import '../../core/utils/held_future.dart';
 
 /// "نقاطي" — the user's rewards screen: balance, where the points came from,
 /// where they were spent, and an invite section to earn more.
@@ -33,7 +34,7 @@ class _PointsPageState extends State<PointsPage> {
   void initState() {
     super.initState();
     if (context.read<SessionController>().isSignedIn) {
-      _future = PointsService().summary();
+      _future = held(PointsService().summary());
     }
   }
 
@@ -42,7 +43,7 @@ class _PointsPageState extends State<PointsPage> {
   // and claiming a reward both went through here and both threw.
   void _reload() {
     setState(() {
-      _future = PointsService().summary();
+      _future = held(PointsService().summary());
     });
   }
 
@@ -82,23 +83,30 @@ class _PointsPageState extends State<PointsPage> {
     final session = context.watch<SessionController>();
     if (!session.isSignedIn) {
       return AppScaffold(
-          appBar: const PinkAppBar(title: 'نقاطي'),
+        appBar: const PinkAppBar(title: 'نقاطي'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.stars_rounded,
-                    size: 72, color: AppColors.primary),
+                const Icon(
+                  Icons.stars_rounded,
+                  size: 72,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(height: 14),
-                const Text('سجّل الدخول لعرض نقاطك ومكافآتك',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text(
+                  'سجّل الدخول لعرض نقاطك ومكافآتك',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 18),
                 ElevatedButton(
-                  onPressed: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const LoginPage())),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                  ),
                   child: const Text('تسجيل الدخول'),
                 ),
               ],
@@ -109,7 +117,6 @@ class _PointsPageState extends State<PointsPage> {
     }
 
     return AppScaffold(
-
       appBar: const PinkAppBar(title: 'نقاطي'),
       body: FutureBuilder<PointsSummary>(
         future: _future,
@@ -118,8 +125,7 @@ class _PointsPageState extends State<PointsPage> {
             return const CenteredLoader();
           }
           if (snap.hasError) {
-            return ErrorState(
-                message: snap.error.toString(), onRetry: _reload);
+            return ErrorState(message: snap.error.toString(), onRetry: _reload);
           }
           final s = snap.data!;
           return RefreshIndicator(
@@ -170,9 +176,9 @@ class _PointsPageState extends State<PointsPage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: .35),
+            color: AppColors.accent.withValues(alpha: 0.28),
             blurRadius: 20,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -192,12 +198,20 @@ class _PointsPageState extends State<PointsPage> {
             ),
           ),
           const SizedBox(height: 2),
-          const Text('نقطة',
-              style:
-                  TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          const Text(
+            'نقطة',
+            style: TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 14),
           // The one number that matters: how far it is to the money.
-          _RedeemMeter(balance: s.balance, cost: s.goal, rewardIls: s.rewardIls),
+          _RedeemMeter(
+            balance: s.balance,
+            cost: s.goal,
+            rewardIls: s.rewardIls,
+          ),
           const SizedBox(height: 14),
           if (s.canClaim)
             SizedBox(
@@ -205,24 +219,31 @@ class _PointsPageState extends State<PointsPage> {
               child: ElevatedButton.icon(
                 onPressed: _claiming ? null : () => _claim(s),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.surface,
                   foregroundColor: AppColors.primaryDark,
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 icon: _claiming
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.4, color: AppColors.primaryDark),
+                          strokeWidth: 2.4,
+                          color: AppColors.primaryDark,
+                        ),
                       )
                     : const Icon(Icons.card_giftcard_rounded, size: 20),
                 label: Text(
-                  _claiming ? 'جارٍ الاستلام…' : 'استلم ${s.rewardIls} شيكل الآن',
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                  _claiming
+                      ? 'جارٍ الاستلام…'
+                      : 'استلم ${s.rewardIls} شيكل الآن',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             )
@@ -230,7 +251,10 @@ class _PointsPageState extends State<PointsPage> {
             Text(
               'باقي ${arabicPoints(left)} لتحصل على ${s.rewardIls} شيكل',
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
             ),
         ],
       ),
@@ -247,12 +271,14 @@ class _PointsPageState extends State<PointsPage> {
       _reload();
       await showDialog<void>(
         context: context,
-        builder: (_) => _CelebrationDialog(amount: s.rewardIls, message: message),
+        builder: (_) =>
+            _CelebrationDialog(amount: s.rewardIls, message: message),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _claiming = false);
     }
@@ -273,7 +299,9 @@ class _PointsPageState extends State<PointsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _CardTitle(
-              icon: Icons.military_tech_rounded, text: 'مستويات المكافآت'),
+            icon: Icons.military_tech_rounded,
+            text: 'مستويات المكافآت',
+          ),
           const Padding(
             padding: EdgeInsets.only(top: 2, bottom: 12),
             child: Text(
@@ -309,9 +337,9 @@ class _PointsPageState extends State<PointsPage> {
             icon: Icons.all_inclusive_rounded,
             text: beyond
                 ? 'أنت فوق البلاتيني — يتضاعف الهدف مع كل مكافأة، وهدفك الحالي'
-                    ' ${s.goal} نقطة مقابل ${s.rewardIls} شيكل.'
+                      ' ${s.goal} نقطة مقابل ${s.rewardIls} شيكل.'
                 : 'بعد البلاتيني تستمر المكافآت ويتضاعف الهدف في كل مرة'
-                    ' (1600، 3200 …) مع بقاء 15 تفاعلاً للنقطة.',
+                      ' (1600، 3200 …) مع بقاء 15 تفاعلاً للنقطة.',
           ),
         ],
       ),
@@ -332,12 +360,20 @@ class _PointsPageState extends State<PointsPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 20),
+              const Icon(
+                Icons.bolt_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('تفاعلات محتسبة اليوم',
-                    style: TextStyle(
-                        color: AppColors.textDark, fontWeight: FontWeight.w800)),
+                child: Text(
+                  'تفاعلات محتسبة اليوم',
+                  style: TextStyle(
+                    color: AppColors.textDark,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               for (var i = 0; i < s.dailyCap; i++)
                 Container(
@@ -350,7 +386,8 @@ class _PointsPageState extends State<PointsPage> {
                         ? AppColors.primary
                         : AppColors.primaryLight,
                     border: Border.all(
-                        color: AppColors.primary.withValues(alpha: .45)),
+                      color: AppColors.primary.withValues(alpha: .45),
+                    ),
                   ),
                 ),
             ],
@@ -360,10 +397,13 @@ class _PointsPageState extends State<PointsPage> {
             child: Text(
               capLeft > 0
                   ? 'يتبقّى لك ${arabicInteractions(capLeft)} اليوم من أصل'
-                      ' ${s.dailyCap}.'
+                        ' ${s.dailyCap}.'
                   : 'انتهت تفاعلات اليوم — تعود غداً. تفاعلك يبقى كما هو لكنه لا'
-                      ' يضيف نقاطاً.',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                        ' يضيف نقاطاً.',
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12.5,
+              ),
             ),
           ),
           const Divider(height: 22),
@@ -375,20 +415,24 @@ class _PointsPageState extends State<PointsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('نقاط الولاء اليومية',
-                        style: TextStyle(
-                            color: AppColors.textDark,
-                            fontWeight: FontWeight.w800)),
+                    const Text(
+                      'نقاط الولاء اليومية',
+                      style: TextStyle(
+                        color: AppColors.textDark,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       s.streakDays >= s.streakNeeded
                           ? 'أتممت الشهر كاملاً! ${s.streakAward} نقطة في طريقها إليك.'
                           : 'افتح التطبيق ${s.streakNeeded} يوماً متتالياً لتحصل على'
-                              ' ${s.streakAward} نقطة دفعة واحدة (3 نقاط عن كل يوم).',
+                                ' ${s.streakAward} نقطة دفعة واحدة (3 نقاط عن كل يوم).',
                       style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 12.5,
-                          height: 1.35),
+                        color: AppColors.textMuted,
+                        fontSize: 12.5,
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),
@@ -409,37 +453,54 @@ class _PointsPageState extends State<PointsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _CardTitle(
-              icon: Icons.emoji_events_rounded, text: 'مكافآتك المستلمة'),
+            icon: Icons.emoji_events_rounded,
+            text: 'مكافآتك المستلمة',
+          ),
           const SizedBox(height: 4),
-          ...s.rewards.map((r) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                child: Row(
-                  children: [
-                    const Icon(Icons.verified_rounded,
-                        size: 20, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('المستوى ${r.level} · ${r.tier}',
-                              style: const TextStyle(
-                                  color: AppColors.textDark,
-                                  fontWeight: FontWeight.w700)),
-                          if (r.createdAt != null)
-                            Text(df.format(r.createdAt!),
-                                style: const TextStyle(
-                                    color: AppColors.textMuted, fontSize: 12)),
-                        ],
-                      ),
+          ...s.rewards.map(
+            (r) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.verified_rounded,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'المستوى ${r.level} · ${r.tier}',
+                          style: const TextStyle(
+                            color: AppColors.textDark,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (r.createdAt != null)
+                          Text(
+                            df.format(r.createdAt!),
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
                     ),
-                    Text('${r.amountIls} شيكل',
-                        style: const TextStyle(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              )),
+                  ),
+                  Text(
+                    '${r.amountIls} شيكل',
+                    style: const TextStyle(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -458,23 +519,58 @@ class _PointsPageState extends State<PointsPage> {
               const Icon(Icons.group_add_rounded, color: AppColors.primary),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('ادعُ أصدقاءك',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                        fontSize: 16)),
+                child: Text(
+                  'ادعُ أصدقاءك',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                    fontSize: 16,
+                  ),
+                ),
               ),
+              // The count opens the list. A number on its own cannot be
+              // checked: a member who sent twenty invitations has no way to
+              // tell which three landed.
               if (s.invitesCount > 0)
-                Text('${s.invitesCount} صديق',
-                    style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w700)),
+                InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          AcceptedInvitesPage(code: s.referralCode ?? ''),
+                    ),
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${s.invitesCount} صديق',
+                          style: const TextStyle(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_left_rounded,
+                          size: 20,
+                          color: AppColors.primaryDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'أرسل الكود إلى أصدقائك واجعلهم يستخدمونه عند إنشاء حسابهم'
-            ' في التطبيق لتحصل على ${arabicPoints(s.invitePoints)} فوراً.',
+            'ابعت الرابط لأصحابك — بيضغطوا عليه وبيسجّلوا، '
+            'وبتوصلك ${arabicPoints(s.invitePoints)} فورًا.',
             style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 10),
@@ -487,46 +583,7 @@ class _PointsPageState extends State<PointsPage> {
             ],
           ),
           const SizedBox(height: 10),
-          if (code.isNotEmpty)
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _copyCode(code),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight.withValues(alpha: .5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppColors.primary.withValues(alpha: .3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(code,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
-                                  letterSpacing: 2,
-                                  color: AppColors.primaryDark)),
-                          const Spacer(),
-                          const Icon(Icons.copy_rounded,
-                              size: 18, color: AppColors.primary),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () => _shareCode(code),
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  label: const Text('مشاركة'),
-                ),
-              ],
-            ),
+          if (code.isNotEmpty) InviteActions(code: code),
         ],
       ),
     );
@@ -559,18 +616,19 @@ class _PointsPageState extends State<PointsPage> {
   /// seven of ten is a reason to do three more, "1 نقطة" is not.
   Widget _progressSection(PointsSummary s) {
     final t = s.threshold;
-    final rows = [
-      for (final key in _earnable)
-        (
-          key: key,
-          done: (s.progress[key] ?? 0).clamp(0, t),
-          points: s.breakdown[key] ?? 0,
-        ),
-    ]..sort((a, b) {
-        // Closest to the next point first — that is the one worth doing today.
-        final byProgress = b.done.compareTo(a.done);
-        return byProgress != 0 ? byProgress : b.points.compareTo(a.points);
-      });
+    final rows =
+        [
+          for (final key in _earnable)
+            (
+              key: key,
+              done: (s.progress[key] ?? 0).clamp(0, t),
+              points: s.breakdown[key] ?? 0,
+            ),
+        ]..sort((a, b) {
+          // Closest to the next point first — that is the one worth doing today.
+          final byProgress = b.done.compareTo(a.done);
+          return byProgress != 0 ? byProgress : b.points.compareTo(a.points);
+        });
 
     final signup = s.breakdown['signup'] ?? 0;
     final nearest = rows.first;
@@ -580,15 +638,20 @@ class _PointsPageState extends State<PointsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _CardTitle(
-              icon: Icons.trending_up_rounded, text: 'طريقك للنقطة القادمة'),
+            icon: Icons.trending_up_rounded,
+            text: 'طريقك للنقطة القادمة',
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 8),
             child: Text(
               nearest.done > 0
                   ? 'أقرب نقطة لك: ${PointsSummary.categoryLabel(nearest.key)}'
-                      ' — باقي ${t - nearest.done}'
+                        ' — باقي ${t - nearest.done}'
                   : 'في مستوى ${s.tier}: كل ${arabicInteractions(t)} = نقطة واحدة',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12.5,
+              ),
             ),
           ),
           // Each category counts on its own, so the same $t applies seven times
@@ -596,7 +659,8 @@ class _PointsPageState extends State<PointsPage> {
           // inferred from seven identical bars.
           _Note(
             icon: Icons.info_outline_rounded,
-            text: 'كل نوع تفاعل له عدّاده الخاص، ويُحتسب لك'
+            text:
+                'كل نوع تفاعل له عدّاده الخاص، ويُحتسب لك'
                 ' ${arabicInteractions(s.dailyCap)} في اليوم على الأكثر.',
           ),
           const SizedBox(height: 6),
@@ -634,7 +698,8 @@ class _PointsPageState extends State<PointsPage> {
               done: r.done,
               total: t,
               points: r.points,
-              soon: _notYetInApp.contains(r.key) && r.done == 0 && r.points == 0,
+              soon:
+                  _notYetInApp.contains(r.key) && r.done == 0 && r.points == 0,
               // Nudge only the row that is actually close, so the highlight
               // means something.
               highlight: r.key == nearest.key && r.done > 0,
@@ -652,45 +717,61 @@ class _PointsPageState extends State<PointsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-              icon: Icons.redeem_rounded, text: 'أين أنفقت نقاطك'),
+          const _CardTitle(icon: Icons.redeem_rounded, text: 'أين أنفقت نقاطك'),
           const SizedBox(height: 4),
           if (s.redemptions.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('لم تستبدل أي نقاط بعد.',
-                  style: TextStyle(color: AppColors.textMuted)),
+              child: Text(
+                'لم تستبدل أي نقاط بعد.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
             )
           else
-            ...s.redemptions.map((r) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.storefront_rounded,
-                          size: 20, color: AppColors.textMuted),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r.vendorName ?? 'معلن',
-                                style: const TextStyle(
-                                    color: AppColors.textDark,
-                                    fontWeight: FontWeight.w700)),
-                            if (r.createdAt != null)
-                              Text(df.format(r.createdAt!),
-                                  style: const TextStyle(
-                                      color: AppColors.textMuted, fontSize: 12)),
-                          ],
-                        ),
+            ...s.redemptions.map(
+              (r) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.storefront_rounded,
+                      size: 20,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.vendorName ?? 'معلن',
+                            style: const TextStyle(
+                              color: AppColors.textDark,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (r.createdAt != null)
+                            Text(
+                              df.format(r.createdAt!),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
-                      Text('- ${r.points}',
-                          style: const TextStyle(
-                              color: AppColors.discount,
-                              fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                )),
+                    ),
+                    Text(
+                      '- ${r.points}',
+                      style: const TextStyle(
+                        color: AppColors.discount,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -711,11 +792,14 @@ class _PointsPageState extends State<PointsPage> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'يمكنك استبدال ${s.redeemCost} نقطة لدى أي معلن مقابل خصم يحدده '
-              'صاحب المحل — مرة كل 24 ساعة لكل معلن. تُخصم من الرصيد نفسه، '
+              'يمكنك استبدال ${s.redeemCost} نقطة لدى أي معلن والحصول على '
+              'خصم مباشرة — مرة كل 24 ساعة لكل معلن. تُخصم من الرصيد نفسه، '
               'فتبتعد قليلاً عن مكافأة الـ${s.rewardIls} شيكل.',
               style: const TextStyle(
-                  color: AppColors.textDark, fontSize: 13, height: 1.4),
+                color: AppColors.textDark,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -726,40 +810,14 @@ class _PointsPageState extends State<PointsPage> {
   // ---- helpers -----------------------------------------------------------
 
   Widget _card({required Widget child}) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 12,
-                offset: const Offset(0, 4)),
-          ],
-        ),
-        child: child,
-      );
-
-  void _copyCode(String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم نسخ كود الدعوة')),
-    );
-  }
-
-  void _shareCode(String code) {
-    // Share a LINK, not just the code: it opens the app straight to sign-up
-    // when installed, and otherwise lands on a page that sends the friend to
-    // the right store (Android or iPhone) with the code on their clipboard.
-    // The code stays in the text as a fallback for anyone who types it by hand.
-    final link = 'https://afrahna.co/r/$code';
-    Share.share(
-      'انضم إلى تطبيق أفراحنا 🎉\n'
-      'سجّل من هذا الرابط ليصلنا كلانا نقاط:\n$link\n\n'
-      'أو أدخل كود الدعوة عند التسجيل: $code',
-      subject: 'دعوة أفراحنا',
-    );
-  }
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(28),
+      boxShadow: AppDecor.lift,
+    ),
+    child: child,
+  );
 }
 
 /// How close the balance is to being worth something in a shop.
@@ -883,9 +941,11 @@ class _EarnRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon,
-                  size: 19,
-                  color: complete ? AppColors.primaryDark : AppColors.primary),
+              Icon(
+                icon,
+                size: 19,
+                color: complete ? AppColors.primaryDark : AppColors.primary,
+              ),
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
@@ -906,7 +966,9 @@ class _EarnRow extends StatelessWidget {
               Text(
                 complete ? completedNote! : '$done من $total',
                 style: TextStyle(
-                  color: highlight ? AppColors.primaryDark : AppColors.textMuted,
+                  color: highlight
+                      ? AppColors.primaryDark
+                      : AppColors.textMuted,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                 ),
@@ -943,8 +1005,8 @@ class _EarnRow extends StatelessWidget {
                     color: complete || left <= 0
                         ? const Color(0xFF2E9E5B)
                         : (highlight
-                            ? AppColors.primaryDark
-                            : AppColors.textMuted),
+                              ? AppColors.primaryDark
+                              : AppColors.textMuted),
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -962,7 +1024,9 @@ class _EarnRow extends StatelessWidget {
   String _status(bool complete, int left) {
     if (complete) return 'اكتمل — نقاطها في رصيدك';
     if (left <= 0) return 'وصلت الهدف — النقطة في رصيدك';
-    if (done == 0) return 'لم تبدأ بعد — ${arabicInteractions(total)} تكفي لنقطة';
+    if (done == 0) {
+      return 'لم تبدأ بعد — ${arabicInteractions(total)} تكفي لنقطة';
+    }
     if (left == 1) return 'لم تصل للهدف — باقي واحدة فقط!';
     return 'لم تصل للهدف — باقي $left';
   }
@@ -970,30 +1034,30 @@ class _EarnRow extends StatelessWidget {
   /// One quiet line: the way to earn is real, the place to do it is not
   /// open yet. A meter stuck at «0 من 7» would just look broken.
   Widget _soonRow() => Opacity(
-        opacity: .55,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          child: Row(
-            children: [
-              Icon(icon, size: 19, color: AppColors.textMuted),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textDark,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13.5,
-                  ),
-                ),
+    opacity: .55,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: AppColors.textMuted),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textDark,
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
               ),
-              const _Chip(text: 'قريباً'),
-            ],
+            ),
           ),
-        ),
-      );
+          const _Chip(text: 'قريباً'),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Ten steps rather than one continuous bar: a filled segment is one like, one
@@ -1079,11 +1143,14 @@ class _CardTitle extends StatelessWidget {
       children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 8),
-        Text(text,
-            style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
-                fontSize: 16)),
+        Text(
+          text,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textDark,
+            fontSize: 16,
+          ),
+        ),
       ],
     );
   }
@@ -1092,11 +1159,7 @@ class _CardTitle extends StatelessWidget {
 /// One rung of the ladder: the metal disc, the name, the goal, and what an
 /// interaction is worth once you are standing on it.
 class _Rung extends StatelessWidget {
-  const _Rung({
-    required this.rung,
-    required this.done,
-    required this.current,
-  });
+  const _Rung({required this.rung, required this.done, required this.current});
 
   final LadderRung rung;
   final bool done;
@@ -1118,8 +1181,9 @@ class _Rung extends StatelessWidget {
             shape: BoxShape.circle,
             gradient: lit ? rung.gradient : null,
             color: lit ? null : AppColors.primaryLight.withValues(alpha: .55),
-            border:
-                current ? Border.all(color: AppColors.primary, width: 2.4) : null,
+            border: current
+                ? Border.all(color: AppColors.primary, width: 2.4)
+                : null,
             boxShadow: current
                 ? [
                     BoxShadow(
@@ -1195,15 +1259,23 @@ class _StreakRing extends StatelessWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$days',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        height: 1,
-                        color: AppColors.textDark)),
-                Text('من $needed',
-                    style: const TextStyle(
-                        fontSize: 9, color: AppColors.textMuted, height: 1.4)),
+                Text(
+                  '$days',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    height: 1,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  'من $needed',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textMuted,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ],
@@ -1238,7 +1310,10 @@ class _Note extends StatelessWidget {
             child: Text(
               text,
               style: const TextStyle(
-                  color: AppColors.textDark, fontSize: 11.8, height: 1.4),
+                color: AppColors.textDark,
+                fontSize: 11.8,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -1281,25 +1356,36 @@ class _CelebrationDialog extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: .18),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: .5), width: 2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .5),
+                    width: 2,
+                  ),
                 ),
-                child: const Icon(Icons.emoji_events_rounded,
-                    size: 40, color: Colors.white),
+                child: const Icon(
+                  Icons.emoji_events_rounded,
+                  size: 40,
+                  color: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 14),
             Text(
               'مبروك! $amount شيكل',
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21),
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 21,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: Colors.white70, fontSize: 13.5, height: 1.5),
+                color: Colors.white70,
+                fontSize: 13.5,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -1307,13 +1393,16 @@ class _CelebrationDialog extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.surface,
                   foregroundColor: AppColors.primaryDark,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                child: const Text('تمام',
-                    style: TextStyle(fontWeight: FontWeight.w900)),
+                child: const Text(
+                  'تمام',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
               ),
             ),
           ],

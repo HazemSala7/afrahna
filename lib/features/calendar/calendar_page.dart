@@ -117,12 +117,8 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('التقويم الذكي'),
-        backgroundColor: AppColors.primaryDark,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: Colors.transparent,
+      appBar: const PinkAppBar(title: 'التقويم الذكي'),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -318,9 +314,10 @@ class _MonthCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.hairline, width: 0.8),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: AppColors.accent.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 1))],
       ),
       child: Column(children: [
         Row(children: [
@@ -376,7 +373,7 @@ class _MonthCard extends StatelessWidget {
                           child: Container(
                             width: 5, height: 5,
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.white : AppColors.primary,
+                              color: isSelected ? AppColors.surface : AppColors.primary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -406,7 +403,7 @@ class _EventTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
       ),
@@ -425,7 +422,7 @@ class _EventTile extends StatelessWidget {
         ),
         trailing: IconButton(
           onPressed: onDelete,
-          icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B)),
+          icon: const Icon(Icons.delete_outline, color: Color(0xFFE7A192)),
         ),
       ),
     );
@@ -518,6 +515,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       child: Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.hairline, width: 0.8)),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
@@ -573,7 +571,6 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
             const SizedBox(height: 8),
             SwitchListTile(
               value: _isMain,
-              activeThumbColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               title: const Text('اجعلها مناسبتي الرئيسية',
                   style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),

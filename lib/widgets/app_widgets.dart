@@ -1,13 +1,16 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import 'cosmos.dart';
 import 'shell_bottom_nav.dart';
 
-/// Pink gradient app background scaffold.
+/// The page scaffold: no background of its own — the page's sky shows through
+/// (see [CosmicPage]).
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
     super.key,
@@ -39,34 +42,30 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       extendBody: extendBody,
       appBar: appBar,
       bottomNavigationBar: bottomNavigationBar ??
           (showShellNav ? const ShellBottomNav() : null),
       floatingActionButton: floatingActionButton,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.background, Color(0xFFF3E5D2)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: padding ?? const EdgeInsets.all(0),
-            child: body,
-          ),
+      body: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: padding ?? EdgeInsets.zero,
+          child: body,
         ),
       ),
     );
   }
 }
 
-/// Unified premium AppBar used across the app:
-/// rose-gold gradient, soft shadow, rounded bottom corners,
-/// decorative sparkles, glass back button, optional subtitle.
+/// The app's command bar, used across the app.
+///
+/// Dark glass with a little of the sky caught inside it — two faint nebulae
+/// and a scatter of stars — a band of light that passes slowly across it, a
+/// line of neon along its lower edge, and the title cast in gold foil. The
+/// name is historical (it was a rose-gold gradient); every screen that used
+/// it gets the new bar without a change of its own.
 class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
   const PinkAppBar({
     super.key,
@@ -84,6 +83,8 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBack;
 
   static const double _barHeight = 72;
+  static const BorderRadius _radius =
+      BorderRadius.vertical(bottom: Radius.circular(28));
 
   @override
   Size get preferredSize => const Size.fromHeight(_barHeight);
@@ -93,80 +94,64 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
     final canPop = Navigator.canPop(context);
     final hasLeading = showBack && canPop;
     final hasActions = actions != null && actions!.isNotEmpty;
+    final titleStyle =
+        (Theme.of(context).appBarTheme.titleTextStyle ?? const TextStyle())
+            .copyWith(fontSize: 19, fontWeight: FontWeight.w700, height: 1.2);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
+      value: AppTheme.overlay,
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                Color(0xFFE6B450),
-                Color(0xFFB8835A),
-                Color(0xFF8B5A3C),
-              ],
-              stops: [0.0, 0.55, 1.0],
-            ),
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(26),
-            ),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            borderRadius: _radius,
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.30),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: Color(0x1F8E5F4A),
+                blurRadius: 22,
+                offset: Offset(0, 10),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(26),
-            ),
+            borderRadius: _radius,
             child: Stack(
               children: [
-                // Decorative sparkle pattern
-                const Positioned.fill(child: _AppBarSparkles()),
-                // Soft top sheen
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 36,
+                const Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.18),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
+                        colors: [Color(0xF5FFFFFF), Color(0xEDF6EFEA)],
                       ),
                     ),
                   ),
                 ),
-                // Thin gold underline
+                const Positioned.fill(
+                  child: CustomPaint(painter: _BarSkyPainter()),
+                ),
+                const Positioned.fill(child: _BarSweep()),
+                // The line of neon along the lower edge.
                 Positioned(
+                  left: 22,
+                  right: 22,
                   bottom: 0,
-                  left: 24,
-                  right: 24,
-                  child: Container(
-                    height: 2,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0x00FFFFFF),
-                          Color(0xCCFFE2B0),
-                          Color(0x00FFFFFF),
-                        ],
-                      ),
+                  height: 1.4,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [
+                        AppColors.accent.withValues(alpha: 0),
+                        AppColors.accent.withValues(alpha: 0.55),
+                        AppColors.holoLavender.withValues(alpha: 0.45),
+                        AppColors.accent.withValues(alpha: 0),
+                      ]),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -175,7 +160,7 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                   child: SizedBox(
                     height: _barHeight,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
                           if (hasLeading)
@@ -190,26 +175,12 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                           Expanded(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Text(
+                                GoldFoilText(
                                   title,
                                   maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 18,
-                                    letterSpacing: 0.3,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0x66000000),
-                                        blurRadius: 6,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
+                                  style: titleStyle,
                                 ),
                                 if (subtitle != null &&
                                     subtitle!.isNotEmpty) ...[
@@ -219,9 +190,8 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                          alpha: 0.85),
+                                    style: const TextStyle(
+                                      color: AppColors.textMuted,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 11.5,
                                       letterSpacing: 0.2,
@@ -234,7 +204,7 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                           if (hasActions)
                             IconTheme(
                               data: const IconThemeData(
-                                color: Colors.white,
+                                color: AppColors.accent,
                                 size: 22,
                               ),
                               child: Row(
@@ -258,7 +228,7 @@ class PinkAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// Translucent circular button used by [PinkAppBar].
+/// A glass orb with a gold rim, used by [PinkAppBar].
 class _AppBarGlassButton extends StatelessWidget {
   const _AppBarGlassButton({required this.icon, required this.onTap});
   final IconData icon;
@@ -267,23 +237,29 @@ class _AppBarGlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        customBorder: const CircleBorder(),
+        splashColor: AppColors.accent.withValues(alpha: 0.2),
         child: Container(
           width: 42,
           height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.18),
+            color: Colors.white.withValues(alpha: 0.05),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.35),
-              width: 1,
+              color: AppColors.accent.withValues(alpha: 0.45),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.16),
+                blurRadius: 12,
+              ),
+            ],
           ),
           alignment: Alignment.center,
-          child: Icon(icon, color: Colors.white, size: 21),
+          child: Icon(icon, color: AppColors.accent, size: 21),
         ),
       ),
     );
@@ -333,10 +309,11 @@ class OverlayBackButton extends StatelessWidget {
                 ],
               ),
               child: Material(
-                color: Colors.black.withValues(alpha: .34),
+                color: Colors.black.withValues(alpha: .38),
                 clipBehavior: Clip.antiAlias,
                 shape: CircleBorder(
-                  side: BorderSide(color: Colors.white.withValues(alpha: .28)),
+                  side: BorderSide(
+                      color: AppColors.accent.withValues(alpha: .45)),
                 ),
                 child: InkWell(
                   onTap: () {
@@ -368,27 +345,46 @@ class OverlayBackButton extends StatelessWidget {
   }
 }
 
-/// Subtle sparkle dots pattern for the AppBar background.
-class _AppBarSparkles extends StatelessWidget {
-  const _AppBarSparkles();
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _AppBarSparklesPainter());
-  }
-}
+/// The sky caught inside the command bar: two faint nebulae and a scatter of
+/// stars, a few of them with the four-point flare. Painted once.
+class _BarSkyPainter extends CustomPainter {
+  const _BarSkyPainter();
 
-class _AppBarSparklesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    void glow(Offset c, double r, Color color) {
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..shader = RadialGradient(colors: [color, color.withValues(alpha: 0)])
+              .createShader(Rect.fromCircle(center: c, radius: r)),
+      );
+    }
+
+    glow(Offset(size.width * 0.9, size.height * 0.1), size.width * 0.45,
+        AppColors.primary.withValues(alpha: 0.22));
+    glow(Offset(size.width * 0.08, size.height * 0.95), size.width * 0.4,
+        AppColors.holoLavender.withValues(alpha: 0.12));
+
     final rng = math.Random(7);
-    final paint = Paint()..style = PaintingStyle.fill;
-    for (int i = 0; i < 22; i++) {
-      final dx = rng.nextDouble() * size.width;
-      final dy = rng.nextDouble() * size.height;
-      final r = rng.nextDouble() * 1.6 + 0.6;
-      final alpha = 0.10 + rng.nextDouble() * 0.18;
-      paint.color = Colors.white.withValues(alpha: alpha);
-      canvas.drawCircle(Offset(dx, dy), r, paint);
+    final dot = Paint();
+    for (var i = 0; i < 30; i++) {
+      final o = Offset(
+          rng.nextDouble() * size.width, rng.nextDouble() * size.height);
+      final r = rng.nextDouble() * 1.1 + 0.3;
+      final a = 0.15 + rng.nextDouble() * 0.5;
+      dot.color = (i % 5 == 0 ? AppColors.accent : AppColors.pearl)
+          .withValues(alpha: a);
+      canvas.drawCircle(o, r, dot);
+      if (i % 11 == 0) {
+        final flare = Paint()
+          ..color = AppColors.pearl.withValues(alpha: a * 0.6)
+          ..strokeWidth = 0.6;
+        canvas.drawLine(o.translate(-4, 0), o.translate(4, 0), flare);
+        canvas.drawLine(o.translate(0, -4), o.translate(0, 4), flare);
+      }
     }
   }
 
@@ -396,7 +392,76 @@ class _AppBarSparklesPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Reusable network image with pink fallback.
+/// A slow band of light passing across the command bar, like the scan of an
+/// instrument panel. Its own layer, so the bar's text never repaints with it.
+class _BarSweep extends StatefulWidget {
+  const _BarSweep();
+
+  @override
+  State<_BarSweep> createState() => _BarSweepState();
+}
+
+class _BarSweepState extends State<_BarSweep>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) {
+            // Crosses in the first 40% of the cycle, then rests.
+            final t = (_c.value / 0.4).clamp(0.0, 1.0);
+            if (t >= 1) return const SizedBox.expand();
+            return FractionalTranslation(
+              translation:
+                  Offset(-1.2 + 2.4 * Curves.easeInOut.transform(t), 0),
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment(-1, -0.4),
+                    end: Alignment(1, 0.4),
+                    colors: [
+                      Color(0x00F2CC8F),
+                      Color(0x14F7E3C3),
+                      Color(0x10C6B3F5),
+                      Color(0x00F2CC8F),
+                    ],
+                    stops: [0.3, 0.48, 0.56, 0.72],
+                  ),
+                ),
+                child: SizedBox.expand(),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Reusable network image with a violet-glass fallback.
 class AppNetworkImage extends StatelessWidget {
   const AppNetworkImage({
     super.key,
@@ -420,13 +485,21 @@ class AppNetworkImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = fallbackColor ?? AppColors.primaryLight;
-    if (url == null || url!.isEmpty) {
-      return Container(
-        color: color,
-        alignment: Alignment.center,
-        child: Icon(fallbackIcon, color: AppColors.primary, size: 36),
-      );
-    }
+    Widget fallback() => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [color, AppColors.surface],
+            ),
+          ),
+          child: Center(
+            child: Icon(fallbackIcon,
+                color: AppColors.primary.withValues(alpha: 0.75), size: 36),
+          ),
+        );
+
+    if (url == null || url!.isEmpty) return fallback();
     return LayoutBuilder(
       builder: (context, constraints) {
         // Decode at (roughly) the on-screen size rather than the image's full
@@ -444,12 +517,8 @@ class AppNetworkImage extends StatelessWidget {
           imageUrl: url!,
           fit: fit,
           memCacheWidth: memWidth,
-          placeholder: (_, _) => Container(color: color.withValues(alpha: .4)),
-          errorWidget: (_, _, _) => Container(
-            color: color,
-            alignment: Alignment.center,
-            child: Icon(fallbackIcon, color: AppColors.primary, size: 36),
-          ),
+          placeholder: (_, _) => Container(color: color.withValues(alpha: .6)),
+          errorWidget: (_, _, _) => fallback(),
         );
       },
     );
@@ -468,9 +537,9 @@ class CenteredLoader extends StatelessWidget {
   }
 }
 
-/// Professional wedding-themed loading animation used across the whole app:
-/// two interlocking rose-gold "wedding rings" with a sweeping shimmer comet
-/// and twinkling sparkles. Pure Flutter (no packages) so it stays lightweight.
+/// The app's loading mark: two interlocked wedding rings drawn in holographic
+/// light, a point of light pulsing where they cross, and three particles
+/// orbiting them. Pure Flutter (no packages) so it stays lightweight.
 class AfrahnaLoader extends StatefulWidget {
   const AfrahnaLoader({super.key, this.size = 62, this.label});
 
@@ -490,7 +559,7 @@ class _AfrahnaLoaderState extends State<AfrahnaLoader>
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 2400),
     )..repeat();
   }
 
@@ -505,10 +574,12 @@ class _AfrahnaLoaderState extends State<AfrahnaLoader>
     final loader = SizedBox(
       width: widget.size,
       height: widget.size,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, _) => CustomPaint(
-          painter: _AfrahnaRingsPainter(_c.value),
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) => CustomPaint(
+            painter: _AfrahnaRingsPainter(_c.value),
+          ),
         ),
       ),
     );
@@ -537,90 +608,140 @@ class _AfrahnaRingsPainter extends CustomPainter {
   /// Animation position, 0..1.
   final double t;
 
-  static const _clear = Color(0x00B8835A);
+  static const _clear = Color(0x00F7E3C3);
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final c = Offset(w / 2, size.height / 2);
-    final ringR = w * 0.23;
-    final stroke = (w * 0.075).clamp(2.0, 9.0);
+    final ringR = w * 0.22;
+    final stroke = (w * 0.065).clamp(2.0, 8.0);
     final dx = ringR * 0.72;
 
-    // Two overlapping rings → the classic interlocked wedding-ring silhouette.
+    // Two overlapping rings → the interlocked wedding-ring silhouette.
     final left = Offset(c.dx - dx, c.dy + ringR * 0.16);
     final right = Offset(c.dx + dx, c.dy - ringR * 0.16);
 
-    // Gentle breathing pulse.
     final pulse = 1 + 0.035 * math.sin(t * 2 * math.pi);
     final rr = ringR * pulse;
 
-    // Faint base rings.
+    // Faint base rings: glass, not paint.
     final base = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
-      ..color = AppColors.primaryLight.withValues(alpha: 0.6);
+      ..color = AppColors.pearl.withValues(alpha: 0.08);
     canvas.drawCircle(left, rr, base);
     canvas.drawCircle(right, rr, base);
 
-    // Sweeping shimmer "comet" that chases around each ring.
+    // A comet of holographic light chasing round each ring: a blurred pass for
+    // the glow, a crisp one on top.
     void comet(Offset center, double phase) {
-      final rot = (t + phase) * 2 * math.pi;
       final rect = Rect.fromCircle(center: center, radius: rr);
       final shader = SweepGradient(
         colors: const [
           _clear,
           _clear,
-          AppColors.accent,
-          AppColors.primary,
-          AppColors.primaryDark,
+          AppColors.champagne,
+          AppColors.holoRose,
+          AppColors.holoLavender,
+          AppColors.holoAqua,
           _clear,
         ],
-        stops: const [0.0, 0.55, 0.72, 0.86, 0.965, 1.0],
-        transform: GradientRotation(rot),
+        stops: const [0.0, 0.5, 0.64, 0.76, 0.87, 0.965, 1.0],
+        transform: GradientRotation((t + phase) * 2 * math.pi),
       ).createShader(rect);
-      final p = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..shader = shader;
-      canvas.drawArc(rect, 0, 2 * math.pi, false, p);
+      canvas.drawArc(
+        rect,
+        0,
+        2 * math.pi,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke * 1.8
+          ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, stroke)
+          ..shader = shader,
+      );
+      canvas.drawArc(
+        rect,
+        0,
+        2 * math.pi,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round
+          ..shader = shader,
+      );
     }
 
     comet(left, 0.0);
     comet(right, 0.5);
 
-    // Twinkling sparkles around the rings.
-    final sparkles = <Offset>[
-      Offset(c.dx, c.dy - ringR * 1.85),
-      Offset(c.dx + ringR * 2.0, c.dy + ringR * 0.95),
-      Offset(c.dx - ringR * 2.0, c.dy + ringR * 1.05),
-    ];
-    for (var i = 0; i < sparkles.length; i++) {
-      final tw = math.sin((t * 2 + i / sparkles.length) * 2 * math.pi) * .5 + .5;
-      _sparkle(
-        canvas,
-        sparkles[i],
-        (w * 0.055) * (0.45 + tw * 0.9),
-        AppColors.accent.withValues(alpha: 0.25 + tw * 0.65),
+    // The point of light where the rings cross.
+    final glint = 0.5 + 0.5 * math.sin(t * 4 * math.pi);
+    final gr = w * (0.06 + 0.04 * glint);
+    canvas.drawCircle(
+      c,
+      gr * 2.4,
+      Paint()
+        ..shader = RadialGradient(colors: [
+          AppColors.pearl.withValues(alpha: 0.55 * glint + 0.2),
+          AppColors.champagne.withValues(alpha: 0),
+        ]).createShader(Rect.fromCircle(center: c, radius: gr * 2.4)),
+    );
+
+    // Three particles in orbit, each at its own speed.
+    const orbit = [AppColors.accent, AppColors.holoLavender, AppColors.holoAqua];
+    for (var i = 0; i < orbit.length; i++) {
+      final a = (t * (1 + i * 0.35) + i / 3) * 2 * math.pi;
+      final o = c + Offset(math.cos(a), math.sin(a) * 0.62) * (ringR * 1.95);
+      canvas.drawCircle(
+          o, w * 0.022, Paint()..color = orbit[i].withValues(alpha: 0.9));
+      canvas.drawCircle(
+        o,
+        w * 0.05,
+        Paint()
+          ..color = orbit[i].withValues(alpha: 0.25)
+          ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, w * 0.03),
       );
     }
   }
 
-  void _sparkle(Canvas canvas, Offset o, double r, Color color) {
-    final p = Paint()..color = color;
-    final path = Path()
-      ..moveTo(o.dx, o.dy - r)
-      ..quadraticBezierTo(o.dx, o.dy, o.dx + r, o.dy)
-      ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy + r)
-      ..quadraticBezierTo(o.dx, o.dy, o.dx - r, o.dy)
-      ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy - r)
-      ..close();
-    canvas.drawPath(path, p);
-  }
-
   @override
   bool shouldRepaint(covariant _AfrahnaRingsPainter old) => old.t != t;
+}
+
+/// A glowing orb for the icon of an empty or error state.
+class _StateOrb extends StatelessWidget {
+  const _StateOrb({required this.icon, required this.color});
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 104,
+      height: 104,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            color.withValues(alpha: 0.26),
+            color.withValues(alpha: 0.06),
+            color.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.6, 1],
+        ),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Icon(
+        icon,
+        size: 48,
+        color: color,
+        shadows: [Shadow(color: color.withValues(alpha: 0.8), blurRadius: 18)],
+      ),
+    );
+  }
 }
 
 /// Friendly error widget.
@@ -638,9 +759,9 @@ class ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 64, color: AppColors.primary),
-            const SizedBox(height: 12),
+            const _StateOrb(
+                icon: Icons.cloud_off_rounded, color: AppColors.accent),
+            const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -649,7 +770,7 @@ class ErrorState extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             if (onRetry != null)
               ElevatedButton(
                 onPressed: onRetry,
@@ -677,9 +798,11 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon ?? Icons.inbox_outlined,
-                size: 64, color: AppColors.textMuted),
-            const SizedBox(height: 12),
+            _StateOrb(
+              icon: icon ?? Icons.inbox_outlined,
+              color: AppColors.holoLavender,
+            ),
+            const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -692,7 +815,7 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-/// Pink rating row.
+/// Star rating row.
 class RatingRow extends StatelessWidget {
   const RatingRow({super.key, required this.rating, this.reviewsCount});
 
@@ -704,16 +827,19 @@ class RatingRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded,
-            color: Color(0xFFFFB400), size: 18),
+        const Icon(
+          Icons.star_rounded,
+          color: Color(0xFFFFC23D),
+          size: 18,
+          shadows: [Shadow(color: Color(0x99FFB400), blurRadius: 8)],
+        ),
         const SizedBox(width: 2),
         Text(rating.toStringAsFixed(1),
             style: const TextStyle(fontWeight: FontWeight.w700)),
         if (reviewsCount != null) ...[
           const SizedBox(width: 4),
           Text('(${reviewsCount!})',
-              style: const TextStyle(
-                  color: AppColors.textMuted, fontSize: 12)),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
         ],
       ],
     );
@@ -721,8 +847,8 @@ class RatingRow extends StatelessWidget {
 }
 
 /// Subscription-tier verification badge shown next to a vendor's name:
-///  - VIP      → a glowing GOLD verified check (premium)
-///  - featured → the classic BLUE verified check
+///  - VIP      → a blue verified check
+///  - featured → a green verified check
 ///  - neither (normal / no subscription) → nothing
 ///
 /// Kept model-agnostic (takes booleans) so it can be dropped in anywhere.
@@ -740,14 +866,19 @@ class TierBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Verification mark: VIP = blue, مميّز/featured = green.
+    // Verification mark: VIP = blue, مميّز/featured = green — each with a glow
+    // of its own colour so it reads against the dark.
     if (vip) {
       return Icon(Icons.verified_rounded,
-          color: const Color(0xFF1D9BF0), size: size);
+          color: const Color(0xFF3AAEFF),
+          size: size,
+          shadows: const [Shadow(color: Color(0x993AAEFF), blurRadius: 8)]);
     }
     if (featured) {
       return Icon(Icons.verified_rounded,
-          color: const Color(0xFF16A34A), size: size);
+          color: const Color(0xFF34D17A),
+          size: size,
+          shadows: const [Shadow(color: Color(0x9934D17A), blurRadius: 8)]);
     }
     return const SizedBox.shrink();
   }

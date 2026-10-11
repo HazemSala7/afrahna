@@ -69,7 +69,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     final qty = context.select<CartController, int>((c) => c.quantityOf(p.id));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         controller: _scroll,
         slivers: [
@@ -326,7 +326,7 @@ class _RoundIconButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.discount,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: AppColors.hairline, width: 1.5),
                 ),
                 child: Text(
                   '$badge',
@@ -400,7 +400,7 @@ class _Dots extends StatelessWidget {
           width: active ? 18 : 6,
           height: 6,
           decoration: BoxDecoration(
-            color: active ? Colors.white : Colors.white54,
+            color: active ? AppColors.surface : Colors.white54,
             borderRadius: BorderRadius.circular(99),
           ),
         );
@@ -474,7 +474,7 @@ class _ShopRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -573,7 +573,8 @@ class _BuyBar extends StatelessWidget {
         16, 12, 16, 12 + MediaQuery.of(context).viewPadding.bottom,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.hairline, width: 0.8),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         boxShadow: [
           BoxShadow(

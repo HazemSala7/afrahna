@@ -173,7 +173,7 @@ class _CompetitionDialogState extends State<_CompetitionDialog> {
     final voted = _prediction != null;
 
     return Dialog(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 36),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       clipBehavior: Clip.antiAlias,
@@ -303,7 +303,7 @@ class _TeamHead extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.primaryLight.withValues(alpha: 0.35),
-            border: Border.all(color: Colors.white, width: 2),
+            border: Border.all(color: AppColors.hairline, width: 2),
             boxShadow: [
               BoxShadow(
                   color: Colors.black.withValues(alpha: 0.12),
@@ -357,7 +357,7 @@ class _ScoreCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
             color: gold
@@ -379,7 +379,7 @@ class _ScoreCard extends StatelessWidget {
               gradient: gold
                   ? _gold
                   : LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryDark]),
+                      colors: [AppColors.primary, AppColors.goldDeep]),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(label,
@@ -415,7 +415,7 @@ class _ScoreCard extends StatelessWidget {
         height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.background,
+          color: AppColors.surfaceHigh,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(s,
@@ -453,7 +453,7 @@ class _EditScoreCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         boxShadow: [
@@ -528,7 +528,7 @@ class _EditScoreCard extends StatelessWidget {
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(vertical: 8),
             filled: true,
-            fillColor: AppColors.background,
+            fillColor: AppColors.surfaceHigh,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide.none,
@@ -554,7 +554,8 @@ class _SponsorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.hairline, width: 0.8),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -734,7 +735,7 @@ class _QuickSignupDialogState extends State<_QuickSignupDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: Padding(
         padding: EdgeInsets.only(
@@ -852,7 +853,7 @@ class _MyPredictionDialog extends StatelessWidget {
         (c.pageTiktok ?? '').isNotEmpty;
 
     return Dialog(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       clipBehavior: Clip.antiAlias,
@@ -984,8 +985,8 @@ class _MyPredictionDialog extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: correct == true
-                              ? const Color(0xFF1E7A43)
-                              : const Color(0xFFC1452B),
+                              ? const Color(0xFF94E5B5)
+                              : const Color(0xFFE7A192),
                           fontWeight: FontWeight.w900,
                           fontSize: 13.5,
                         ),
@@ -1081,7 +1082,7 @@ class _FollowPagesDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = competition;
     return Dialog(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),

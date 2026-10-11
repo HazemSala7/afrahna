@@ -18,6 +18,9 @@ import 'package:afrahna/features/bookings/my_bookings_block.dart';
 import 'package:afrahna/features/account/customer_header.dart';
 import 'package:afrahna/widgets/tier_badge.dart';
 import 'package:afrahna/widgets/tier_benefits.dart';
+import 'package:afrahna/core/theme.dart';
+
+import 'cosmic_harness.dart';
 
 /// The level badge shows up on the home card, the account card and the facts
 /// row, so it is worth looking at all four metals side by side rather than
@@ -34,11 +37,13 @@ UserModel _user({int rewardsTaken = 0, int balance = 6}) => UserModel(
 
 Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(MaterialApp(
+    theme: AppTheme.cosmic(),
+    builder: cosmicBuilder,
     locale: const Locale('ar'),
     home: Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFAF3EC),
+        backgroundColor: Colors.transparent,
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: child,
@@ -53,6 +58,7 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
 }
 
 void main() {
+  setUpAll(preloadCosmic);
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
     if (font.existsSync()) {
@@ -154,9 +160,11 @@ void main() {
 
     await tester.pumpWidget(ChangeNotifierProvider<SessionController>(
       create: (_) => _Signed(_user(rewardsTaken: 1, balance: 63)),
-      child: const MaterialApp(
-        locale: Locale('ar'),
-        home: Directionality(
+      child: MaterialApp(
+        theme: AppTheme.cosmic(),
+        builder: cosmicBuilder,
+        locale: const Locale('ar'),
+        home: const Directionality(
           textDirection: TextDirection.rtl,
           child: AccountPage(),
         ),

@@ -36,7 +36,7 @@ class OfferDetailsPage extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             ListView(
@@ -131,8 +131,19 @@ class OfferDetailsPage extends StatelessWidget {
                 Transform.translate(
                   offset: const Offset(0, -24),
                   child: Container(
+              // Solid over the hero's edge, thinning into the night sky
+              // rather than ending in a hard line where the content does.
               decoration: const BoxDecoration(
-                color: AppColors.background,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.background,
+                    Color(0xE608070F),
+                    Color(0x0008070F),
+                  ],
+                  stops: [0, 0.55, 1],
+                ),
                 borderRadius:
                     BorderRadius.vertical(top: Radius.circular(26)),
               ),
@@ -156,9 +167,9 @@ class OfferDetailsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(13),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
+                              color: AppColors.accent.withValues(alpha: 0.28),
                               blurRadius: 8,
-                              offset: const Offset(0, 3),
+                              offset: const Offset(0, 1),
                             ),
                           ],
                         ),
@@ -213,15 +224,9 @@ class OfferDetailsPage extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.cardShadow,
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: AppDecor.lift,
                       ),
                       child: Text(promo.description,
                           style: const TextStyle(
@@ -332,7 +337,8 @@ class _InfoTile extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.hairline, width: 0.8),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 19, color: AppColors.primary),
@@ -379,15 +385,9 @@ class _VendorRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppDecor.lift,
         ),
         child: Row(
           children: [
@@ -532,8 +532,8 @@ class _OfferGalleryState extends State<_OfferGallery> {
                         height: 7,
                         decoration: BoxDecoration(
                           color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.6),
+                              ? AppColors.surface
+                              : AppColors.surface.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );

@@ -89,6 +89,47 @@ class _FadeSlideInState extends State<FadeSlideIn>
 }
 
 // ===========================================================================
+// STAGGER — a list arriving one item after another.
+// ===========================================================================
+
+/// One item of a list, arriving a moment after the one before it.
+///
+/// The delay is capped a few items in: a list of forty must not take three
+/// seconds to finish appearing, and nobody can see the difference past the
+/// first screenful anyway.
+class StaggerIn extends StatelessWidget {
+  const StaggerIn({
+    super.key,
+    required this.index,
+    required this.child,
+    this.id,
+    this.step = const Duration(milliseconds: 55),
+    this.cap = 8,
+  });
+
+  final int index;
+  final Widget child;
+
+  /// Names this list, so scrolling back to an item does not replay its
+  /// arrival. Leave null on a list that is rebuilt from scratch each time.
+  final String? id;
+
+  final Duration step;
+  final int cap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeSlideIn(
+      id: id == null ? null : '$id.$index',
+      delay: step * (index < cap ? index : cap),
+      duration: const Duration(milliseconds: 470),
+      offset: const Offset(0, 0.12),
+      child: child,
+    );
+  }
+}
+
+// ===========================================================================
 // PULSE — gentle scale loop (for FABs, highlights).
 // ===========================================================================
 
@@ -369,9 +410,9 @@ class _CountdownCardState extends State<CountdownCard>
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.25),
+            color: AppColors.accent.withValues(alpha: 0.2),
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -544,9 +585,9 @@ class AiCompanionFab extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.45),
+                color: AppColors.accent.withValues(alpha: 0.36),
                 blurRadius: 18,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 2),
               ),
             ],
           ),

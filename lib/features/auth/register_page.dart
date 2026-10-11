@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/services/accounts_services.dart';
 import '../../core/services/referral_storage.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../widgets/cosmos.dart';
 import '../home/home_page.dart';
 import 'auth_shared.dart';
 import 'login_page.dart';
@@ -28,6 +31,51 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscure2 = true;
   bool _agree = true;
 
+  /// What the server said was wrong with a field, shown under that field
+  /// and cleared the moment the field is edited again.
+  final _serverErrors = <String, String>{};
+  static const _fieldOrder = [
+    'name', 'phone', 'email', 'referral_code', 'password',
+  ];
+  final _fieldKeys = {for (final f in _fieldOrder) f: GlobalKey()};
+  final _focus = {for (final f in _fieldOrder) f: FocusNode()};
+
+  String? _serverError(String field) => _serverErrors[field];
+
+  void _clearServerError(String field) {
+    if (_serverErrors.remove(field) != null) setState(() {});
+  }
+
+  /// Puts the server's complaints under their fields, scrolls the first one
+  /// into view and gives it the cursor. False when none of them belongs to
+  /// a field on this form, so the caller falls back to a banner.
+  bool _showServerErrors(Map<String, String> errors) {
+    final mine = <String, String>{};
+    for (final e in errors.entries) {
+      // The confirmation rule reports on the password itself.
+      final key = e.key == 'password_confirmation' ? 'password' : e.key;
+      if (_fieldOrder.contains(key)) mine[key] = e.value;
+    }
+    if (mine.isEmpty) return false;
+    setState(() => _serverErrors..clear()..addAll(mine));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _formKey.currentState?.validate();
+      final first = _fieldOrder.firstWhere(mine.containsKey);
+      final ctx = _fieldKeys[first]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.2,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOut,
+        );
+      }
+      _focus[first]?.requestFocus();
+    });
+    return true;
+  }
+
   /// True when the code was filled in from an invite link rather than typed.
   bool _referralFromLink = false;
 
@@ -37,15 +85,48 @@ class _RegisterPageState extends State<RegisterPage> {
     _loadPendingReferral();
   }
 
-  /// Pre-fills the invite code captured when the friend tapped the invite link,
-  /// so the inviter's point doesn't depend on the friend retyping it.
+  /// Who the waiting invite code belongs to, once the server has confirmed
+  /// it — shown under the field so the friend sees they were invited rather
+  /// than reading a bare code.
+  String? _inviterName;
+
+  /// Pre-fills the invite code, from the tapped link or from the clipboard.
+  ///
+  /// The link is only captured when the app was already installed. A friend
+  /// who taps the link, installs, and opens the app arrives with nothing —
+  /// the invite page copies the code for exactly this reason, and until now
+  /// nobody read it, so the inviter lost the point unless the friend typed
+  /// the code by hand.
   Future<void> _loadPendingReferral() async {
-    final code = await ReferralStorage.read();
+    var code = await ReferralStorage.read();
+    code ??= await _codeFromClipboard();
     if (code == null || !mounted || _referral.text.trim().isNotEmpty) return;
+
     setState(() {
-      _referral.text = code;
+      _referral.text = code!;
       _referralFromLink = true;
     });
+
+    final name = await ReferralService().ownerName(code);
+    if (mounted && name != null) setState(() => _inviterName = name);
+  }
+
+  /// A code sitting on the clipboard, if that is what it is.
+  ///
+  /// Only accepted when it looks like nothing else: the shape of a code and
+  /// no spaces. Anything a friend happens to have copied — a phone number, a
+  /// sentence — is left alone.
+  Future<String?> _codeFromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = (data?.text ?? '').trim();
+      if (raw.isEmpty || raw.length > 16 || raw.contains(RegExp(r'\s'))) return null;
+      final code = ReferralStorage.normalize(raw);
+      if (code == null || code != raw.toUpperCase()) return null;
+      return await ReferralService().ownerName(code) == null ? null : code;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -56,6 +137,9 @@ class _RegisterPageState extends State<RegisterPage> {
     _password.dispose();
     _confirm.dispose();
     _referral.dispose();
+    for (final f in _focus.values) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -65,7 +149,6 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_agree) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('يجب الموافقة على الشروط والأحكام'),
-        backgroundColor: AppColors.primaryDark,
       ));
       return;
     }
@@ -92,18 +175,19 @@ class _RegisterPageState extends State<RegisterPage> {
         PageRouteBuilder(
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-          pageBuilder: (_, _, _) => const HomePage(),
+          // Hand-built, so it brings its own living sky.
+          pageBuilder: (_, _, _) => const CosmicPage(child: HomePage()),
         ),
         (_) => false,
       );
-    } else {
+    } else if (!_showServerErrors(session.fieldErrors)) {
+      // Nothing the form can point at: say it in a banner.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: AppColors.primaryDark,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white),
+            const Icon(Icons.error_outline, color: AppColors.discount),
             const SizedBox(width: 10),
             Expanded(child: Text(session.error ?? 'فشل التسجيل')),
           ],
@@ -160,21 +244,30 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   const SizedBox(height: 18),
                                   AuthField(
+                                    key: _fieldKeys['name'],
+                                    focusNode: _focus['name'],
+                                    onChanged: (_) => _clearServerError('name'),
                                     controller: _name,
                                     label: 'الاسم الكامل',
                                     icon: Icons.person_outline_rounded,
-                                    validator: (v) => (v == null || v.trim().length < 2)
-                                        ? 'الاسم مطلوب'
-                                        : null,
+                                    validator: (v) =>
+                                        _serverError('name') ??
+                                        ((v == null || v.trim().length < 2)
+                                            ? 'الاسم مطلوب'
+                                            : null),
                                   ),
                                   const SizedBox(height: 12),
                                   AuthField(
+                                    key: _fieldKeys['phone'],
+                                    focusNode: _focus['phone'],
+                                    onChanged: (_) => _clearServerError('phone'),
                                     controller: _phone,
                                     label: 'رقم الجوال',
                                     icon: Icons.phone_iphone_rounded,
                                     keyboardType: TextInputType.phone,
-                                    textDirection: TextDirection.ltr,
                                     validator: (v) {
+                                      final fromServer = _serverError('phone');
+                                      if (fromServer != null) return fromServer;
                                       final s = (v ?? '').replaceAll(RegExp(r'\D'), '');
                                       if (s.length < 7) return 'رقم الجوال غير صحيح';
                                       return null;
@@ -182,11 +275,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   const SizedBox(height: 12),
                                   AuthField(
+                                    key: _fieldKeys['email'],
+                                    focusNode: _focus['email'],
+                                    onChanged: (_) => _clearServerError('email'),
                                     controller: _email,
                                     label: 'البريد الإلكتروني (اختياري)',
                                     icon: Icons.alternate_email_rounded,
                                     keyboardType: TextInputType.emailAddress,
                                     validator: (v) {
+                                      final fromServer = _serverError('email');
+                                      if (fromServer != null) return fromServer;
                                       final s = (v ?? '').trim();
                                       if (s.isEmpty) return null;
                                       if (!s.contains('@')) return 'بريد غير صحيح';
@@ -195,23 +293,30 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   const SizedBox(height: 12),
                                   AuthField(
+                                    key: _fieldKeys['referral_code'],
+                                    focusNode: _focus['referral_code'],
+                                    onChanged: (_) =>
+                                        _clearServerError('referral_code'),
                                     controller: _referral,
                                     label: 'كود دعوة صديق (اختياري)',
                                     icon: Icons.group_add_rounded,
                                     textDirection: TextDirection.ltr,
+                                    validator: (_) => _serverError('referral_code'),
                                   ),
                                   if (_referralFromLink)
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 6, right: 6),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6, right: 6),
                                       child: Row(
                                         children: [
-                                          Icon(Icons.check_circle_rounded,
+                                          const Icon(Icons.check_circle_rounded,
                                               size: 15, color: Color(0xFF1B9C5A)),
-                                          SizedBox(width: 5),
+                                          const SizedBox(width: 5),
                                           Expanded(
                                             child: Text(
-                                              'تم تعبئة كود الدعوة تلقائيًا من الرابط',
-                                              style: TextStyle(
+                                              _inviterName != null
+                                                  ? 'دعاك $_inviterName إلى أفراحنا 🎉'
+                                                  : 'تم تعبئة كود الدعوة تلقائيًا',
+                                              style: const TextStyle(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w700,
                                                 color: Color(0xFF1B9C5A),
@@ -223,6 +328,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                     ),
                                   const SizedBox(height: 12),
                                   AuthField(
+                                    key: _fieldKeys['password'],
+                                    focusNode: _focus['password'],
+                                    onChanged: (_) => _clearServerError('password'),
                                     controller: _password,
                                     label: 'كلمة المرور',
                                     icon: Icons.lock_outline_rounded,
@@ -237,9 +345,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                       onPressed: () => setState(() => _obscure1 = !_obscure1),
                                     ),
-                                    validator: (v) => (v == null || v.length < 3)
-                                        ? 'كلمة المرور قصيرة (3 خانات على الأقل)'
-                                        : null,
+                                    validator: (v) =>
+                                        _serverError('password') ??
+                                        ((v == null || v.length < 3)
+                                            ? 'كلمة المرور قصيرة (3 خانات على الأقل)'
+                                            : null),
                                   ),
                                   const SizedBox(height: 12),
                                   AuthField(
@@ -280,8 +390,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                         ),
                                       ),
                                       Expanded(
-                                        child: RichText(
-                                          text: const TextSpan(
+                                        child: const Text.rich(
+                                          TextSpan(
                                             style: TextStyle(
                                               color: AppColors.textDark,
                                               fontSize: 13,

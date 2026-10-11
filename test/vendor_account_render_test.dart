@@ -14,6 +14,9 @@ import 'package:afrahna/core/models/models.dart';
 import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/account/vendor_account_view.dart';
 import 'package:afrahna/widgets/tier_badge.dart';
+import 'package:afrahna/core/theme.dart';
+
+import 'cosmic_harness.dart';
 
 /// An advertiser's «حسابي». Two different point counters live on this screen —
 /// the shop's, which buys subscription months, and the owner's own, which buys
@@ -58,6 +61,7 @@ class _SignedInVendor extends SessionController {
 }
 
 void main() {
+  setUpAll(preloadCosmic);
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
     if (font.existsSync()) {
@@ -89,6 +93,8 @@ void main() {
     await tester.pumpWidget(ChangeNotifierProvider<SessionController>.value(
       value: session,
       child: MaterialApp(
+        theme: AppTheme.cosmic(),
+        builder: cosmicBuilder,
         locale: const Locale('ar'),
         home: Directionality(
           textDirection: TextDirection.rtl,

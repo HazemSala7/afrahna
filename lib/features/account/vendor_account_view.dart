@@ -10,10 +10,13 @@ import '../../widgets/tier_badge.dart';
 import '../../core/theme.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/cosmos.dart';
+import '../bookings/bookings_page.dart';
 import '../notifications/notifications_page.dart';
 import '../points/points_page.dart';
 import '../posts/manage_reels_page.dart';
 import '../posts/vendor_posts_page.dart';
+import '../store/my_orders_page.dart';
 import '../subscriptions/subscription_plans.dart';
 import '../vendors/edit_vendor_page.dart';
 import '../vendors/manage_highlights_page.dart';
@@ -51,11 +54,44 @@ class _VendorAccountViewState extends State<VendorAccountView> {
 
   int _unread = 0;
 
+  /// Requests waiting on the shop's answer. Null until counted (or when the
+  /// count could not be fetched — the tiles still open the lists).
+  int? _pendingBookings;
+  int? _pendingOrders;
+
   @override
   void initState() {
     super.initState();
     _load();
     _loadUnread();
+    _loadInbox();
+  }
+
+  Future<void> _loadInbox() async {
+    Future<int?> count(Future<List<Object>> list) async {
+      try {
+        return (await list).length;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final results = await Future.wait([
+      count(BookingService().list(scope: 'vendor', status: 'pending')),
+      count(OrderService().list(scope: 'vendor', status: 'pending')),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _pendingBookings = results[0];
+      _pendingOrders = results[1];
+    });
+  }
+
+  /// Opens one of the inboxes, and recounts on the way back — the shop has
+  /// probably just answered something.
+  Future<void> _openInbox(Widget page) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    _loadInbox();
   }
 
   Future<void> _load() async {
@@ -82,7 +118,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait([_load(), _loadUnread()]);
+    await Future.wait([_load(), _loadUnread(), _loadInbox()]);
   }
 
   void _go(Widget page) =>
@@ -114,19 +150,25 @@ class _VendorAccountViewState extends State<VendorAccountView> {
                 child: Text(
                   cover ? 'تعديل صورة الغلاف' : 'تعديل الصورة الشخصية',
                   style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 16),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded,
-                  color: AppColors.primary),
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: AppColors.primary,
+              ),
               title: const Text('اختيار من المعرض'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             ListTile(
-              leading:
-                  const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+              leading: const Icon(
+                Icons.photo_camera_rounded,
+                color: AppColors.primary,
+              ),
               title: const Text('التقاط صورة'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
@@ -250,7 +292,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => Container(
         decoration: const BoxDecoration(
-          color: AppColors.background,
+          color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -268,44 +310,46 @@ class _VendorAccountViewState extends State<VendorAccountView> {
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
-              AccountMenuGroup(items: [
-                AccountMenuItem(
-                  icon: Icons.lock_rounded,
-                  label: 'تغيير كلمة المرور',
-                  tint: kTintTeal,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    showChangePasswordSheet(context);
-                  },
-                ),
-                AccountMenuItem(
-                  icon: Icons.language_rounded,
-                  label: 'اللغة',
-                  tint: kTintTerracotta,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    showLanguageDialog(context);
-                  },
-                ),
-                AccountMenuItem(
-                  icon: Icons.help_rounded,
-                  label: 'المساعدة والدعم',
-                  tint: kTintSage,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    showSupportSheet(context);
-                  },
-                ),
-                AccountMenuItem(
-                  icon: Icons.info_rounded,
-                  label: 'حول التطبيق',
-                  tint: kTintMauve,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    showAppAboutSheet(context);
-                  },
-                ),
-              ]),
+              AccountMenuGroup(
+                items: [
+                  AccountMenuItem(
+                    icon: Icons.lock_rounded,
+                    label: 'تغيير كلمة المرور',
+                    tint: kTintTeal,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      showChangePasswordSheet(context);
+                    },
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.language_rounded,
+                    label: 'اللغة',
+                    tint: kTintTerracotta,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      showLanguageDialog(context);
+                    },
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.help_rounded,
+                    label: 'المساعدة والدعم',
+                    tint: kTintSage,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      showSupportSheet(context);
+                    },
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.info_rounded,
+                    label: 'حول التطبيق',
+                    tint: kTintMauve,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      showAppAboutSheet(context);
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -366,8 +410,7 @@ class _VendorAccountViewState extends State<VendorAccountView> {
                 vendor: vendor,
                 busy: _savingImage,
                 onTapAvatar: () => _changeImage(cover: false),
-                onPreview: () =>
-                    _go(VendorDetailsPage(vendorId: vendor.id)),
+                onPreview: () => _go(VendorDetailsPage(vendorId: vendor.id)),
               ),
             ),
             const SizedBox(height: 12),
@@ -380,7 +423,9 @@ class _VendorAccountViewState extends State<VendorAccountView> {
                     child: _GhostButton(
                       icon: Icons.image_rounded,
                       label: 'تعديل الغلاف',
-                      onTap: _savingImage ? null : () => _changeImage(cover: true),
+                      onTap: _savingImage
+                          ? null
+                          : () => _changeImage(cover: true),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -388,11 +433,29 @@ class _VendorAccountViewState extends State<VendorAccountView> {
                     child: _GhostButton(
                       icon: Icons.person_rounded,
                       label: 'تعديل الصورة الشخصية',
-                      onTap:
-                          _savingImage ? null : () => _changeImage(cover: false),
+                      onTap: _savingImage
+                          ? null
+                          : () => _changeImage(cover: false),
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // What customers are waiting on — first, above everything the
+            // shop can tend to later.
+            FadeSlideIn(
+              id: 'vendor.1b',
+              delay: next(),
+              child: _TradeInbox(
+                pendingBookings: _pendingBookings,
+                pendingOrders: _pendingOrders,
+                // Orders come from products, which only a store has — but an
+                // order already waiting is shown whatever the shop is now.
+                showOrders: vendor.isStore || (_pendingOrders ?? 0) > 0,
+                onBookings: () => _openInbox(const BookingsPage()),
+                onOrders: () =>
+                    _openInbox(const MyOrdersPage(initialIncoming: true)),
               ),
             ),
             const SizedBox(height: 16),
@@ -405,36 +468,39 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             FadeSlideIn(
               id: 'vendor.3',
               delay: next(),
-              child: AccountMenuGroup(items: [
-                AccountMenuItem(
-                  icon: Icons.notifications_rounded,
-                  label: 'الإشعارات',
-                  subtitle: 'عرض جميع الإشعارات والتنبيهات',
-                  tint: kTintRose,
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const NotificationsPage()),
-                    );
-                    _loadUnread();
-                  },
-                ),
-                AccountMenuItem(
-                  icon: Icons.person_rounded,
-                  label: 'تعديل الملف الشخصي',
-                  subtitle: 'تحديث معلومات ووسائل التواصل',
-                  tint: kTintMauve,
-                  onTap: _editProfile,
-                ),
-                AccountMenuItem(
-                  icon: Icons.stars_rounded,
-                  label: 'نقاطي ومكافآتي',
-                  subtitle: 'رصيدك من نقاط أفراحنا',
-                  tint: kTintGold,
-                  onTap: () => _go(const PointsPage()),
-                ),
-              ]),
+              child: AccountMenuGroup(
+                items: [
+                  AccountMenuItem(
+                    icon: Icons.notifications_rounded,
+                    label: 'الإشعارات',
+                    subtitle: 'عرض جميع الإشعارات والتنبيهات',
+                    tint: kTintRose,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsPage(),
+                        ),
+                      );
+                      _loadUnread();
+                    },
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.person_rounded,
+                    label: 'تعديل الملف الشخصي',
+                    subtitle: 'تحديث معلومات ووسائل التواصل',
+                    tint: kTintMauve,
+                    onTap: _editProfile,
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.stars_rounded,
+                    label: 'نقاطي ومكافآتي',
+                    subtitle: 'رصيدك من نقاط أفراحنا',
+                    tint: kTintGold,
+                    onTap: () => _go(const PointsPage()),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             // A shop owner is also a member: they collect أفراحنا points and
@@ -462,75 +528,85 @@ class _VendorAccountViewState extends State<VendorAccountView> {
             ),
             const SizedBox(height: 22),
             FadeSlideIn(
-                id: 'vendor.5',
-                delay: next(), child: const AccountSectionLabel('إدارة المتجر')),
+              id: 'vendor.5',
+              delay: next(),
+              child: const AccountSectionLabel('إدارة المتجر'),
+            ),
             const SizedBox(height: 10),
             FadeSlideIn(
               id: 'vendor.6',
               delay: next(),
-              child: AccountMenuGroup(items: [
-                AccountMenuItem(
-                  icon: Icons.workspace_premium_rounded,
-                  label: 'باقات الاشتراك',
-                  subtitle: vendor.subscriptionLabel,
-                  tint: kTintGold,
-                  onTap: () => _go(
-                      SubscriptionPlansPage(currentPlan: vendor.activePlan)),
-                ),
-                AccountMenuItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'كشف الحساب والدفعات',
-                  tint: kTintSage,
-                  onTap: () => _go(const VendorStatementPage()),
-                ),
-                AccountMenuItem(
-                  icon: Icons.local_offer_rounded,
-                  label: 'العروض والخصومات',
-                  tint: kTintTerracotta,
-                  onTap: () => _go(ManagePromotionsPage(vendorId: vendor.id)),
-                ),
-                AccountMenuItem(
-                  icon: Icons.auto_awesome_motion_rounded,
-                  label: 'الهايلايت',
-                  tint: kTintMauve,
-                  onTap: () => _go(ManageHighlightsPage(vendorId: vendor.id)),
-                ),
-                if (vendor.isStore)
+              child: AccountMenuGroup(
+                items: [
                   AccountMenuItem(
-                    icon: Icons.category_rounded,
-                    label: 'أقسام المتجر',
-                    tint: kTintTeal,
-                    onTap: () => _go(ManageSectionsPage(vendorId: vendor.id)),
+                    icon: Icons.workspace_premium_rounded,
+                    label: 'باقات الاشتراك',
+                    subtitle: vendor.subscriptionLabel,
+                    tint: kTintGold,
+                    onTap: () => _go(
+                      SubscriptionPlansPage(currentPlan: vendor.activePlan),
+                    ),
                   ),
-                AccountMenuItem(
-                  icon: Icons.groups_rounded,
-                  label: 'المتابعون',
-                  subtitle: '${_fmt(vendor.followersCount)} متابع',
-                  tint: kTintRose,
-                  onTap: () => _go(VendorFollowersPage(vendorId: vendor.id)),
-                ),
-              ]),
+                  AccountMenuItem(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'كشف الحساب والدفعات',
+                    tint: kTintSage,
+                    onTap: () => _go(const VendorStatementPage()),
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.local_offer_rounded,
+                    label: 'العروض والخصومات',
+                    tint: kTintTerracotta,
+                    subtitle: vendor.allowOffers ? null : 'غير مفعّلة لاشتراكك',
+                    onTap: vendor.allowOffers
+                        ? () => _go(ManagePromotionsPage(vendorId: vendor.id))
+                        : () => _featureClosed(context, 'العروض'),
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.auto_awesome_motion_rounded,
+                    label: 'الهايلايت',
+                    tint: kTintMauve,
+                    onTap: () => _go(ManageHighlightsPage(vendorId: vendor.id)),
+                  ),
+                  if (vendor.isStore)
+                    AccountMenuItem(
+                      icon: Icons.category_rounded,
+                      label: 'أقسام المتجر',
+                      tint: kTintTeal,
+                      onTap: () => _go(ManageSectionsPage(vendorId: vendor.id)),
+                    ),
+                  AccountMenuItem(
+                    icon: Icons.groups_rounded,
+                    label: 'المتابعون',
+                    subtitle: '${_fmt(vendor.followersCount)} متابع',
+                    tint: kTintRose,
+                    onTap: () => _go(VendorFollowersPage(vendorId: vendor.id)),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 22),
             FadeSlideIn(
               id: 'vendor.7',
               delay: next(),
-              child: AccountMenuGroup(items: [
-                AccountMenuItem(
-                  icon: Icons.logout_rounded,
-                  label: 'تسجيل الخروج',
-                  tint: AppColors.discount,
-                  isDestructive: true,
-                  onTap: _confirmLogout,
-                ),
-                AccountMenuItem(
-                  icon: Icons.delete_forever_rounded,
-                  label: 'حذف الحساب',
-                  tint: AppColors.discount,
-                  isDestructive: true,
-                  onTap: _confirmDelete,
-                ),
-              ]),
+              child: AccountMenuGroup(
+                items: [
+                  AccountMenuItem(
+                    icon: Icons.logout_rounded,
+                    label: 'تسجيل الخروج',
+                    tint: AppColors.discount,
+                    isDestructive: true,
+                    onTap: _confirmLogout,
+                  ),
+                  AccountMenuItem(
+                    icon: Icons.delete_forever_rounded,
+                    label: 'حذف الحساب',
+                    tint: AppColors.discount,
+                    isDestructive: true,
+                    onTap: _confirmDelete,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 22),
             const PoweredByNeurex(),
@@ -568,18 +644,23 @@ class _TopBar extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             _CircleIconButton(
-                icon: Icons.notifications_none_rounded, onTap: onNotifications),
+              icon: Icons.notifications_none_rounded,
+              onTap: onNotifications,
+            ),
             if (unread > 0)
               PositionedDirectional(
                 top: 2,
                 start: 2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
                   constraints: const BoxConstraints(minWidth: 18),
                   decoration: BoxDecoration(
                     color: AppColors.discount,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: Colors.white, width: 1.5),
+                    border: Border.all(color: AppColors.hairline, width: 1.5),
                   ),
                   child: Text(
                     unread > 99 ? '99+' : '$unread',
@@ -603,17 +684,21 @@ class _TopBar extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(AppAssets.logo,
-                      width: 28, height: 28, fit: BoxFit.cover),
+                  child: Image.asset(
+                    AppAssets.logo,
+                    width: 28,
+                    height: 28,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   'أفراحنا',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
                 ),
               ],
             ),
@@ -621,9 +706,9 @@ class _TopBar extends StatelessWidget {
             Text(
               'كل ما يلزم مناسباتك في مكان واحد',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textMuted,
-                    fontSize: 10,
-                  ),
+                color: AppColors.textMuted,
+                fontSize: 10,
+              ),
             ),
           ],
         ),
@@ -643,7 +728,7 @@ class _CircleIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       shape: const CircleBorder(),
       elevation: 0,
       child: InkWell(
@@ -652,16 +737,7 @@ class _CircleIconButton extends StatelessWidget {
         child: Container(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+          decoration: const BoxDecoration(shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Icon(icon, color: AppColors.textDark, size: 22),
         ),
@@ -705,9 +781,9 @@ class _VendorHero extends StatelessWidget {
         gradient: AppColors.brandDeepGradient,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.35),
+            color: AppColors.accent.withValues(alpha: 0.28),
             blurRadius: 20,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -784,9 +860,10 @@ class _VendorHero extends StatelessWidget {
                               fontSize: 20,
                               shadows: [
                                 Shadow(
-                                    color: Color(0x66000000),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2)),
+                                  color: Color(0x66000000),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
                               ],
                             ),
                           ),
@@ -794,10 +871,11 @@ class _VendorHero extends StatelessWidget {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.place_rounded,
-                                    size: 13,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.85)),
+                                Icon(
+                                  Icons.place_rounded,
+                                  size: 13,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
                                 const SizedBox(width: 3),
                                 Expanded(
                                   child: Text(
@@ -805,8 +883,9 @@ class _VendorHero extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.9),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -825,7 +904,7 @@ class _VendorHero extends StatelessWidget {
                                 iconColor: const Color(0xFFFFC961),
                                 text: rating > 0
                                     ? '${rating.toStringAsFixed(1)} '
-                                        '(${_fmt(vendor.reviewsCount ?? 0)} تقييم)'
+                                          '(${_fmt(vendor.reviewsCount ?? 0)} تقييم)'
                                     : 'لا توجد تقييمات بعد',
                               ),
                               _StatChip(
@@ -855,7 +934,11 @@ class _VendorHero extends StatelessWidget {
 }
 
 class _HeroAvatar extends StatelessWidget {
-  const _HeroAvatar({required this.url, required this.busy, required this.onTap});
+  const _HeroAvatar({
+    required this.url,
+    required this.busy,
+    required this.onTap,
+  });
 
   final String? url;
   final bool busy;
@@ -874,9 +957,11 @@ class _HeroAvatar extends StatelessWidget {
             height: 86,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white,
+              color: AppColors.surface,
               border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.85), width: 3),
+                color: AppColors.hairline.withValues(alpha: 0.85),
+                width: 3,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.22),
@@ -894,7 +979,9 @@ class _HeroAvatar extends StatelessWidget {
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.4, color: AppColors.primary),
+                          strokeWidth: 2.4,
+                          color: AppColors.primary,
+                        ),
                       ),
                     )
                   : AppNetworkImage(
@@ -919,10 +1006,13 @@ class _HeroAvatar extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: AppColors.hairline, width: 2),
                   ),
-                  child: const Icon(Icons.photo_camera_rounded,
-                      color: Colors.white, size: 14),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
                 ),
               ),
             ),
@@ -956,12 +1046,12 @@ class _VerifiedChip extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.verified_rounded, size: 13, color: Color(0xFF5B3A17)),
+          Icon(Icons.verified_rounded, size: 13, color: Color(0xFFE5BE94)),
           SizedBox(width: 4),
           Text(
             'معلن موثّق',
             style: TextStyle(
-              color: Color(0xFF5B3A17),
+              color: Color(0xFFE5BE94),
               fontSize: 10.5,
               fontWeight: FontWeight.w900,
             ),
@@ -988,8 +1078,7 @@ class _PreviewChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
-            border:
-                Border.all(color: Colors.white.withValues(alpha: 0.45)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
@@ -1062,7 +1151,7 @@ class _GhostButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onTap != null;
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -1071,25 +1160,18 @@ class _GhostButton extends StatelessWidget {
           height: 46,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.primaryLight,
-              width: 1.3,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.primaryLight, width: 1.3),
+            boxShadow: AppDecor.lift,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  size: 17,
-                  color: enabled ? AppColors.primary : AppColors.textMuted),
+              Icon(
+                icon,
+                size: 17,
+                color: enabled ? AppColors.primary : AppColors.textMuted,
+              ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -1099,8 +1181,9 @@ class _GhostButton extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color:
-                        enabled ? AppColors.primaryDark : AppColors.textMuted,
+                    color: enabled
+                        ? AppColors.primaryDark
+                        : AppColors.textMuted,
                   ),
                 ),
               ),
@@ -1125,6 +1208,9 @@ class _QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tiles = <_QuickTileData>[
+      // A shop that sells products may also offer services — a hall sells
+      // decoration and books evenings. These used to be either/or, which left
+      // every «متجر» with no way to add a service at all.
       if (vendor.isStore)
         _QuickTileData(
           icon: Icons.shopping_bag_rounded,
@@ -1132,21 +1218,21 @@ class _QuickActions extends StatelessWidget {
           sub: 'إدارة المنتجات والطلبات',
           colors: const [Color(0xFFF8896B), Color(0xFFE05B6E)],
           onTap: () => go(ManageProductsPage(vendorId: vendor.id)),
-        )
-      else
-        _QuickTileData(
-          icon: Icons.design_services_rounded,
-          title: 'خدماتي',
-          sub: 'إضافة وإدارة الخدمات',
-          colors: const [Color(0xFFF8896B), Color(0xFFE05B6E)],
-          onTap: () => go(const VendorPostsPage()),
         ),
+      _QuickTileData(
+        icon: Icons.design_services_rounded,
+        title: 'خدماتي',
+        sub: 'إضافة وإدارة الخدمات',
+        colors: const [Color(0xFFF2A65A), Color(0xFFD9774B)],
+        onTap: () => go(const VendorPostsPage()),
+      ),
       _QuickTileData(
         icon: Icons.add_circle_rounded,
         title: 'الستوريز',
         sub: 'إضافة وإدارة القصص',
         colors: const [Color(0xFFB07BE0), Color(0xFF7C4DC4)],
         onTap: () => go(ManageStoriesPage(vendorId: vendor.id)),
+        locked: !vendor.allowStories,
       ),
       _QuickTileData(
         icon: Icons.movie_creation_rounded,
@@ -1157,6 +1243,7 @@ class _QuickActions extends StatelessWidget {
         // than straight into the uploader — an advertiser had no way to see
         // or remove what they had already posted.
         onTap: () => go(ManageReelsPage(vendorId: vendor.id)),
+        locked: !vendor.allowReels,
       ),
       _QuickTileData(
         icon: Icons.article_rounded,
@@ -1164,30 +1251,36 @@ class _QuickActions extends StatelessWidget {
         sub: 'إنشاء وإدارة المنشورات',
         colors: const [Color(0xFF6FB6F5), Color(0xFF3D7BE0)],
         onTap: () => go(const VendorPostsPage()),
+        locked: !vendor.allowPosts,
       ),
     ];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final t in tiles) Expanded(child: _QuickTile(data: t)),
-        ],
+        children: [for (final t in tiles) Expanded(child: _QuickTile(data: t))],
       ),
     );
   }
+}
+
+/// Tells a shop, where it tapped, that a feature is switched off for it.
+void _featureClosed(BuildContext context, String feature) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          'ميزة $feature غير مفعّلة لاشتراكك. تواصل مع إدارة أفراحنا لتفعيلها.',
+        ),
+      ),
+    );
 }
 
 class _QuickTileData {
@@ -1197,6 +1290,7 @@ class _QuickTileData {
     required this.sub,
     required this.colors,
     required this.onTap,
+    this.locked = false,
   });
 
   final IconData icon;
@@ -1204,6 +1298,11 @@ class _QuickTileData {
   final String sub;
   final List<Color> colors;
   final VoidCallback onTap;
+
+  /// Switched off for this shop by an admin: drawn grey with a padlock, and
+  /// a tap explains rather than opens. The tile stays so the shop knows the
+  /// feature exists.
+  final bool locked;
 }
 
 class _QuickTile extends StatelessWidget {
@@ -1216,7 +1315,9 @@ class _QuickTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: data.onTap,
+        onTap: data.locked
+            ? () => _featureClosed(context, data.title)
+            : data.onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
           child: Column(
@@ -1227,20 +1328,29 @@ class _QuickTile extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: data.colors,
+                    colors: data.locked
+                        ? const [Color(0xFFBDB4AE), Color(0xFF9A8F88)]
+                        : data.colors,
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: data.colors.last.withValues(alpha: 0.38),
+                      color: (data.locked
+                              ? const Color(0xFF9A8F88)
+                              : data.colors.last)
+                          .withValues(alpha: 0.38),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
                   ],
                 ),
-                child: Icon(data.icon, color: Colors.white, size: 24),
+                child: Icon(
+                  data.locked ? Icons.lock_rounded : data.icon,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1255,7 +1365,7 @@ class _QuickTile extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                data.sub,
+                data.locked ? 'غير مفعّلة لاشتراكك' : data.sub,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -1294,23 +1404,20 @@ class _MemberPointsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: AppDecor.lift,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.stars_rounded,
-                  size: 19, color: AppColors.primary),
+              const Icon(
+                Icons.stars_rounded,
+                size: 19,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -1327,26 +1434,29 @@ class _MemberPointsCard extends StatelessWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(99),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'عرض',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(99),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'عرض',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_left_rounded,
+                          size: 18,
                           color: AppColors.primaryDark,
                         ),
-                      ),
-                      Icon(Icons.chevron_left_rounded,
-                          size: 18, color: AppColors.primaryDark),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 ),
               ),
             ],
@@ -1362,7 +1472,10 @@ class _MemberPointsCard extends StatelessWidget {
             'منفصلة عن نقاط المتجر: هذه نقاطك كعضو في أفراحنا، وتلك تُحتسب'
             ' لاشتراك متجرك.',
             style: TextStyle(
-                color: AppColors.textMuted, fontSize: 11.5, height: 1.4),
+              color: AppColors.textMuted,
+              fontSize: 11.5,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1382,19 +1495,13 @@ class _StorePointsCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFFF6E6), Color(0xFFF6E3C4)],
+          colors: [AppColors.surface, AppColors.surface],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0xFFE9CFA4)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppDecor.lift,
       ),
       child: Column(
         children: [
@@ -1426,15 +1533,18 @@ class _StorePointsCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.stars_rounded,
-                            color: Color(0xFFE0AE44), size: 22),
+                        const Icon(
+                          Icons.stars_rounded,
+                          color: Color(0xFFE0AE44),
+                          size: 22,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '1000 نقطة = شهر اشتراك مجاني'
                       '${vendor.beneficiariesCount > 0 ? ' • استفاد '
-                          '${_fmt(vendor.beneficiariesCount)} عميل' : ''}',
+                                '${_fmt(vendor.beneficiariesCount)} عميل' : ''}',
                       style: const TextStyle(
                         fontSize: 10.5,
                         color: AppColors.textMuted,
@@ -1463,8 +1573,11 @@ class _StorePointsCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.card_giftcard_rounded,
-                    color: Colors.white, size: 32),
+                child: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
             ],
           ),
@@ -1476,13 +1589,182 @@ class _StorePointsCard extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFB4832F),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               onPressed: onDetails,
               child: const Text(
                 'عرض تفاصيل النقاط والاشتراك',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// INBOX — what customers are waiting on
+// ===========================================================================
+
+/// The shop's two inboxes — booking requests and store orders — with how
+/// many of each are still waiting on an answer. A customer who booked is
+/// following the request from their side; this is where the shop answers.
+class _TradeInbox extends StatelessWidget {
+  const _TradeInbox({
+    required this.pendingBookings,
+    required this.pendingOrders,
+    required this.showOrders,
+    required this.onBookings,
+    required this.onOrders,
+  });
+
+  final int? pendingBookings;
+  final int? pendingOrders;
+  final bool showOrders;
+  final VoidCallback onBookings;
+  final VoidCallback onOrders;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = [
+      _InboxTile(
+        icon: Icons.event_available_rounded,
+        title: 'الحجوزات الواردة',
+        waiting: pendingBookings,
+        tint: AppColors.holoLavender,
+        onTap: onBookings,
+      ),
+      if (showOrders)
+        _InboxTile(
+          icon: Icons.receipt_long_rounded,
+          title: 'طلبات المتجر',
+          waiting: pendingOrders,
+          tint: AppColors.holoAqua,
+          onTap: onOrders,
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AccountSectionLabel('طلبات الزبائن'),
+        const SizedBox(height: 10),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < tiles.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(child: tiles[i]),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InboxTile extends StatelessWidget {
+  const _InboxTile({
+    required this.icon,
+    required this.title,
+    required this.waiting,
+    required this.tint,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final int? waiting;
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = waiting ?? 0;
+    final urgent = n > 0;
+
+    return GlassPanel(
+      tint: urgent ? AppColors.accent : tint,
+      glow: urgent,
+      radius: 20,
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tint.withValues(alpha: 0.12),
+                  border: Border.all(color: tint.withValues(alpha: 0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: tint.withValues(alpha: 0.25),
+                      blurRadius: 14,
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: tint, size: 21),
+              ),
+              const Spacer(),
+              if (urgent)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 26),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.goldGradient,
+                    borderRadius: BorderRadius.circular(99),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.5),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    n > 99 ? '99+' : '$n',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textDark,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            waiting == null
+                ? 'اضغط للعرض'
+                : urgent
+                ? (n == 1 ? 'طلب واحد بانتظار ردّك' : '$n بانتظار ردّك')
+                : 'لا طلبات بانتظارك',
+            style: TextStyle(
+              color: urgent ? AppColors.accent : AppColors.textMuted,
+              fontWeight: urgent ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 11.5,
             ),
           ),
         ],

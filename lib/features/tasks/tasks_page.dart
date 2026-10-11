@@ -147,11 +147,9 @@ class _TasksPageState extends State<TasksPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('قائمة المهام'),
-        backgroundColor: AppColors.primaryDark,
-        foregroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+      appBar: PinkAppBar(
+        title: 'قائمة المهام',
         actions: [
           IconButton(
             tooltip: 'استيراد قالب',
@@ -247,13 +245,13 @@ class _SummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFCF6EE), Color(0xFFF3E3CC)],
+          colors: [AppColors.surface, AppColors.surface],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: AppColors.accent.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 1)),
         ],
       ),
       child: Column(
@@ -277,7 +275,7 @@ class _SummaryCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: summary.progress,
               minHeight: 10,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface,
               valueColor: const AlwaysStoppedAnimation(AppColors.primary),
             ),
           ),
@@ -306,7 +304,7 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
@@ -369,7 +367,7 @@ class _TaskTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: overdue ? const Color(0xFFC1452B).withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.12),
@@ -432,7 +430,7 @@ class _TaskTile extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B)),
+                icon: const Icon(Icons.delete_outline, color: Color(0xFFE7A192)),
                 tooltip: 'حذف',
               ),
             ],
@@ -572,6 +570,7 @@ class _TaskEditorSheetState extends State<_TaskEditorSheet> {
       child: Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.hairline, width: 0.8)),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
@@ -699,6 +698,7 @@ class _TemplatePickerSheet extends StatelessWidget {
       builder: (_, scroll) => Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.hairline, width: 0.8)),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
@@ -730,7 +730,7 @@ class _TemplatePickerSheet extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: AppColors.primaryLight),
                       ),

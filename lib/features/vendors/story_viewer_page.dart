@@ -437,9 +437,9 @@ class StoriesRing extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.25),
+                        color: AppColors.accent.withValues(alpha: 0.2),
                         blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),

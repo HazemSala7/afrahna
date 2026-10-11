@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
+import '../../widgets/cosmos.dart';
 import '../../widgets/section_header.dart';
 import '../invitation/invitation_designer_page.dart';
 import '../coordinator/coordinator_page.dart';
@@ -25,11 +28,8 @@ class PlanYourWeddingBlock extends StatelessWidget {
             children: [
               Expanded(
                 child: _PlanCompactCard(
-                  colors: const [
-                    Color(0xFF57B3A8),
-                    Color(0xFF4FA69C),
-                    Color(0xFF2F7C74),
-                  ],
+                  tint: AppColors.accent,
+                  depths: const [Color(0xFF8E5F4A), Color(0xFF4A2C24)],
                   icon: Icons.assignment_rounded,
                   title: 'منسق المناسبة',
                   subtitle: 'خطّطي تفاصيل يومك خطوة بخطوة',
@@ -43,18 +43,16 @@ class PlanYourWeddingBlock extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _PlanCompactCard(
-                  colors: const [
-                    Color(0xFF8B5A3C),
-                    Color(0xFFB8835A),
-                    Color(0xFFD4A373),
-                  ],
+                  tint: AppColors.holoRose,
+                  depths: const [Color(0xFF9C5560), Color(0xFF4E2B33)],
                   icon: Icons.card_giftcard_rounded,
                   title: 'صمّم كرت فرحك',
                   subtitle: 'اختر قالبك واطلبه من أفراحنا',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const InvitationDesignerPage()),
+                      builder: (_) => const InvitationDesignerPage(),
+                    ),
                   ),
                 ),
               ),
@@ -68,9 +66,12 @@ class PlanYourWeddingBlock extends StatelessWidget {
   }
 }
 
+/// Deep glass lit from one corner in the card's own colour, with the icon in
+/// a glowing orb and a gold pill to act on.
 class _PlanCompactCard extends StatelessWidget {
   const _PlanCompactCard({
-    required this.colors,
+    required this.tint,
+    required this.depths,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -78,7 +79,10 @@ class _PlanCompactCard extends StatelessWidget {
     this.badge,
   });
 
-  final List<Color> colors; // [light, base, dark]
+  final Color tint;
+
+  /// The glass, from the lit corner to the far one.
+  final List<Color> depths;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -87,99 +91,150 @@ class _PlanCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Color.alphaBlend(
-        Colors.black.withValues(alpha: 0.35), colors[1]);
+    const radius = 20.0;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
+      child: CustomPaint(
+        foregroundPainter: const HoloBorderPainter(radius: radius),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(
+              colors: depths,
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: tint.withValues(alpha: 0.14),
+                blurRadius: 22,
+                spreadRadius: -6,
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: colors[1].withValues(alpha: 0.42),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 1.2),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 23),
-                ),
-                const Spacer(),
-                if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+          child: Stack(
+            children: [
+              // The light the card is lit by, pooled behind the icon.
+              Positioned(
+                top: -40,
+                right: -40,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 150,
+                    height: 150,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(20),
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          tint.withValues(alpha: 0.22),
+                          tint.withValues(alpha: 0),
+                        ],
+                      ),
                     ),
-                    child: Text(badge!,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 9.5)),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15)),
-            const SizedBox(height: 5),
-            Text(subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
-                    height: 1.35)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('ابدأ الآن',
-                      style: TextStyle(
-                          color: dark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11.5)),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_back_rounded, color: dark, size: 15),
-                ],
+              Padding(
+                padding: const EdgeInsets.all(13),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: tint.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: tint.withValues(alpha: 0.55),
+                              width: 1.1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: tint.withValues(alpha: 0.3),
+                                blurRadius: 14,
+                                spreadRadius: -2,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            icon,
+                            color: Color.lerp(tint, Colors.white, 0.2),
+                            size: 23,
+                            shadows: [Shadow(color: tint, blurRadius: 10)],
+                          ),
+                        ),
+                        const Spacer(),
+                        if (badge != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.holoLavender.withValues(
+                                    alpha: 0.22,
+                                  ),
+                                  AppColors.holoAqua.withValues(alpha: 0.14),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: AppColors.holoLavender.withValues(
+                                  alpha: 0.45,
+                                ),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              badge!,
+                              style: const TextStyle(
+                                color: AppColors.pearl,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 9.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.pearl,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        // The card is a deep panel, so this is type ON a
+                        // panel — not the muted grey of type on the page.
+                        color: AppColors.champagne,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(height: 12),
+                    const GoldPill(label: 'ابدأ الآن', compact: true),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

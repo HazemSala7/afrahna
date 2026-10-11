@@ -125,6 +125,12 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
           _liked = res.liked;
           _likes = res.likes;
         });
+        final said = res.reward?.message;
+        if (said != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(said), duration: const Duration(seconds: 2)),
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -198,10 +204,10 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
         Navigator.pop(context, _result);
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: AppColors.surface,
           elevation: 0.5,
           title: const Text(
             'المنشور',
@@ -221,7 +227,7 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
                 children: [
                   // ---- Post header ----
                   Container(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                     child: Row(
                       children: [
@@ -275,7 +281,7 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
                   // ---- Body text ----
                   if (body.isNotEmpty)
                     Container(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
                       child: Text(
@@ -290,12 +296,12 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
                   // ---- Images ----
                   if (images.isNotEmpty)
                     Container(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       child: PostGallery(images: images),
                     ),
                   // ---- Counts ----
                   Container(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
                     child: Row(
                       children: [
@@ -317,7 +323,7 @@ class _PostDetailsPageState extends State<PostDetailsPage> {
                   ),
                   // ---- Action buttons ----
                   Container(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     child: Column(
                       children: [
                         const Divider(height: 1),
@@ -496,7 +502,7 @@ class _CommentTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primaryLight),
       ),
@@ -558,7 +564,7 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.primaryLight)),
       ),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -630,7 +636,7 @@ class _LoginGate extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primaryLight),
       ),

@@ -9,13 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:afrahna/core/api/api_client.dart';
 import 'package:afrahna/core/state/session.dart';
+import 'package:afrahna/core/theme.dart';
 import 'package:afrahna/features/splash/splash_page.dart';
 
-/// What the app actually shows in the seconds before the home page.
-///
-/// The video cannot play in a test binding, so this is the fallback branch —
-/// which is exactly the branch worth looking at: it is what every user sees
-/// while the film is still being decoded.
+/// The opening sequence, and the promise it rests on: that the colour the
+/// phone shows while the app starts is the colour the intro opens on.
 class _Empty implements HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? s,
@@ -27,6 +25,20 @@ class _Empty implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+Widget _splash() => MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => SessionController())],
+      child: const MaterialApp(
+        locale: Locale('ar'),
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: SplashPage(),
+        ),
+      ),
+    );
+
+/// 0xRRGGBB of a colour, without its alpha.
+int _rgb(Color c) => c.toARGB32() & 0xFFFFFF;
+
 void main() {
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
@@ -37,59 +49,68 @@ void main() {
     }
   });
 
-  testWidgets('nothing is shown in front of the film', (tester) async {
+  testWidgets('the intro opens with no spinner and names the app',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     ApiClient.instance.dio.httpClientAdapter = _Empty();
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => SessionController())],
-      child: const MaterialApp(
-        locale: Locale('ar'),
-        home: Directionality(
-          textDirection: TextDirection.rtl,
-          child: SplashPage(),
-        ),
-      ),
-    ));
+    await tester.pumpWidget(_splash());
 
-    // First frame, while the film is still being opened: the app used to draw
-    // a whole animated splash here — logo, taglines, spinner — and then throw
-    // it away the moment the film was ready. Two openings in a row.
+    // An opening, not a loading screen: nothing on it says "wait".
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.textContaining('كل مناسباتك'), findsNothing);
+
+    // Once the ring has drawn itself the name and the tagline are there.
+    for (var i = 0; i < 9; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(find.text('أفراحنا'), findsOneWidget);
+    expect(find.text('كل مناسباتك في مكان واحد'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('the wait is painted in the colour of the film', (tester) async {
+  testWidgets('the intro sits on the sky, with no ground of its own',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     ApiClient.instance.dio.httpClientAdapter = _Empty();
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => SessionController())],
-      child: const MaterialApp(
-        locale: Locale('ar'),
-        home: Directionality(
-          textDirection: TextDirection.rtl,
-          child: SplashPage(),
-        ),
-      ),
-    ));
+    await tester.pumpWidget(_splash());
 
-    // Cream, not white and not black: the handover to the film's first frame
-    // has to be invisible, and the OS window behind it is painted to match in
-    // res/values/colors.xml and LaunchScreen.storyboard.
+    // Transparent: what shows is the sky, which starts at AppColors.space.
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-    expect(scaffold.backgroundColor, const Color(0xFFFAF3EC));
+    expect(scaffold.backgroundColor, Colors.transparent);
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 5));
+  });
+
+  test('the launch screens are painted the colour the intro opens on', () {
+    // Android: the launch window.
+    final xml =
+        File('android/app/src/main/res/values/colors.xml').readAsStringSync();
+    final android = RegExp(r'<color name="splashGround">#([0-9A-Fa-f]{6})</color>')
+        .firstMatch(xml);
+    expect(android, isNotNull, reason: 'splashGround missing from colors.xml');
+    expect(int.parse(android!.group(1)!, radix: 16), _rgb(AppColors.space),
+        reason: 'res/values/colors.xml splashGround must equal AppColors.space');
+
+    // iOS: the launch storyboard, written as 0..1 components.
+    final board = File('ios/Runner/Base.lproj/LaunchScreen.storyboard')
+        .readAsStringSync();
+    final ios = RegExp(
+      r'key="backgroundColor" red="([0-9.]+)" green="([0-9.]+)" blue="([0-9.]+)"',
+    ).firstMatch(board);
+    expect(ios, isNotNull, reason: 'backgroundColor missing from storyboard');
+    int channel(int i) => (double.parse(ios!.group(i)!) * 255).round();
+    expect((channel(1) << 16) | (channel(2) << 8) | channel(3),
+        _rgb(AppColors.space),
+        reason: 'LaunchScreen.storyboard must equal AppColors.space');
   });
 }

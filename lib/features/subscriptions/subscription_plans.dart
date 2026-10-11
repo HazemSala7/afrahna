@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../widgets/shell_bottom_nav.dart';
+import '../../widgets/app_widgets.dart';
 
 /// Static definition of the 3 subscription tiers (prices + features) shown both
 /// as a selectable picker (delegate/admin) and a read-only view (vendor).
@@ -87,12 +88,20 @@ class SubscriptionPlansView extends StatelessWidget {
     this.shrinkWrap = true,
     this.physics,
     this.compact = false,
+    this.showPrices = true,
   });
 
   final String? selected;
   final ValueChanged<String>? onSelected;
   final bool shrinkWrap;
   final ScrollPhysics? physics;
+
+  /// Whether the yearly/monthly price is on the card.
+  ///
+  /// Off for the shop's own view: a shop is told what its plan includes and
+  /// when it runs out, and settles the money with its delegate — the price
+  /// list is between the delegate and the office.
+  final bool showPrices;
 
   /// Smaller, denser cards (used inside forms/sheets).
   final bool compact;
@@ -109,6 +118,7 @@ class SubscriptionPlansView extends StatelessWidget {
         plan: kSubscriptionPlans[i],
         selected: selected == kSubscriptionPlans[i].key,
         compact: compact,
+        showPrices: showPrices,
         onTap: onSelected == null
             ? null
             : () => onSelected!(kSubscriptionPlans[i].key),
@@ -123,11 +133,13 @@ class _PlanCard extends StatelessWidget {
     required this.selected,
     this.onTap,
     this.compact = false,
+    this.showPrices = true,
   });
   final PlanInfo plan;
   final bool selected;
   final VoidCallback? onTap;
   final bool compact;
+  final bool showPrices;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +152,7 @@ class _PlanCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(compact ? 16 : 20),
           border: Border.all(
             color: selected ? plan.color : plan.color.withValues(alpha: 0.25),
@@ -194,27 +206,29 @@ class _PlanCard extends StatelessWidget {
               ),
             ),
             // Prices
-            Padding(
-              padding: EdgeInsets.fromLTRB(14, compact ? 8 : 12, 14, compact ? 4 : 8),
-              child: Row(
-                children: [
-                  _PricePill(
-                    label: 'سنة',
-                    value: plan.yearly,
-                    color: plan.color,
-                    big: !compact,
-                  ),
-                  if (plan.monthly != null) ...[
-                    const SizedBox(width: 10),
+            if (showPrices)
+              Padding(
+                padding:
+                    EdgeInsets.fromLTRB(14, compact ? 8 : 12, 14, compact ? 4 : 8),
+                child: Row(
+                  children: [
                     _PricePill(
-                      label: 'شهر',
-                      value: plan.monthly!,
+                      label: 'سنة',
+                      value: plan.yearly,
                       color: plan.color,
+                      big: !compact,
                     ),
+                    if (plan.monthly != null) ...[
+                      const SizedBox(width: 10),
+                      _PricePill(
+                        label: 'شهر',
+                        value: plan.monthly!,
+                        color: plan.color,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
             // Features
             Padding(
               padding: EdgeInsets.fromLTRB(14, 0, 14, compact ? 10 : 14),
@@ -316,7 +330,7 @@ class SubscriptionPlansPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      appBar: AppBar(title: const Text('أسعار الاشتراكات')),
+      appBar: const PinkAppBar(title: 'باقات الاشتراك'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -342,10 +356,10 @@ class SubscriptionPlansPage extends StatelessWidget {
                 ],
               ),
             ),
-          SubscriptionPlansView(selected: currentPlan),
+          SubscriptionPlansView(selected: currentPlan, showPrices: false),
           const SizedBox(height: 12),
           const Text(
-            'للاشتراك أو الترقية، تواصل مع مندوبك أو إدارة أفراحنا.',
+            'للاشتراك أو الترقية والاطّلاع على الأسعار، تواصل مع مندوبك أو إدارة أفراحنا.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
           ),

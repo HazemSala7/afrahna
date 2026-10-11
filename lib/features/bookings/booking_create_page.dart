@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
 import '../auth/login_page.dart';
+import '../../widgets/celebration.dart';
 
 class BookingCreatePage extends StatefulWidget {
   const BookingCreatePage({super.key, required this.vendor, this.service});
@@ -129,9 +130,10 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
         notes: _notes.text,
       );
       if (!mounted) return;
+      CelebrationBurst.show(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         backgroundColor: AppColors.primary,
-        content: Text('تم إرسال الحجز بنجاح'),
+        content: Text('تم إرسال الحجز — سنُعلمك فور رد المتجر، وتابعه من «مناسباتي»'),
       ));
       // Hand the customer straight to WhatsApp with the enquiry written for
       // them, so the vendor also gets it as a message from the customer's own
@@ -160,15 +162,9 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cardShadow,
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: AppDecor.lift,
               ),
               child: Row(
                 children: [
@@ -222,15 +218,9 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
                   }
                   return Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.cardShadow,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: AppDecor.lift,
                     ),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
@@ -266,15 +256,9 @@ class _BookingCreatePageState extends State<BookingCreatePage> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.cardShadow,
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: AppDecor.lift,
                 ),
                 child: Row(
                   children: [
@@ -338,15 +322,9 @@ class _SelectedServiceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         children: [

@@ -57,7 +57,7 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: const Color(0xFFFCF8F3),
+      backgroundColor: Colors.transparent,
       appBar: PinkAppBar(title: 'كشف حساب'),
       body: SafeArea(
         bottom: false,
@@ -84,15 +84,9 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
                 ]);
               }
 
-              final total = subs.fold<double>(0, (s, x) => s + x.totalAmount);
-              final paid = subs.fold<double>(0, (s, x) => s + x.amountPaid);
-              final remaining = subs.fold<double>(0, (s, x) => s + x.remaining);
-
               return ListView(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
                 children: [
-                  _SummaryCard(total: total, paid: paid, remaining: remaining),
-                  const SizedBox(height: 16),
                   const Text('الاشتراكات',
                       style: TextStyle(
                           fontWeight: FontWeight.w900,
@@ -115,7 +109,7 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0x11000000)),
         boxShadow: [
@@ -151,14 +145,10 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
           Text('${_date(s.startDate)} → ${_date(s.endDate)}',
               style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              _miniStat('السعر', _money(s.totalAmount), AppColors.textDark),
-              _miniStat('المدفوع', _money(s.amountPaid), const Color(0xFF2E7D5B)),
-              _miniStat('المتبقّي', _money(s.remaining),
-                  s.remaining > 0 ? const Color(0xFFC1452B) : const Color(0xFF2E7D5B)),
-            ],
-          ),
+          // No price and no balance: the shop sees its plan, its dates and
+          // the payments it has made. Anything owed is settled with the
+          // delegate, who has the full figures.
+          const SizedBox(height: 2),
           if (s.payments.isNotEmpty) ...[
             const Divider(height: 20),
             const Text('الدفعات:',
@@ -172,7 +162,7 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
                   child: Row(
                     children: [
                       const Icon(Icons.check_circle,
-                          size: 15, color: Color(0xFF2E7D5B)),
+                          size: 15, color: Color(0xFF9CDDC1)),
                       const SizedBox(width: 6),
                       Text(_money(p.amount),
                           style: const TextStyle(
@@ -187,21 +177,6 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
                   ),
                 )),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _miniStat(String label, String value, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.w900, fontSize: 13.5, color: color)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
         ],
       ),
     );
@@ -224,67 +199,6 @@ class _VendorStatementPageState extends State<VendorStatementPage> {
       child: Text(label,
           style: TextStyle(
               color: color, fontWeight: FontWeight.w800, fontSize: 11.5)),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(
-      {required this.total, required this.paid, required this.remaining});
-  final double total;
-  final double paid;
-  final double remaining;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _cell('إجمالي الاشتراكات', total),
-          _divider(),
-          _cell('إجمالي المدفوع', paid),
-          _divider(),
-          _cell('إجمالي المتبقّي', remaining),
-        ],
-      ),
-    );
-  }
-
-  Widget _divider() => Container(
-      width: 1, height: 40, color: Colors.white.withValues(alpha: 0.25));
-
-  Widget _cell(String label, double v) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(_VendorStatementPageState._money(v),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14.5)),
-          const SizedBox(height: 4),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 11)),
-        ],
-      ),
     );
   }
 }

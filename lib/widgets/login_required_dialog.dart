@@ -22,12 +22,13 @@ Future<void> showLoginRequiredDialog(
         padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
         decoration: BoxDecoration(
           color: AppColors.surface,
+          border: Border.all(color: AppColors.hairline, width: 0.8),
           borderRadius: BorderRadius.circular(26),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.18),
+              color: AppColors.accent.withValues(alpha: 0.14),
               blurRadius: 30,
-              offset: const Offset(0, 12),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -40,7 +41,7 @@ Future<void> showLoginRequiredDialog(
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
+                  colors: [AppColors.primary, AppColors.goldDeep],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

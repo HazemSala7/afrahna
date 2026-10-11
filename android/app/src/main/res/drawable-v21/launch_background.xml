@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The window the OS draws while the process starts. It is painted the same
-     cream as the intro film, so the handover between them is invisible. -->
+<!-- The window the OS draws while the process starts. It is painted the same deep space
+     as the top of the intro (AppColors.space), so the handover is invisible. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splashGround" />
 </layer-list>

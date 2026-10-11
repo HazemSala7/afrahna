@@ -35,6 +35,28 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
   UserModel? _user;
   String? _error;
 
+  /// The last request's complaints about particular fields ('phone',
+  /// 'password' ...), first line each: what a form shows under the field
+  /// instead of in a banner. Empty when the failure was not about a field.
+  Map<String, String> _fieldErrors = const {};
+  Map<String, String> get fieldErrors => _fieldErrors;
+
+  void _fail(Object e) {
+    if (e is ApiException) {
+      _error = e.message;
+      _fieldErrors = {
+        for (final entry in (e.errors ?? const <String, dynamic>{}).entries)
+          if (entry.value is List && (entry.value as List).isNotEmpty)
+            entry.key: (entry.value as List).first.toString()
+          else if (entry.value is String)
+            entry.key: entry.value as String,
+      };
+    } else {
+      _fail(e);
+      _fieldErrors = const {};
+    }
+  }
+
   AuthStatus get status => _status;
   UserModel? get user => _user;
   String? get error => _error;
@@ -72,6 +94,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> login(String phone, String password) async {
     _error = null;
+    _fieldErrors = const {};
     try {
       final result = await _auth.login(phone: phone, password: password);
       _user = result.user;
@@ -84,7 +107,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _fail(e);
       notifyListeners();
       return false;
     }
@@ -98,6 +121,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
     String? referralCode,
   }) async {
     _error = null;
+    _fieldErrors = const {};
     try {
       final result = await _auth.register(
         name: name,
@@ -116,7 +140,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _fail(e);
       notifyListeners();
       return false;
     }
@@ -235,7 +259,7 @@ class SessionController extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _fail(e);
       notifyListeners();
       return false;
     }

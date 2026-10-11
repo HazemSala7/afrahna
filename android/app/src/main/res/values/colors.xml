@@ -3,7 +3,7 @@
     <!-- Accent color used for the FCM notification icon tint. -->
     <color name="colorPrimary">#D4AF37</color>
 
-    <!-- The intro film's own background. Painted by the launch window so the
-         app never flashes white (or black, under dark mode) before it. -->
-    <color name="splashGround">#FAF3EC</color>
+    <!-- The top of the ivory sky (AppColors.space). Painted by the launch
+         window so the app never flashes a different colour before its intro. -->
+    <color name="splashGround">#FAF4EF</color>
 </resources>

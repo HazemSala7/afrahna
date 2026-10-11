@@ -235,7 +235,8 @@ class _StoreSectionState extends State<StoreSection>
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.hairline, width: 0.8),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Column(
@@ -288,9 +289,9 @@ class _StoreSectionState extends State<StoreSection>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.30),
+                color: AppColors.accent.withValues(alpha: 0.24),
                 blurRadius: 6,
-                offset: const Offset(0, 2),
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -371,7 +372,7 @@ class _ProductCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: highlighted
@@ -441,12 +442,12 @@ class _ProductCard extends StatelessWidget {
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: AppColors.surface.withValues(alpha: 0.6),
                       ),
                       child: const Center(
                         child: Text('غير متوفر',
                             style: TextStyle(
-                                color: Colors.black87,
+                                color: AppColors.textDark,
                                 fontWeight: FontWeight.w900)),
                       ),
                     ),
@@ -546,7 +547,7 @@ class _CardGalleryState extends State<_CardGallery> {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
       child: Container(
-        color: const Color(0xFFF3EDE6),
+        color: AppColors.surface,
         child: imgs.length <= 1
             ? AppNetworkImage(
                 url: imgs.isNotEmpty ? imgs.first : null,
@@ -582,8 +583,8 @@ class _CardGalleryState extends State<_CardGallery> {
                           height: 5,
                           decoration: BoxDecoration(
                             color: active
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.6),
+                                ? AppColors.surface
+                                : AppColors.surface.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(4),
                             boxShadow: const [
                               BoxShadow(color: Colors.black26, blurRadius: 2),
@@ -619,7 +620,7 @@ class _AddButton extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: enabled
                 ? const LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDark],
+                    colors: [AppColors.primary, AppColors.goldDeep],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -629,9 +630,9 @@ class _AddButton extends StatelessWidget {
             boxShadow: enabled
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.4),
+                      color: AppColors.accent.withValues(alpha: 0.32),
                       blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      offset: const Offset(0, 1),
                     ),
                   ]
                 : null,
@@ -716,7 +717,7 @@ class _CartBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: [AppColors.primary, AppColors.goldDeep],
         ),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -738,7 +739,7 @@ class _CartBar extends StatelessWidget {
           const Spacer(),
           FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface,
               foregroundColor: AppColors.primaryDark,
             ),
             onPressed: busy ? null : onCheckout,
@@ -921,7 +922,7 @@ class _CheckoutSheet extends StatelessWidget {
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: AppColors.surface,
               ),
             ),
             const SizedBox(height: 14),

@@ -207,7 +207,7 @@ class _CommentTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primaryLight),
       ),
@@ -278,7 +278,7 @@ class _Composer extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'اكتب تعليقاً...',
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: AppColors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -329,7 +329,7 @@ class _LoginGate extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primaryLight),
       ),

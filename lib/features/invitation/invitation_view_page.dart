@@ -22,19 +22,35 @@ class _Ink {
   static const deep = Color(0xFF1B1E2B);
   static const ivory = Color(0xFFF6EFE3);
 
-  /// Light ground the content sits on once the scene has faded out, and the
-  /// inks used on it. The hero is type-on-photograph; everything below is
-  /// print on paper.
-  static const paper = Color(0xFFF4F1EC);
-  static const heading = Color(0xFF2E2A25);
-  static const body = Color(0xFF6A625A);
+  /// The ground everything below the hero stands on. It is a *glass*, not a
+  /// fill: the sky keeps drifting behind the whole invitation instead of
+  /// being covered by a sheet of paper after the first screen.
+  static const glass = Color(0x1AFFFFFF);
 
-  /// Gold for use ON the light ground. The pale foil golds read as washed-out
-  /// yellow against cream, so printed gold is darker than foil gold.
-  static const goldInk = Color(0xFFA07A2E);
+  /// A panel one step brighter than the glass, for a surface that has to hold
+  /// a form.
+  static const glassHigh = Color(0x26FFFFFF);
+
+  /// Kept under its old name because a hundred call sites say `paper`: it is
+  /// the colour of a surface on the dark, and surfaces here are glass.
+  static const paper = glass;
+
+  static const heading = Color(0xFFF7F1E6);
+  static const body = Color(0xFFB9AFC4);
+
+  /// Gold on the dark can be foil again — bright, and brighter still where the
+  /// light catches it. On cream it had to be darkened to a printed gold; that
+  /// is no longer the ground.
+  static const goldInk = Color(0xFFE6C78C);
 
   static const goldInkSweep = LinearGradient(
-    colors: [Color(0xFF8A6520), goldInk, Color(0xFFC79B45), goldInk, Color(0xFF8A6520)],
+    colors: [
+      Color(0xFFB08A46),
+      goldInk,
+      Color(0xFFFFF0CB),
+      goldInk,
+      Color(0xFFB08A46),
+    ],
     stops: [0.0, 0.28, 0.5, 0.72, 1.0],
   );
   static const gold = Color(0xFFD9B36C);
@@ -46,6 +62,13 @@ class _Ink {
     stops: [0.0, 0.28, 0.5, 0.72, 1.0],
   );
 }
+
+/// Holds the invitation's idle motion still — the envelope's float and the
+/// ring leaving its seal. A render test cannot measure where the seal sits
+/// while it is breathing; with this set, the envelope rests exactly where it
+/// was designed to rest.
+@visibleForTesting
+bool debugInvitationStill = false;
 
 /// Display face for the invitation currently on screen. Set from the theme's
 /// `font_family` so two themes can differ by more than colour — typography is
@@ -65,9 +88,12 @@ TextStyle _display(double size, {Color color = _Ink.heading, double h = 1.25}) {
   }
 }
 
-TextStyle _body(double size,
-        {Color color = _Ink.body, double h = 1.9, FontWeight w = FontWeight.w400}) =>
-    GoogleFonts.amiri(fontSize: size, color: color, height: h, fontWeight: w);
+TextStyle _body(
+  double size, {
+  Color color = _Ink.body,
+  double h = 1.9,
+  FontWeight w = FontWeight.w400,
+}) => GoogleFonts.amiri(fontSize: size, color: color, height: h, fontWeight: w);
 
 /// The invitation as the guest experiences it: a sealed envelope that opens,
 /// then a cinematic card with the couple's details, a live countdown, the
@@ -116,29 +142,32 @@ class _InvitationViewPageState extends State<InvitationViewPage> {
         children: [
           SizedBox.expand(
             child: _error != null
-                ? _ErrorPane(error: _error!, onRetry: () {
-                    setState(() => _error = null);
-                    _load();
-                  })
+                ? _ErrorPane(
+                    error: _error!,
+                    onRetry: () {
+                      setState(() => _error = null);
+                      _load();
+                    },
+                  )
                 : _data == null
-                    ? const Center(
-                        child: CircularProgressIndicator(color: _Ink.gold),
-                      )
-                    : AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 700),
-                        child: _opened
-                            ? _InvitationScroll(
-                                key: const ValueKey('open'),
-                                code: widget.code,
-                                data: _data!,
-                                onChanged: _refreshWith,
-                              )
-                            : _EnvelopeStage(
-                                key: const ValueKey('sealed'),
-                                data: _data!,
-                                onOpened: () => setState(() => _opened = true),
-                              ),
-                      ),
+                ? const Center(
+                    child: CircularProgressIndicator(color: _Ink.gold),
+                  )
+                : AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 700),
+                    child: _opened
+                        ? _InvitationScroll(
+                            key: const ValueKey('open'),
+                            code: widget.code,
+                            data: _data!,
+                            onChanged: _refreshWith,
+                          )
+                        : _EnvelopeStage(
+                            key: const ValueKey('sealed'),
+                            data: _data!,
+                            onOpened: () => setState(() => _opened = true),
+                          ),
+                  ),
           ),
           const Positioned.fill(child: OverlayBackButton()),
         ],
@@ -178,14 +207,22 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
 
   // Staged so the motion reads as a sequence rather than one blur:
   // seal lifts → flap swings → card rises → everything fades to the next scene.
-  late final Animation<double> _seal =
-      CurvedAnimation(parent: _open, curve: const Interval(0.0, 0.22, curve: Curves.easeOut));
-  late final Animation<double> _flap =
-      CurvedAnimation(parent: _open, curve: const Interval(0.16, 0.55, curve: Curves.easeInOutCubic));
-  late final Animation<double> _card =
-      CurvedAnimation(parent: _open, curve: const Interval(0.45, 0.85, curve: Curves.easeOutCubic));
-  late final Animation<double> _out =
-      CurvedAnimation(parent: _open, curve: const Interval(0.85, 1.0, curve: Curves.easeIn));
+  late final Animation<double> _seal = CurvedAnimation(
+    parent: _open,
+    curve: const Interval(0.0, 0.22, curve: Curves.easeOut),
+  );
+  late final Animation<double> _flap = CurvedAnimation(
+    parent: _open,
+    curve: const Interval(0.16, 0.55, curve: Curves.easeInOutCubic),
+  );
+  late final Animation<double> _card = CurvedAnimation(
+    parent: _open,
+    curve: const Interval(0.45, 0.85, curve: Curves.easeOutCubic),
+  );
+  late final Animation<double> _out = CurvedAnimation(
+    parent: _open,
+    curve: const Interval(0.85, 1.0, curve: Curves.easeIn),
+  );
 
   @override
   void dispose() {
@@ -227,161 +264,328 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
         fit: StackFit.expand,
         children: [
           _ThemedBackdrop(template: widget.data.invitation.template),
-          // Full-bleed: the envelope IS the screen, the way a real one fills
-          // your hands. A small envelope floating in a dark frame was the
-          // single biggest thing making this look like an app screen rather
-          // than a piece of stationery.
+          // Night over whatever the couple chose for a background, so the
+          // envelope and the invitation inside it are the same place. Without
+          // it the scene changes worlds the moment the flap opens.
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0, -0.15),
+                  radius: 1.1,
+                  colors: [Color(0xD91A1726), Color(0xF2080810)],
+                ),
+              ),
+            ),
+          ),
+          const Positioned.fill(child: _NightField(offset: 0)),
+          const Positioned.fill(child: _Particles(count: 16)),
+          // The envelope is an OBJECT now, not the ground: a little smaller
+          // than the screen, tilted, and with air around it.
           LayoutBuilder(
             builder: (context, box) {
-              final w = box.maxWidth;
-              final h = box.maxHeight;
+              final screenH = box.maxHeight;
+              final w = math.min(box.maxWidth * 0.84, 460.0);
+              final h = math.min(w * 1.42, screenH * 0.74);
               // The pocket is the lower part; the flap covers exactly the
               // rest, so its point lands on the pocket's edge and the two
               // together are one closed envelope. The flap used to be shorter
               // than the space above the pocket, which left the envelope's own
               // corners transparent — the backdrop showed through them and the
               // flap read as a triangle floating in the air.
-              final bodyH = h * 0.56;
-              final seamY = h - bodyH;   // the mouth: where the card comes out
+              // The seam — the mouth of the envelope, and the point the wax
+              // seal is centred on — sits on the exact middle of the screen.
+              // It was at 0.44 of the height, which put the seal noticeably
+              // high: the one thing the eye lands on first was off-centre.
+              // Halving it also makes the flap and the pocket the same depth,
+              // so the fold lines read as one symmetrical X.
+              final seamY = h / 2; // the mouth: where the card comes out
+              final bodyH = h - seamY;
               final flapH = seamY;
               final sealSize = w * 0.24;
               final cardH = h * 0.42;
 
               return AnimatedBuilder(
-                animation: _open,
+                animation: Listenable.merge([_open, _idle]),
                 builder: (context, _) {
+                  // A still invitation for tests; see [debugInvitationStill].
+                  final idle = debugInvitationStill ? 0.5 : _idle.value;
+                  // Breathing, not bouncing: six pixels and three hundredths
+                  // of a radian. Enough that the light moves across the paper,
+                  // little enough that nothing looks loose.
+                  final sway = (idle - 0.5) * 2;
+
                   return Opacity(
                     opacity: 1 - _out.value,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Back panel: the sheet the flap is folded onto. Plain
-                        // paper, no folds — without it the envelope has holes.
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: _EnvelopeBodyPainter(
-                                accent: accent, folds: false),
-                          ),
-                        ),
-                        // The inside of the envelope: paper in shadow, deeper
-                        // towards the mouth. It sits under the flap, so it is
-                        // only seen once the flap lifts — and it is what makes
-                        // the card look like it is coming out of something.
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: seamY,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  const Color(0xFF6B5836).withValues(alpha: .05),
-                                  const Color(0xFF4A3A20).withValues(alpha: .30),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // The card, sliding up out of the mouth. It starts
-                        // below the seam — hidden behind the pocket — and ends
-                        // standing above it.
-                        Positioned(
-                          // Ends with its foot still inside the envelope
-                          // rather than clear of it — a card resting in the
-                          // mouth reads as having come out of this envelope;
-                          // one floating above it reads as a separate object.
-                          top: seamY + 12 - (cardH * .82 + 12) * _card.value,
-                          child: _MiniCard(
-                            bride: inv.brideName,
-                            groom: inv.groomName,
-                            width: w * 0.66,
-                            height: cardH,
-                          ),
-                        ),
-                        // Envelope body — edge to edge, no margins.
-                        Positioned(
-                          bottom: 0,
-                          child: CustomPaint(
-                            size: Size(w, bodyH),
-                            painter: _EnvelopeBodyPainter(accent: accent),
-                          ),
-                        ),
-                        // The flap, hinged along the envelope's top edge and
-                        // long enough for its point to meet the pocket.
-                        Positioned(
-                          top: 0,
-                          child: Transform(
-                            alignment: Alignment.topCenter,
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.0012)
-                              ..rotateX(-math.pi * _flap.value),
-                            child: CustomPaint(
-                              size: Size(w, flapH),
-                              painter: _FlapPainter(
-                                  open: _flap.value, accent: accent),
-                            ),
-                          ),
-                        ),
-                        // Wax seal, sized to the screen and sitting on the
-                        // seam where the flap meets the body.
-                        Positioned(
-                          top: seamY - sealSize / 2,
-                          child: Transform.scale(
-                            scale: (1 + 0.04 * _idle.value) *
-                                (1 + 0.5 * _seal.value),
-                            child: Opacity(
-                              opacity: 1 - _seal.value,
-                              child: CustomPaint(
-                                size: Size(sealSize, sealSize),
-                                painter: _WaxSealPainter(
-                                  initials: _initials(inv),
-                                  accent: accent,
+                    child: Center(
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.0009)
+                          ..translateByDouble(0.0, sway * 6.0, 0.0, 1.0)
+                          ..rotateY(sway * 0.035)
+                          ..rotateX(-0.045 + sway * 0.015),
+                        child: SizedBox(
+                          width: w,
+                          height: h,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              // The shadow it casts on the night, so it is floating
+                              // above something rather than pasted onto it.
+                              Positioned(
+                                bottom: -h * 0.10,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    width: w * (0.72 + 0.02 * sway),
+                                    height: h * 0.10,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.all(
+                                        Radius.elliptical(w * 0.36, h * 0.05),
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x66000000),
+                                          blurRadius: 42,
+                                          spreadRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                        // Gold shards bursting out of the broken seal.
-                        if (_seal.value > 0)
-                          Positioned(
-                            bottom: bodyH - sealSize / 2,
-                            child: SizedBox(
-                              width: sealSize * 4,
-                              height: sealSize * 4,
-                              child: CustomPaint(
-                                painter: _SealBurstPainter(
-                                  t: _seal.value,
-                                  accent: accent,
+                              // Back panel: the sheet the flap is folded onto. Plain
+                              // paper, no folds — without it the envelope has holes.
+                              Positioned.fill(
+                                child: CustomPaint(
+                                  painter: _EnvelopeBodyPainter(
+                                    accent: accent,
+                                    folds: false,
+                                  ),
                                 ),
                               ),
-                            ),
+                              // The inside of the envelope: paper in shadow, deeper
+                              // towards the mouth. It sits under the flap, so it is
+                              // only seen once the flap lifts — and it is what makes
+                              // the card look like it is coming out of something.
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: seamY,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        const Color(
+                                          0xFF6B5836,
+                                        ).withValues(alpha: .05),
+                                        const Color(
+                                          0xFF4A3A20,
+                                        ).withValues(alpha: .30),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // The card, sliding up out of the mouth. It starts
+                              // below the seam — hidden behind the pocket — and ends
+                              // standing above it.
+                              Positioned(
+                                // Ends with its foot still inside the envelope
+                                // rather than clear of it — a card resting in the
+                                // mouth reads as having come out of this envelope;
+                                // one floating above it reads as a separate object.
+                                top:
+                                    seamY +
+                                    12 -
+                                    (cardH * .82 + 12) * _card.value,
+                                child: _MiniCard(
+                                  bride: inv.brideName,
+                                  groom: inv.groomName,
+                                  width: w * 0.66,
+                                  height: cardH,
+                                ),
+                              ),
+                              // Envelope body — edge to edge, no margins.
+                              Positioned(
+                                bottom: 0,
+                                child: CustomPaint(
+                                  size: Size(w, bodyH),
+                                  painter: _EnvelopeBodyPainter(accent: accent),
+                                ),
+                              ),
+                              // The flap, hinged along the envelope's top edge and
+                              // long enough for its point to meet the pocket.
+                              Positioned(
+                                top: 0,
+                                child: Transform(
+                                  alignment: Alignment.topCenter,
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.0012)
+                                    ..rotateX(-math.pi * _flap.value),
+                                  child: CustomPaint(
+                                    size: Size(w, flapH),
+                                    painter: _FlapPainter(
+                                      open: _flap.value,
+                                      accent: accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // The invitation inside is already lit, so light escapes
+                              // along the mouth. Drawn OVER the flap on purpose:
+                              // under it, the paper hides the very thing that
+                              // makes a closed envelope read as full. It goes out
+                              // as the flap lifts, because by then the light has
+                              // somewhere else to be.
+                              Positioned(
+                                top: seamY - 9,
+                                left: w * 0.06,
+                                right: w * 0.06,
+                                height: 18,
+                                child: IgnorePointer(
+                                  child: Opacity(
+                                    opacity:
+                                        ((0.5 + 0.35 * sway) *
+                                                (1 - _flap.value))
+                                            .clamp(0.0, 1.0),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            accent.withValues(alpha: 0),
+                                            accent.withValues(alpha: .85),
+                                            accent.withValues(alpha: 0),
+                                          ],
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: accent.withValues(
+                                              alpha: .35,
+                                            ),
+                                            blurRadius: 26,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // The ring that leaves the seal every few seconds.
+                              if (!_breaking)
+                                Positioned(
+                                  top: seamY - sealSize * 1.6,
+                                  child: IgnorePointer(
+                                    child: CustomPaint(
+                                      size: Size.square(sealSize * 3.2),
+                                      painter: _SealPulsePainter(
+                                        t: idle,
+                                        accent: accent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              // Wax seal, sized to the screen and sitting on the
+                              // seam where the flap meets the body — which is the
+                              // exact middle of the screen. The key is what
+                              // `invitation_seal_test.dart` measures.
+                              Positioned(
+                                key: const ValueKey('wax-seal'),
+                                top: seamY - sealSize / 2,
+                                child: Transform.scale(
+                                  scale:
+                                      (1 + 0.04 * _idle.value) *
+                                      (1 + 0.5 * _seal.value),
+                                  child: Opacity(
+                                    opacity: 1 - _seal.value,
+                                    child: CustomPaint(
+                                      size: Size(sealSize, sealSize),
+                                      painter: _WaxSealPainter(
+                                        initials: _initials(inv),
+                                        accent: accent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Gold shards bursting out of the broken seal.
+                              if (_seal.value > 0)
+                                Positioned(
+                                  bottom: bodyH - sealSize / 2,
+                                  child: SizedBox(
+                                    width: sealSize * 4,
+                                    height: sealSize * 4,
+                                    child: CustomPaint(
+                                      painter: _SealBurstPainter(
+                                        t: _seal.value,
+                                        accent: accent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   );
                 },
               );
             },
           ),
-          // Invitation to tap — hidden the moment the seal breaks.
+          // Who it is for, set above the envelope the way a card is addressed.
           if (!_breaking)
             Positioned(
               left: 0,
               right: 0,
-              bottom: 70,
-              child: FadeTransition(
-                opacity: Tween<double>(begin: .35, end: 1).animate(_idle),
+              top: 0,
+              height: MediaQuery.sizeOf(context).height * 0.13,
+              child: Center(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.touch_app_rounded,
-                        color: _Ink.gold.withValues(alpha: .85), size: 26),
-                    const SizedBox(height: 8),
-                    Text('اضغط لفتح الدعوة',
-                        style: _body(14, color: _Ink.gold)),
+                    Text(
+                      'دعوة خاصة',
+                      style: _body(
+                        10.5,
+                        color: _Ink.gold.withValues(alpha: .7),
+                      ).copyWith(letterSpacing: 6),
+                    ),
+                    const SizedBox(height: 10),
+                    _GoldText(
+                      [
+                        inv.groomName,
+                        inv.brideName,
+                      ].where((e) => e.trim().isNotEmpty).join('  &  '),
+                      size: 19,
+                      onDark: true,
+                    ),
                   ],
+                ),
+              ),
+            ),
+          // Not an icon and a sentence: a ring leaving the seal, the way a
+          // thing that wants pressing announces itself.
+          if (!_breaking)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: MediaQuery.sizeOf(context).height * 0.11,
+              child: Center(
+                child: FadeTransition(
+                  opacity: Tween<double>(begin: .45, end: 1).animate(_idle),
+                  child: Text(
+                    'المسي الختم لفتح الدعوة',
+                    style: _body(
+                      11.5,
+                      color: _Ink.gold.withValues(alpha: .85),
+                    ).copyWith(letterSpacing: 2),
+                  ),
                 ),
               ),
             ),
@@ -389,6 +593,162 @@ class _EnvelopeStageState extends State<_EnvelopeStage>
       ),
     );
   }
+}
+
+/// Two rings leaving the seal, one behind the other, fading as they go.
+///
+/// It replaces a touch icon and a sentence. A control that wants pressing is
+/// better shown than labelled, and a ring that keeps arriving draws the eye
+/// back to the one place on the screen that does anything.
+class _SealPulsePainter extends CustomPainter {
+  const _SealPulsePainter({required this.t, required this.accent});
+
+  /// The idle cycle, 0..1 and back.
+  final double t;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final maxR = size.shortestSide / 2;
+
+    void ring(double phase) {
+      // Each ring runs its own lap of the cycle, half a lap apart.
+      final p = (t + phase) % 1.0;
+      final r = maxR * (0.34 + 0.66 * p);
+      final fade = (1 - p) * 0.5;
+      if (fade <= 0.01) return;
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1
+          ..color = accent.withValues(alpha: fade),
+      );
+    }
+
+    ring(0.0);
+    ring(0.5);
+  }
+
+  @override
+  bool shouldRepaint(_SealPulsePainter old) => old.t != t;
+}
+
+/// An arch drawn in a gold hairline: two uprights that rise and a crown that
+/// closes over them.
+///
+/// It is drawn in one stroke from the foot of one side, up and over, and down
+/// the other, so at any moment it looks like a line being traced rather than a
+/// shape being faded in. The feet are left open — the arch stands on the page
+/// instead of sitting in a box.
+class _ArchPainter extends CustomPainter {
+  const _ArchPainter({required this.t, required this.accent});
+
+  /// 0 — nothing drawn; 1 — the whole arch.
+  final double t;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (t <= 0.001 || size.isEmpty) return;
+
+    final w = size.width;
+    final h = size.height;
+    // The crown is a half-ellipse as wide as the arch and a little under a
+    // third of its height; the uprights carry the rest.
+    final crown = math.min(w / 2, h * 0.42);
+    final foot = h - 4;
+
+    final path = Path()
+      ..moveTo(0, foot)
+      ..lineTo(0, crown)
+      ..arcToPoint(
+        Offset(w, crown),
+        radius: Radius.elliptical(w / 2, crown),
+        clockwise: true,
+      )
+      ..lineTo(w, foot);
+
+    // Trace it: one metric, cut to the fraction drawn so far.
+    final metric = path.computeMetrics().first;
+    final drawn = metric.extractPath(0, metric.length * t);
+
+    canvas.drawPath(
+      drawn,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1
+        ..strokeCap = StrokeCap.round
+        ..color = accent.withValues(alpha: 0.75 * t),
+    );
+
+    // A bead of light at the head of the stroke while it is still being
+    // drawn — the point the line is coming from.
+    if (t < 0.995) {
+      final tan = metric.getTangentForOffset(metric.length * t);
+      if (tan != null) {
+        canvas.drawCircle(
+          tan.position,
+          2.2,
+          Paint()..color = accent.withValues(alpha: 0.9),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ArchPainter old) => old.t != t;
+}
+
+/// A hairline border that cuts itself into the hero as the title arrives:
+/// four corners growing along the edges until they almost meet, the way an
+/// engraver works a plate inwards from its corners.
+///
+/// It never closes completely — a gap is left at the middle of each side, so
+/// the frame reads as drawn rather than as a box around a screen.
+class _HeroFramePainter extends CustomPainter {
+  const _HeroFramePainter({required this.t, required this.accent});
+
+  /// 0 — nothing; 1 — fully cut.
+  final double t;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (t <= 0.001) return;
+    const inset = 18.0;
+    final r = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
+    );
+
+    // Each arm reaches at most 38% of its side, leaving the middle open.
+    final hx = r.width * 0.38 * t;
+    final hy = r.height * 0.30 * t;
+
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round
+      ..color = accent.withValues(alpha: 0.55 * t);
+
+    void corner(Offset at, double dx, double dy) {
+      canvas.drawLine(at, at.translate(dx, 0), line);
+      canvas.drawLine(at, at.translate(0, dy), line);
+    }
+
+    corner(r.topLeft, hx, hy);
+    corner(r.topRight, -hx, hy);
+    corner(r.bottomLeft, hx, -hy);
+    corner(r.bottomRight, -hx, -hy);
+  }
+
+  @override
+  bool shouldRepaint(_HeroFramePainter old) => old.t != t;
 }
 
 /// The small card that rises out of the envelope.
@@ -432,8 +792,10 @@ class _MiniCard extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('دعوة زفاف',
-                    style: _body(13, color: _Ink.goldDeep, w: FontWeight.w700)),
+                Text(
+                  'دعوة زفاف',
+                  style: _body(13, color: _Ink.goldDeep, w: FontWeight.w700),
+                ),
                 const SizedBox(height: 14),
                 Text(groom, style: _display(24, color: _Ink.night)),
                 Text('&', style: _display(16, color: _Ink.gold)),
@@ -474,8 +836,22 @@ class _InvitationScrollState extends State<_InvitationScroll>
     duration: const Duration(milliseconds: 2600),
   )..forward();
 
+  /// The slow swell of the scene behind the hero. Twenty-six seconds there
+  /// and back, which is slow enough that you notice the picture has moved
+  /// without ever catching it moving.
+  late final AnimationController _drift = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 26),
+  )..repeat(reverse: true);
+
   final _scroll = ScrollController();
   double _offset = 0;
+
+  Timer? _autoStart;
+
+  /// True once the reader has touched the screen. The page then stays where
+  /// they put it for good.
+  bool _handedOver = false;
 
   @override
   void initState() {
@@ -485,10 +861,44 @@ class _InvitationScrollState extends State<_InvitationScroll>
     _scroll.addListener(() {
       if (mounted) setState(() => _offset = _scroll.offset);
     });
+    // Let the entrance finish and the first screen be looked at before the
+    // page starts moving.
+    _autoStart = Timer(const Duration(milliseconds: 3400), _autoScroll);
+  }
+
+  /// Carries the page from wherever it is to the end, at a reading pace.
+  ///
+  /// The duration is set by distance, not fixed, so a short invitation does
+  /// not crawl and a long one does not race: about seventy pixels a second,
+  /// held between half a minute and two.
+  void _autoScroll() {
+    if (!mounted || _handedOver || !_scroll.hasClients) return;
+    final end = _scroll.position.maxScrollExtent;
+    final togo = end - _scroll.offset;
+    if (togo <= 8) return;
+    final seconds = (togo / 70).clamp(30.0, 120.0);
+    _scroll.animateTo(
+      end,
+      duration: Duration(milliseconds: (seconds * 1000).round()),
+      curve: Curves.linear,
+    );
+  }
+
+  /// The reader took over. Stop where we are and do not start again.
+  void _handOver() {
+    if (_handedOver) return;
+    _handedOver = true;
+    _autoStart?.cancel();
+    if (_scroll.hasClients) {
+      // Cancels the running animation by replacing it with a no-op jump.
+      _scroll.jumpTo(_scroll.offset);
+    }
   }
 
   @override
   void dispose() {
+    _autoStart?.cancel();
+    _drift.dispose();
     _enter.dispose();
     _scroll.dispose();
     super.dispose();
@@ -496,9 +906,9 @@ class _InvitationScrollState extends State<_InvitationScroll>
 
   /// A staggered reveal slot: each element appears a beat after the last.
   Animation<double> _step(double start, double end) => CurvedAnimation(
-        parent: _enter,
-        curve: Interval(start, end, curve: Curves.easeOut),
-      );
+    parent: _enter,
+    curve: Interval(start, end, curve: Curves.easeOut),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -511,155 +921,203 @@ class _InvitationScrollState extends State<_InvitationScroll>
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Stars first, and they never end: the scene below covers only the
+        // first screen, and without this the invitation fell off the sky the
+        // moment you scrolled past the hero.
+        Positioned.fill(child: _NightField(offset: _offset)),
         // The painted scene sits behind everything and drifts at a third of
         // the scroll speed, so the hero reads as a place you move through
         // rather than a picture behind a card.
         Positioned(
-          top: -_offset * 0.32,
+          // The scene drifts at a third of the scroll, then parks. Left
+          // unclamped it slid off the top of a long invitation and the page
+          // fell onto flat night with a hard horizontal edge across it; the
+          // parallax is only read in the first screen or two anyway.
+          top: -math.min(_offset * 0.32, screen.height * 0.095),
           left: 0,
           right: 0,
           height: screen.height * 1.1,
-          child: _SceneLayer(
-            base: base,
-            accent: accent,
-            template: inv.template,
+          // A very slow swell and sideways drift. A hero that is a still
+          // photograph reads as a screenshot; the same picture moving a few
+          // per cent reads as a place.
+          child: AnimatedBuilder(
+            animation: _drift,
+            builder: (context, child) {
+              final k = Curves.easeInOut.transform(_drift.value);
+              return Transform.scale(
+                scale: 1.0 + 0.055 * k,
+                alignment: Alignment(-0.25 + 0.5 * k, -0.1),
+                child: child,
+              );
+            },
+            child: _SceneLayer(
+              base: base,
+              accent: accent,
+              template: inv.template,
+            ),
           ),
         ),
-        ListView(
-          controller: _scroll,
-          padding: EdgeInsets.zero,
-          children: [
-            // ---- HERO: full bleed, type straight onto the scene ----
-            _SceneHero(
-              invitation: inv,
-              enter: _enter,
-              height: screen.height,
-              accent: accent,
-            ),
-            // The scene dissolves into the light ground the content sits on.
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [_Ink.paper.withValues(alpha: 0), _Ink.paper],
+        // Any touch at all — a drag, a tap, a press on a button — ends the
+        // automatic descent. Listener rather than a scroll notification so it
+        // stops on contact, not after the page has already been pulled.
+        Listener(
+          onPointerDown: (_) => _handOver(),
+          child: ListView(
+            controller: _scroll,
+            padding: EdgeInsets.zero,
+            children: [
+              // ---- HERO: full bleed, type straight onto the scene ----
+              _SceneHero(
+                invitation: inv,
+                enter: _enter,
+                height: screen.height,
+                accent: accent,
+              ),
+              // The hero settles into the night rather than dissolving into a
+              // sheet: a band of deeper sky, so the eye knows the reading part
+              // has begun while the stars carry straight on through it.
+              Container(
+                // Was 140, which sat on top of the hero's own full screen and
+                // opened the reading part on a void. Enough to mark the change
+                // of register, not enough to be a gap.
+                height: 56,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00060711), Color(0x99060711)],
+                  ),
                 ),
               ),
-            ),
-            Container(
-              color: _Ink.paper,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
-              child: Column(
-                children: [
-                  const SizedBox(height: 4),
-              _Reveal(
-                anim: _step(0.45, 0.7),
-                child: _Countdown(target: inv.eventDate),
-              ),
-
-              // The couple's words sit on the page itself, framed by quote
-              // flourishes — boxing them would make them look like a form
-              // field rather than a sentiment.
-              if ((inv.customMessage ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 34),
-                _Reveal(
-                  anim: _step(0.55, 0.8),
-                  child: _Quote(text: inv.customMessage!.trim()),
-                ),
-              ],
-
-              if ((inv.venue ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 34),
-                _Reveal(anim: _step(0.6, 0.85), child: const _Flourish()),
-                const SizedBox(height: 22),
-                _Reveal(
-                  anim: _step(0.62, 0.88),
-                  child: _VenueBlock(venue: inv.venue!, mapUrl: inv.mapUrl),
-                ),
-              ],
-
-              if (inv.gallery.isNotEmpty) ...[
-                const SizedBox(height: 34),
-                _Reveal(anim: _step(0.65, 0.9), child: const _Flourish()),
-                const SizedBox(height: 26),
-                _Reveal(
-                  anim: _step(0.66, 0.92),
-                  child: const _SectionHeading(
-                      title: 'لحظاتنا الجميلة', sub: 'معرض الصور'),
-                ),
-                const SizedBox(height: 16),
-                _Reveal(
-                  anim: _step(0.68, 0.94),
-                  child: _GalleryStrip(images: inv.gallery),
-                ),
-              ],
-
-              const SizedBox(height: 64),
-              _Reveal(anim: _step(0.7, 0.95), child: const _Flourish()),
-              const SizedBox(height: 26),
-              _Reveal(
-                anim: _step(0.71, 0.96),
-                child: const _SectionHeading(
-                    title: 'تأكيد الحضور', sub: 'يسعدنا وجودكم'),
-              ),
-              const SizedBox(height: 26),
-              _Reveal(
-                anim: _step(0.72, 0.97),
-                child: _RsvpPanel(
-                  code: widget.code,
-                  data: widget.data,
-                  onChanged: widget.onChanged,
-                ),
-              ),
-
-              const SizedBox(height: 64),
-              _Reveal(anim: _step(0.75, 1.0), child: const _Flourish()),
-              const SizedBox(height: 26),
-              _Reveal(
-                anim: _step(0.76, 1.0),
-                child: const _SectionHeading(
-                    title: 'سجل التهاني', sub: 'شاركونا فرحتنا'),
-              ),
-              const SizedBox(height: 26),
-              _Reveal(
-                anim: _step(0.78, 1.0),
-                child: _WishesPanel(
-                  code: widget.code,
-                  data: widget.data,
-                  onChanged: widget.onChanged,
-                ),
-              ),
-
-              if ((inv.giftNote ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 34),
-                _Reveal(anim: _step(0.8, 1.0), child: const _Flourish()),
-                const SizedBox(height: 26),
-                _Reveal(
-                  anim: _step(0.82, 1.0),
-                  child: _GiftPanel(note: inv.giftNote!.trim()),
-                ),
-              ],
-
-              const SizedBox(height: 40),
-              _Reveal(anim: _step(0.85, 1.0), child: const _Flourish()),
-              const SizedBox(height: 18),
-              Center(
+              Container(
+                // Transparent on purpose: see [_Ink.glass]. The scene behind is
+                // the invitation's ground from the first screen to the last.
+                color: const Color(0x99060711),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
                 child: Column(
                   children: [
-                    Text('بكل الحب',
-                        style: _body(12.5,
-                            color: _Ink.body.withValues(alpha: .65))),
-                    const SizedBox(height: 6),
-                    _GoldText('أفراحنا', size: 17),
+                    const SizedBox(height: 4),
+                    _Reveal(
+                      anim: _step(0.45, 0.7),
+                      child: _Countdown(target: inv.eventDate),
+                    ),
+
+                    // The couple's words sit on the page itself, framed by quote
+                    // flourishes — boxing them would make them look like a form
+                    // field rather than a sentiment.
+                    if ((inv.customMessage ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _Reveal(
+                        anim: _step(0.55, 0.8),
+                        child: _Quote(text: inv.customMessage!.trim()),
+                      ),
+                    ],
+
+                    if ((inv.venue ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _Reveal(anim: _step(0.6, 0.85), child: const _Flourish()),
+                      const SizedBox(height: 22),
+                      _Reveal(
+                        anim: _step(0.62, 0.88),
+                        child: _VenueBlock(
+                          venue: inv.venue!,
+                          mapUrl: inv.mapUrl,
+                        ),
+                      ),
+                    ],
+
+                    if (inv.gallery.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _Reveal(anim: _step(0.65, 0.9), child: const _Flourish()),
+                      const SizedBox(height: 18),
+                      _Reveal(
+                        anim: _step(0.66, 0.92),
+                        child: const _SectionHeading(
+                          title: 'لحظاتنا الجميلة',
+                          sub: 'معرض الصور',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _Reveal(
+                        anim: _step(0.68, 0.94),
+                        child: _GalleryStrip(images: inv.gallery),
+                      ),
+                    ],
+
+                    const SizedBox(height: 42),
+                    _Reveal(anim: _step(0.7, 0.95), child: const _Flourish()),
+                    const SizedBox(height: 18),
+                    _Reveal(
+                      anim: _step(0.71, 0.96),
+                      child: const _SectionHeading(
+                        title: 'تأكيد الحضور',
+                        sub: 'يسعدنا وجودكم',
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _Reveal(
+                      anim: _step(0.72, 0.97),
+                      child: _RsvpPanel(
+                        code: widget.code,
+                        data: widget.data,
+                        onChanged: widget.onChanged,
+                      ),
+                    ),
+
+                    const SizedBox(height: 42),
+                    _Reveal(anim: _step(0.75, 1.0), child: const _Flourish()),
+                    const SizedBox(height: 18),
+                    _Reveal(
+                      anim: _step(0.76, 1.0),
+                      child: const _SectionHeading(
+                        title: 'سجل التهاني',
+                        sub: 'شاركونا فرحتنا',
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _Reveal(
+                      anim: _step(0.78, 1.0),
+                      child: _WishesPanel(
+                        code: widget.code,
+                        data: widget.data,
+                        onChanged: widget.onChanged,
+                      ),
+                    ),
+
+                    if ((inv.giftNote ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _Reveal(anim: _step(0.8, 1.0), child: const _Flourish()),
+                      const SizedBox(height: 18),
+                      _Reveal(
+                        anim: _step(0.82, 1.0),
+                        child: _GiftPanel(note: inv.giftNote!.trim()),
+                      ),
+                    ],
+
+                    const SizedBox(height: 30),
+                    _Reveal(anim: _step(0.85, 1.0), child: const _Flourish()),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'بكل الحب',
+                            style: _body(
+                              12.5,
+                              color: _Ink.body.withValues(alpha: .65),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _GoldText('أفراحنا', size: 17),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
                   ],
                 ),
               ),
-                  const SizedBox(height: 18),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         // Floating section bar, the way the reference keeps navigation within
         // reach without ever covering the invitation itself.
@@ -767,100 +1225,127 @@ class _HeroCardState extends State<_HeroCard>
       child: AspectRatio(
         aspectRatio: 3 / 4.2,
         child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_Ink.deep, Color(0xFF23283A), _Ink.deep],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_Ink.deep, Color(0xFF23283A), _Ink.deep],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .55),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: .55),
-              blurRadius: 34,
-              offset: const Offset(0, 16),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: AnimatedBuilder(
-            animation: Listenable.merge([enter, _ambient]),
-            builder: (context, child) => Stack(
-              fit: StackFit.expand,
-              children: [
-                // Woven paper texture, then a vignette: without these the card
-                // is a flat swatch of colour.
-                const CustomPaint(painter: _CardTexturePainter()),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      radius: .95,
-                      colors: [Color(0x00000000), Color(0x66000000)],
-                      stops: [.55, 1.0],
-                    ),
-                  ),
-                ),
-                CustomPaint(
-                  painter: _GoldFramePainter(
-                    progress: Curves.easeInOut.transform(
-                      (enter.value / 0.5).clamp(0.0, 1.0),
-                    ),
-                  ),
-                ),
-                child!,
-                // A single slow pass of light across the foil, once the card
-                // has settled — the moment that sells it as metal.
-                // The foil keeps catching light: one pass per ambient cycle,
-                // spending most of the cycle dark so it reads as an occasional
-                // glint rather than a strobe.
-                CustomPaint(
-                  painter: _SheenPainter(
-                    t: enter.value < .55
-                        ? 0
-                        : ((_ambient.value % 1.0) / .38).clamp(0.0, 1.0),
-                  ),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 38),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: AnimatedBuilder(
+              animation: Listenable.merge([enter, _ambient]),
+              builder: (context, child) => Stack(
+                fit: StackFit.expand,
                 children: [
-                  Text('بسم الله الرحمن الرحيم',
-                      style:
-                          _body(11.5, color: _Ink.gold.withValues(alpha: .75))),
-                  const Spacer(),
-                  _Monogram(
-                    groom: invitation.groomName,
-                    bride: invitation.brideName,
+                  // Woven paper texture, then a vignette: without these the card
+                  // is a flat swatch of colour.
+                  const CustomPaint(painter: _CardTexturePainter()),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        radius: .95,
+                        colors: [Color(0x00000000), Color(0x66000000)],
+                        stops: [.55, 1.0],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 18),
-                  _GoldText('دعوة زفاف', size: 27, onDark: true),
-                  const SizedBox(height: 12),
-                  const _Ornament(),
-                  const SizedBox(height: 16),
-                  Text(invitation.groomName,
-                      textAlign: TextAlign.center, style: _display(29)),
-                  const SizedBox(height: 2),
-                  _GoldText('&', size: 19, onDark: true),
-                  const SizedBox(height: 2),
-                  Text(invitation.brideName,
-                      textAlign: TextAlign.center, style: _display(29)),
-                  const SizedBox(height: 16),
-                  const _Ornament(),
-                  const Spacer(),
-                  Text(df.format(invitation.eventDate),
-                      textAlign: TextAlign.center, style: _body(13.5)),
-                  const SizedBox(height: 4),
-                  Text(tf.format(invitation.eventDate),
-                      style: _body(13.5, color: _Ink.gold)),
+                  CustomPaint(
+                    painter: _GoldFramePainter(
+                      progress: Curves.easeInOut.transform(
+                        (enter.value / 0.5).clamp(0.0, 1.0),
+                      ),
+                    ),
+                  ),
+                  child!,
+                  // A single slow pass of light across the foil, once the card
+                  // has settled — the moment that sells it as metal.
+                  // The foil keeps catching light: one pass per ambient cycle,
+                  // spending most of the cycle dark so it reads as an occasional
+                  // glint rather than a strobe.
+                  CustomPaint(
+                    painter: _SheenPainter(
+                      t: enter.value < .55
+                          ? 0
+                          : ((_ambient.value % 1.0) / .38).clamp(0.0, 1.0),
+                    ),
+                  ),
                 ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 38,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'بسم الله الرحمن الرحيم',
+                      style: _body(
+                        11.5,
+                        color: _Ink.gold.withValues(alpha: .75),
+                      ),
+                    ),
+                    const Spacer(),
+                    _OrbitRings(
+                      // The medallion is 74; the rings need room to swing
+                      // clear of it on both sides.
+                      size: 128,
+                      accent: _ThemedBackdrop._hex(
+                        invitation.template?.accentColor,
+                        _Ink.gold,
+                      ),
+                      child: _Monogram(
+                        groom: invitation.groomName,
+                        bride: invitation.brideName,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _GoldText('دعوة زفاف', size: 27, onDark: true),
+                    const SizedBox(height: 12),
+                    const _Ornament(),
+                    const SizedBox(height: 16),
+                    Text(
+                      invitation.groomName,
+                      textAlign: TextAlign.center,
+                      style: _display(29),
+                    ),
+                    const SizedBox(height: 2),
+                    _GoldText('&', size: 19, onDark: true),
+                    const SizedBox(height: 2),
+                    Text(
+                      invitation.brideName,
+                      textAlign: TextAlign.center,
+                      style: _display(29),
+                    ),
+                    const SizedBox(height: 16),
+                    const _Ornament(),
+                    const Spacer(),
+                    Text(
+                      df.format(invitation.eventDate),
+                      textAlign: TextAlign.center,
+                      style: _body(13.5),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tf.format(invitation.eventDate),
+                      style: _body(13.5, color: _Ink.gold),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
         ),
       ),
     );
@@ -946,8 +1431,11 @@ class _CountdownState extends State<_Countdown> {
   Widget build(BuildContext context) {
     if (_left == Duration.zero) {
       return _Panel(
-        child: Text('اليوم الموعود 🤍',
-            textAlign: TextAlign.center, style: _body(16, color: _Ink.gold)),
+        child: Text(
+          'اليوم الموعود 🤍',
+          textAlign: TextAlign.center,
+          style: _body(16, color: _Ink.gold),
+        ),
       );
     }
     final d = _left.inDays;
@@ -955,25 +1443,58 @@ class _CountdownState extends State<_Countdown> {
     final m = _left.inMinutes % 60;
     final s = _left.inSeconds % 60;
 
-    return _Panel(
-      child: Column(
-        children: [
-          Text('العدّ التنازلي',
-              style: _body(12.5, color: _Ink.goldInk.withValues(alpha: .9))),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _Unit(value: d, label: 'يوم'),
-              _Unit(value: h, label: 'ساعة'),
-              _Unit(value: m, label: 'دقيقة'),
-              _Unit(value: s, label: 'ثانية'),
-            ],
+    // One plate, four figures, hairlines between them. No panel around it:
+    // the numbers are the object, and a border would make them a widget.
+    return Column(
+      children: [
+        Text(
+          'العدّ التنازلي',
+          style: _body(
+            10,
+            color: _Ink.goldInk.withValues(alpha: .85),
+          ).copyWith(letterSpacing: 6, height: 1.2),
+        ),
+        const SizedBox(height: 16),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: _Ink.glass,
+            border: Border(
+              top: BorderSide(color: _Ink.goldInk.withValues(alpha: .35)),
+              bottom: BorderSide(color: _Ink.goldInk.withValues(alpha: .35)),
+            ),
           ),
-        ],
-      ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _Unit(value: d, label: 'يوم'),
+                const _UnitRule(),
+                _Unit(value: h, label: 'ساعة'),
+                const _UnitRule(),
+                _Unit(value: m, label: 'دقيقة'),
+                const _UnitRule(),
+                _Unit(value: s, label: 'ثانية'),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
+}
+
+/// The hairline standing between two figures of the countdown. Short, and
+/// well inside the plate, so it divides without boxing anything.
+class _UnitRule extends StatelessWidget {
+  const _UnitRule();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 1,
+    height: 34,
+    color: _Ink.goldInk.withValues(alpha: .22),
+  );
 }
 
 class _Unit extends StatelessWidget {
@@ -987,15 +1508,9 @@ class _Unit extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: _Ink.paper,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _Ink.goldInk.withValues(alpha: .28)),
-            ),
-            // Each digit rolls up as it changes, like a flip clock.
+          // No box: the figure IS the element. Each digit still rolls up as
+          // it changes, which is the only motion this block needs.
+          SizedBox(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 420),
               switchInCurve: Curves.easeOutCubic,
@@ -1027,7 +1542,10 @@ class _Unit extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 5),
-          Text(label, style: _body(10.5, color: _Ink.body.withValues(alpha: .8))),
+          Text(
+            label,
+            style: _body(10.5, color: _Ink.body.withValues(alpha: .8)),
+          ),
         ],
       ),
     );
@@ -1049,11 +1567,15 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         // Glass over the living background, not a flat grey box.
-        color: Colors.white,
+        color: _Ink.glass,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: _Ink.goldInk.withValues(alpha: .28)),
         boxShadow: const [
-          BoxShadow(color: Color(0x0F000000), blurRadius: 26, offset: Offset(0, 12)),
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 26,
+            offset: Offset(0, 12),
+          ),
         ],
       ),
       child: CustomPaint(
@@ -1075,9 +1597,14 @@ class _Panel extends StatelessWidget {
                       Icon(icon, size: 15, color: _Ink.gold),
                       const SizedBox(width: 6),
                     ],
-                    Text(title!,
-                        style: _body(13.5,
-                            color: _Ink.goldLight, w: FontWeight.w700)),
+                    Text(
+                      title!,
+                      style: _body(
+                        13.5,
+                        color: _Ink.goldLight,
+                        w: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     const Expanded(child: _HairRule(fromLeft: false)),
                   ],
@@ -1150,8 +1677,6 @@ class _PanelCornersPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
-
-
 class _GiftPanel extends StatelessWidget {
   const _GiftPanel({required this.note});
 
@@ -1164,13 +1689,15 @@ class _GiftPanel extends StatelessWidget {
       icon: Icons.card_giftcard_rounded,
       child: Column(
         children: [
-          SelectableText(note,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.cormorantGaramond(
-                fontSize: 17,
-                color: _Ink.goldInk,
-                letterSpacing: 1.5,
-              )),
+          SelectableText(
+            note,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.cormorantGaramond(
+              fontSize: 17,
+              color: _Ink.goldInk,
+              letterSpacing: 1.5,
+            ),
+          ),
           const SizedBox(height: 12),
           _GoldButton(
             icon: Icons.copy_rounded,
@@ -1204,9 +1731,12 @@ class _RsvpPanel extends StatefulWidget {
 }
 
 class _RsvpPanelState extends State<_RsvpPanel> {
-  late final _name = TextEditingController(text: widget.data.myRsvp?.name ?? '');
-  late final _notes =
-      TextEditingController(text: widget.data.myRsvp?.notes ?? '');
+  late final _name = TextEditingController(
+    text: widget.data.myRsvp?.name ?? '',
+  );
+  late final _notes = TextEditingController(
+    text: widget.data.myRsvp?.notes ?? '',
+  );
   late bool? _attending = widget.data.myRsvp?.attending;
   late int _plusOnes = widget.data.myRsvp?.plusOnes ?? 0;
   bool _busy = false;
@@ -1221,9 +1751,9 @@ class _RsvpPanelState extends State<_RsvpPanel> {
   Future<void> _submit() async {
     if (_name.text.trim().isEmpty || _attending == null) {
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتب اسمك واختر الحضور')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('اكتب اسمك واختر الحضور')));
       return;
     }
     setState(() => _busy = true);
@@ -1239,12 +1769,16 @@ class _RsvpPanelState extends State<_RsvpPanel> {
       HapticFeedback.mediumImpact();
       widget.onChanged(v);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_attending! ? 'تم تأكيد حضورك 🎉' : 'تم تسجيل اعتذارك')),
+        SnackBar(
+          content: Text(_attending! ? 'تم تأكيد حضورك 🎉' : 'تم تسجيل اعتذارك'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e is ApiException ? e.message : 'تعذّر الإرسال')),
+        SnackBar(
+          content: Text(e is ApiException ? e.message : 'تعذّر الإرسال'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1263,13 +1797,20 @@ class _RsvpPanelState extends State<_RsvpPanel> {
           Center(
             child: Text(
               '${widget.data.confirmedCount} تأكيد حضور',
-              style: _body(12, color: _Ink.goldInk.withValues(alpha: .9), w: FontWeight.w700),
+              style: _body(
+                12,
+                color: _Ink.goldInk.withValues(alpha: .9),
+                w: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(height: 14),
           if (!open)
-            Text('أُغلق تأكيد الحضور لهذه الدعوة.',
-                textAlign: TextAlign.center, style: _body(13))
+            Text(
+              'أُغلق تأكيد الحضور لهذه الدعوة.',
+              textAlign: TextAlign.center,
+              style: _body(13),
+            )
           else ...[
             _Field(controller: _name, hint: 'الاسم الكامل'),
             const SizedBox(height: 10),
@@ -1296,8 +1837,7 @@ class _RsvpPanelState extends State<_RsvpPanel> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('عدد المرافقين',
-                      style: _body(13, color: _Ink.body)),
+                  Text('عدد المرافقين', style: _body(13, color: _Ink.body)),
                   const Spacer(),
                   _Stepper(
                     value: _plusOnes,
@@ -1394,13 +1934,20 @@ class _WishesPanelState extends State<_WishesPanel> {
                   color: _Ink.paper,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: _Ink.goldInk.withValues(alpha: .16)),
+                    color: _Ink.goldInk.withValues(alpha: .16),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(w.name,
-                        style: _body(12.5, color: _Ink.goldInk, w: FontWeight.w700)),
+                    Text(
+                      w.name,
+                      style: _body(
+                        12.5,
+                        color: _Ink.goldInk,
+                        w: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 3),
                     Text('“${w.body}”', style: _body(13)),
                   ],
@@ -1416,7 +1963,11 @@ class _WishesPanelState extends State<_WishesPanel> {
 // ---- small controls --------------------------------------------------------
 
 class _Field extends StatelessWidget {
-  const _Field({required this.controller, required this.hint, this.maxLines = 1});
+  const _Field({
+    required this.controller,
+    required this.hint,
+    this.maxLines = 1,
+  });
 
   final TextEditingController controller;
   final String hint;
@@ -1433,9 +1984,11 @@ class _Field extends StatelessWidget {
         hintText: hint,
         hintStyle: _body(13, color: _Ink.body.withValues(alpha: .55)),
         filled: true,
-        fillColor: _Ink.paper,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        fillColor: _Ink.glassHigh,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: _Ink.goldInk.withValues(alpha: .22)),
@@ -1471,7 +2024,7 @@ class _Choice extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? _Ink.goldInk : _Ink.paper,
+          color: selected ? _Ink.goldInk : _Ink.glassHigh,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected
@@ -1492,9 +2045,11 @@ class _Choice extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: _body(14,
-              color: selected ? Colors.white : _Ink.heading,
-              w: selected ? FontWeight.w700 : FontWeight.w600),
+          style: _body(
+            14,
+            color: selected ? Colors.white : _Ink.heading,
+            w: selected ? FontWeight.w700 : FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -1511,7 +2066,7 @@ class _Stepper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: _Ink.paper,
+        color: _Ink.glassHigh,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _Ink.goldInk.withValues(alpha: .25)),
       ),
@@ -1520,10 +2075,17 @@ class _Stepper extends StatelessWidget {
         children: [
           IconButton(
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.remove_rounded, size: 18, color: _Ink.goldInk),
+            icon: const Icon(
+              Icons.remove_rounded,
+              size: 18,
+              color: _Ink.goldInk,
+            ),
             onPressed: value > 0 ? () => onChanged(value - 1) : null,
           ),
-          Text('$value', style: _body(15, color: _Ink.heading, w: FontWeight.w700)),
+          Text(
+            '$value',
+            style: _body(15, color: _Ink.heading, w: FontWeight.w700),
+          ),
           IconButton(
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.add_rounded, size: 18, color: _Ink.goldInk),
@@ -1563,8 +2125,10 @@ class _GoldButton extends StatelessWidget {
                 Icon(icon, size: 17, color: _Ink.night),
                 const SizedBox(width: 7),
               ],
-              Text(label,
-                  style: _body(14, color: _Ink.night, w: FontWeight.w700)),
+              Text(
+                label,
+                style: _body(14, color: _Ink.night, w: FontWeight.w700),
+              ),
             ],
           ),
         ),
@@ -1587,8 +2151,11 @@ class _ErrorPane extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.mark_email_unread_outlined,
-                size: 60, color: _Ink.gold),
+            const Icon(
+              Icons.mark_email_unread_outlined,
+              size: 60,
+              color: _Ink.gold,
+            ),
             const SizedBox(height: 14),
             Text(
               error is ApiException
@@ -1647,10 +2214,7 @@ class _ThemedBackdrop extends StatelessWidget {
             gradient: RadialGradient(
               center: const Alignment(0, -0.5),
               radius: 1.2,
-              colors: [
-                Color.lerp(bg, Colors.white, .10) ?? bg,
-                bg,
-              ],
+              colors: [Color.lerp(bg, Colors.white, .10) ?? bg, bg],
             ),
           ),
         ),
@@ -1664,6 +2228,277 @@ class _ThemedBackdrop extends StatelessWidget {
 }
 
 /// Slow drifting gold motes. Cheap: a handful of circles on one ticker.
+/// Three depths of stars over the night, each moving at its own fraction of
+/// the scroll, and a shooting star every few seconds.
+///
+/// Parallax is the whole trick: the near layer travels almost with the
+/// content and the far layer barely moves, which is what makes a flat screen
+/// read as depth. One repeating controller drives the twinkle so the field
+/// costs a single repaint per frame.
+class _NightField extends StatefulWidget {
+  const _NightField({required this.offset});
+
+  /// Pixels scrolled. The layers divide it between them.
+  final double offset;
+
+  @override
+  State<_NightField> createState() => _NightFieldState();
+}
+
+class _NightFieldState extends State<_NightField>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 24),
+  )..repeat();
+
+  /// Seeded, so the constellation is the same every time the invitation is
+  /// opened — a guest who comes back twice sees the same sky.
+  late final List<_Spark> _stars = List.generate(130, (i) {
+    final r = math.Random(i * 2654435761 % 100003);
+    final depth = i % 3; // 0 far, 2 near
+    return _Spark(
+      x: r.nextDouble(),
+      y: r.nextDouble(),
+      radius: 0.6 + depth * 0.45 + r.nextDouble() * 0.7,
+      phase: r.nextDouble() * math.pi * 2,
+      depth: depth,
+      flare: r.nextDouble() < 0.1,
+    );
+  });
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) => CustomPaint(
+            painter: _NightFieldPainter(
+              stars: _stars,
+              t: _c.value,
+              offset: widget.offset,
+            ),
+            size: Size.infinite,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Spark {
+  const _Spark({
+    required this.x,
+    required this.y,
+    required this.radius,
+    required this.phase,
+    required this.depth,
+    required this.flare,
+  });
+
+  final double x, y, radius, phase;
+
+  /// 0 far, 1 middle, 2 near — sets both the drift and the brightness.
+  final int depth;
+
+  /// The few that get a four-point glint.
+  final bool flare;
+}
+
+class _NightFieldPainter extends CustomPainter {
+  const _NightFieldPainter({
+    required this.stars,
+    required this.t,
+    required this.offset,
+  });
+
+  final List<_Spark> stars;
+  final double t;
+  final double offset;
+
+  /// How far each depth travels per pixel scrolled.
+  static const _drift = [0.06, 0.14, 0.26];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final dot = Paint();
+    final flare = Paint()
+      ..strokeWidth = 0.7
+      ..strokeCap = StrokeCap.round;
+
+    for (final s in stars) {
+      // Wrap instead of scrolling away, so the field never runs out however
+      // long the invitation is.
+      final shift = offset * _drift[s.depth];
+      final y = ((s.y * size.height) - shift) % size.height;
+      final o = Offset(s.x * size.width, y < 0 ? y + size.height : y);
+
+      final twinkle = 0.55 + 0.45 * math.sin(t * math.pi * 2 + s.phase);
+      final a = (0.18 + 0.22 * s.depth) * twinkle;
+      dot.color = _Ink.goldLight.withValues(alpha: a.clamp(0.0, 1.0));
+      canvas.drawCircle(o, s.radius, dot);
+
+      if (s.flare) {
+        final len = s.radius * (3 + 2 * twinkle);
+        flare.color = _Ink.goldLight.withValues(alpha: a * 0.5);
+        canvas.drawLine(o.translate(-len, 0), o.translate(len, 0), flare);
+        canvas.drawLine(o.translate(0, -len), o.translate(0, len), flare);
+      }
+    }
+
+    _shootingStar(canvas, size);
+  }
+
+  /// One every six seconds, on a path of its own, fading as it goes.
+  void _shootingStar(Canvas canvas, Size size) {
+    const period = 0.25; // of the 24 s cycle → every 6 s
+    final n = (t / period).floor();
+    final local = (t - n * period) / period; // 0..1 across its life
+    if (local > 0.34) return;
+
+    final r = math.Random(n * 7919 + 3);
+    final start = Offset(
+      (0.25 + r.nextDouble() * 0.7) * size.width,
+      r.nextDouble() * size.height * 0.5,
+    );
+    final angle = math.pi * (0.74 + r.nextDouble() * 0.1);
+    final dir = Offset(math.cos(angle), math.sin(angle));
+    final p = Curves.easeOut.transform(local / 0.34);
+    final head = start + dir * (size.shortestSide * 0.8 * p);
+    final tail = head - dir * (110 * (1 - p * 0.4));
+    final fade = 1 - local / 0.34;
+
+    canvas.drawLine(
+      tail,
+      head,
+      Paint()
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round
+        ..shader = LinearGradient(
+          colors: [
+            _Ink.goldLight.withValues(alpha: 0),
+            _Ink.goldLight.withValues(alpha: fade * 0.85),
+          ],
+        ).createShader(Rect.fromPoints(tail, head)),
+    );
+    canvas.drawCircle(
+      head,
+      1.7,
+      Paint()..color = _Ink.goldLight.withValues(alpha: fade),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NightFieldPainter old) =>
+      old.t != t || old.offset != offset;
+}
+
+/// Two tilted rings turning around whatever they are given, at different
+/// speeds and in opposite directions — the couple's initials with an orbit.
+class _OrbitRings extends StatefulWidget {
+  const _OrbitRings({
+    required this.child,
+    required this.accent,
+    this.size = 150,
+  });
+
+  final Widget child;
+  final Color accent;
+  final double size;
+
+  @override
+  State<_OrbitRings> createState() => _OrbitRingsState();
+}
+
+class _OrbitRingsState extends State<_OrbitRings>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 30),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (_, _) => CustomPaint(
+                size: Size.square(widget.size),
+                painter: _OrbitPainter(t: _c.value, accent: widget.accent),
+              ),
+            ),
+          ),
+          widget.child,
+        ],
+      ),
+    );
+  }
+}
+
+class _OrbitPainter extends CustomPainter {
+  const _OrbitPainter({required this.t, required this.accent});
+
+  final double t;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.shortestSide / 2;
+
+    void orbit(double rx, double ry, double tilt, double speed, double alpha) {
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(tilt + t * math.pi * 2 * speed);
+      final rect = Rect.fromCenter(
+        center: Offset.zero,
+        width: rx * 2,
+        height: ry * 2,
+      );
+      canvas.drawOval(
+        rect,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.9
+          ..color = accent.withValues(alpha: alpha),
+      );
+      // The bead riding the ring, so the turn can actually be seen.
+      canvas.drawCircle(
+        Offset(rx, 0),
+        1.9,
+        Paint()..color = accent.withValues(alpha: alpha * 2.2),
+      );
+      canvas.restore();
+    }
+
+    orbit(r * 0.96, r * 0.34, 0.22, 1.0, 0.30);
+    orbit(r * 0.80, r * 0.28, -0.55, -0.62, 0.22);
+  }
+
+  @override
+  bool shouldRepaint(_OrbitPainter old) => old.t != t;
+}
+
 class _Particles extends StatefulWidget {
   const _Particles({required this.count});
 
@@ -1859,7 +2694,6 @@ class _EnvelopeBodyPainter extends CustomPainter {
     );
   }
 
-
   @override
   bool shouldRepaint(covariant _EnvelopeBodyPainter old) =>
       old.accent != accent;
@@ -1983,12 +2817,15 @@ class _WaxSealPainter extends CustomPainter {
     final blob = Path();
     for (var i = 0; i <= 96; i++) {
       final a = i / 96 * math.pi * 2;
-      final wobble = 1 +
+      final wobble =
+          1 +
           0.030 * math.sin(a * 9 + .6) +
           0.020 * math.cos(a * 5) +
           0.012 * math.sin(a * 17);
       final p = Offset(
-          c.dx + r * wobble * math.cos(a), c.dy + r * wobble * math.sin(a));
+        c.dx + r * wobble * math.cos(a),
+        c.dy + r * wobble * math.sin(a),
+      );
       i == 0 ? blob.moveTo(p.dx, p.dy) : blob.lineTo(p.dx, p.dy);
     }
     blob.close();
@@ -2065,13 +2902,18 @@ class _WaxSealPainter extends CustomPainter {
       c.translate(-r * .38, -r * .42),
       r * .55,
       Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: .30),
-            Colors.white.withValues(alpha: 0),
-          ],
-        ).createShader(
-            Rect.fromCircle(center: c.translate(-r * .38, -r * .42), radius: r * .55)),
+        ..shader =
+            RadialGradient(
+              colors: [
+                Colors.white.withValues(alpha: .30),
+                Colors.white.withValues(alpha: 0),
+              ],
+            ).createShader(
+              Rect.fromCircle(
+                center: c.translate(-r * .38, -r * .42),
+                radius: r * .55,
+              ),
+            ),
     );
     canvas.restore();
   }
@@ -2105,13 +2947,13 @@ class _GoldFramePainter extends CustomPainter {
 
     // Three rules at different weights — a single line looks like a border,
     // three at graded weights look like engraving.
-    for (final (inset, paint) in [
-      (13.0, gold),
-      (18.0, hair),
-      (23.0, gold),
-    ]) {
+    for (final (inset, paint) in [(13.0, gold), (18.0, hair), (23.0, gold)]) {
       final rect = Rect.fromLTWH(
-          inset, inset, size.width - inset * 2, size.height - inset * 2);
+        inset,
+        inset,
+        size.width - inset * 2,
+        size.height - inset * 2,
+      );
       canvas.drawPath(_partial(Path()..addRect(rect), progress), paint);
     }
 
@@ -2180,10 +3022,7 @@ class _GoldFramePainter extends CustomPainter {
     if (lt <= 0) return;
 
     final leafPaint = Paint()..color = _Ink.gold.withValues(alpha: lt * .85);
-    for (final (px, py, rot) in [
-      (7.0, 20.0, -0.5),
-      (20.0, 7.0, -1.1),
-    ]) {
+    for (final (px, py, rot) in [(7.0, 20.0, -0.5), (20.0, 7.0, -1.1)]) {
       canvas.save();
       canvas.translate(px, py);
       canvas.rotate(rot);
@@ -2451,11 +3290,10 @@ class _FlourishPainter extends CustomPainter {
         start,
         end,
         line
-          ..shader = ui.Gradient.linear(
-            start,
-            end,
-            [_Ink.goldInk.withValues(alpha: .75), _Ink.goldInk.withValues(alpha: 0)],
-          ),
+          ..shader = ui.Gradient.linear(start, end, [
+            _Ink.goldInk.withValues(alpha: .75),
+            _Ink.goldInk.withValues(alpha: 0),
+          ]),
       );
     }
 
@@ -2498,8 +3336,10 @@ class _SectionHeading extends StatelessWidget {
         if (sub != null) ...[
           Text(
             sub!,
-            style: _body(10, color: _Ink.goldInk.withValues(alpha: .9))
-                .copyWith(letterSpacing: 6, height: 1.2),
+            style: _body(
+              10,
+              color: _Ink.goldInk.withValues(alpha: .9),
+            ).copyWith(letterSpacing: 6, height: 1.2),
           ),
           const SizedBox(height: 12),
         ],
@@ -2522,12 +3362,14 @@ class _Quote extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Column(
         children: [
-          Text('”',
-              style: GoogleFonts.cormorantGaramond(
-                fontSize: 46,
-                height: .8,
-                color: _Ink.goldInk.withValues(alpha: .45),
-              )),
+          Text(
+            '”',
+            style: GoogleFonts.cormorantGaramond(
+              fontSize: 46,
+              height: .8,
+              color: _Ink.goldInk.withValues(alpha: .45),
+            ),
+          ),
           const SizedBox(height: 2),
           Text(
             text,
@@ -2553,30 +3395,29 @@ class _VenueBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Set like the destination on a ticket rather than an address on a form:
+    // label, rule, place, rule. The ringed map pin that used to lead it is
+    // the same component every app in the world uses, and it said nothing
+    // about this place in particular.
     return Column(
       children: [
         Text(
           'المكان',
-          style: _body(10, color: _Ink.goldInk.withValues(alpha: .9))
-              .copyWith(letterSpacing: 6, height: 1.2),
+          style: _body(
+            10,
+            color: _Ink.goldInk.withValues(alpha: .9),
+          ).copyWith(letterSpacing: 6, height: 1.2),
         ),
-        const SizedBox(height: 16),
-        Container(
-          width: 46,
-          height: 46,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: _Ink.goldInk.withValues(alpha: .45)),
-            gradient: RadialGradient(colors: [
-              _Ink.goldInk.withValues(alpha: .12),
-              Colors.transparent,
-            ]),
-          ),
-          child: const Icon(Icons.place_rounded, size: 20, color: _Ink.goldInk),
+        const SizedBox(height: 18),
+        const _HairRule(fromLeft: true),
+        const SizedBox(height: 18),
+        Text(
+          venue,
+          textAlign: TextAlign.center,
+          style: _display(27, color: _Ink.heading, h: 1.3),
         ),
-        const SizedBox(height: 12),
-        Text(venue, textAlign: TextAlign.center, style: _display(21)),
+        const SizedBox(height: 18),
+        const _HairRule(fromLeft: false),
         if ((mapUrl ?? '').isNotEmpty) ...[
           const SizedBox(height: 16),
           _OutlineGoldButton(
@@ -2614,18 +3455,22 @@ class _OutlineGoldButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(99),
           border: Border.all(color: _Ink.goldInk.withValues(alpha: .55)),
-          gradient: LinearGradient(colors: [
-            _Ink.goldInk.withValues(alpha: .10),
-            _Ink.goldInk.withValues(alpha: .02),
-          ]),
+          gradient: LinearGradient(
+            colors: [
+              _Ink.goldInk.withValues(alpha: .10),
+              _Ink.goldInk.withValues(alpha: .02),
+            ],
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 16, color: _Ink.goldInk),
             const SizedBox(width: 8),
-            Text(label,
-                style: _body(13.5, color: _Ink.goldInk, w: FontWeight.w700)),
+            Text(
+              label,
+              style: _body(13.5, color: _Ink.goldInk, w: FontWeight.w700),
+            ),
           ],
         ),
       ),
@@ -2700,11 +3545,16 @@ class _SealBurstPainter extends CustomPainter {
         c,
         r,
         Paint()
-          ..shader = ui.Gradient.radial(c, r, [
-            Colors.white.withValues(alpha: .9 * flare),
-            light.withValues(alpha: .35 * flare),
-            accent.withValues(alpha: 0),
-          ], [0.0, 0.35, 1.0]),
+          ..shader = ui.Gradient.radial(
+            c,
+            r,
+            [
+              Colors.white.withValues(alpha: .9 * flare),
+              light.withValues(alpha: .35 * flare),
+              accent.withValues(alpha: 0),
+            ],
+            [0.0, 0.35, 1.0],
+          ),
       );
       final arm = Paint()
         ..color = Colors.white.withValues(alpha: .8 * flare)
@@ -2742,11 +3592,10 @@ class _SealBurstPainter extends CustomPainter {
       canvas.drawPath(
         chip,
         Paint()
-          ..shader = ui.Gradient.linear(
-            Offset(-s, -s),
-            Offset(s, s),
-            [light.withValues(alpha: fade), accent.withValues(alpha: fade)],
-          ),
+          ..shader = ui.Gradient.linear(Offset(-s, -s), Offset(s, s), [
+            light.withValues(alpha: fade),
+            accent.withValues(alpha: fade),
+          ]),
       );
       canvas.restore();
     }
@@ -2876,89 +3725,211 @@ class _SceneHero extends StatelessWidget {
     final tf = DateFormat('HH:mm');
 
     Widget line(double start, double end, Widget child) => _Reveal(
-          anim: CurvedAnimation(
-            parent: enter,
-            curve: Interval(start, end, curve: Curves.easeOut),
-          ),
-          child: child,
-        );
+      anim: CurvedAnimation(
+        parent: enter,
+        curve: Interval(start, end, curve: Curves.easeOut),
+      ),
+      child: child,
+    );
 
     List<Shadow> glow(double blur) => [
-          Shadow(color: Colors.black.withValues(alpha: .5), blurRadius: blur),
-        ];
+      Shadow(color: Colors.black.withValues(alpha: .5), blurRadius: blur),
+    ];
 
     return SizedBox(
       height: height,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          child: Column(
-            children: [
-              const SizedBox(height: 18),
-              line(
-                0.0,
-                0.35,
-                Text(
-                  'دعوة زفاف',
-                  textAlign: TextAlign.center,
-                  style: _display(38, color: Colors.white)
-                      .copyWith(shadows: glow(18)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Whatever photograph the couple chose, the type has to read on it.
+          // Dark at the top and the foot, clear through the middle where the
+          // picture is.
+          const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x73000000),
+                    Color(0x1A000000),
+                    Color(0x00000000),
+                    Color(0x40000000),
+                    Color(0x8C000000),
+                  ],
+                  stops: [0, 0.18, 0.46, 0.8, 1],
                 ),
               ),
-              const SizedBox(height: 10),
-              line(
-                0.15,
-                0.45,
-                Text(
-                  '${df.format(invitation.eventDate)}  •  '
-                      '${tf.format(invitation.eventDate)}',
-                  style: GoogleFonts.cormorantGaramond(
-                    fontSize: 15,
-                    color: Colors.white.withValues(alpha: .92),
-                    letterSpacing: 1.5,
+            ),
+          ),
+          // The plate's border, cut as the title arrives.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: enter,
+                builder: (context, _) => CustomPaint(
+                  painter: _HeroFramePainter(
+                    t: Curves.easeInOut.transform(
+                      Interval(0.1, 0.8).transform(enter.value),
+                    ),
+                    accent: accent,
                   ),
                 ),
               ),
-              const Spacer(),
-              line(
-                0.35,
-                0.7,
-                Text(invitation.groomName,
-                    textAlign: TextAlign.center,
-                    style: _display(42, color: Colors.white)
-                        .copyWith(shadows: glow(22))),
-              ),
-              const SizedBox(height: 6),
-              line(0.45, 0.75, _GoldText('&', size: 26, onDark: true)),
-              const SizedBox(height: 6),
-              line(
-                0.5,
-                0.85,
-                Text(invitation.brideName,
-                    textAlign: TextAlign.center,
-                    style: _display(42, color: Colors.white)
-                        .copyWith(shadows: glow(22))),
-              ),
-              const Spacer(flex: 2),
-              line(
-                0.8,
-                1.0,
-                Column(
-                  children: [
-                    Icon(Icons.keyboard_double_arrow_down_rounded,
-                        color: Colors.white.withValues(alpha: .8), size: 22),
-                    const SizedBox(height: 4),
-                    Text('مرّر للأسفل',
-                        style: _body(11.5,
-                            color: Colors.white.withValues(alpha: .75))),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 26),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  line(
+                    0.0,
+                    0.3,
+                    Text(
+                      'بسم الله الرحمن الرحيم',
+                      style: _body(
+                        10.5,
+                        color: Colors.white.withValues(alpha: .78),
+                      ).copyWith(letterSpacing: 4),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  line(
+                    0.05,
+                    0.35,
+                    Text(
+                      'دعوة زفاف',
+                      textAlign: TextAlign.center,
+                      style: _display(
+                        34,
+                        color: Colors.white,
+                      ).copyWith(shadows: glow(18)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  line(
+                    0.15,
+                    0.45,
+                    Text(
+                      '${df.format(invitation.eventDate)}  •  '
+                      '${tf.format(invitation.eventDate)}',
+                      style: GoogleFonts.cormorantGaramond(
+                        fontSize: 15,
+                        color: Colors.white.withValues(alpha: .92),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                  // The arch: the shape behind the type in the photograph, and
+                  // the one a couple stands under. It holds the names, and it
+                  // is what fills the middle of the screen that used to be a
+                  // Spacer.
+                  Expanded(
+                    // The arch takes the width it is given rather than
+                    // shrinking to the names inside it: sized to the child it
+                    // came out as a narrow doorway with two words in it,
+                    // instead of a span the screen stands under.
+                    child: FractionallySizedBox(
+                      widthFactor: 0.82,
+                      child: AnimatedBuilder(
+                        animation: enter,
+                        builder: (context, child) => CustomPaint(
+                          painter: _ArchPainter(
+                            t: const Interval(
+                              0.2,
+                              0.9,
+                              curve: Curves.easeInOutCubic,
+                            ).transform(enter.value),
+                            accent: accent,
+                          ),
+                          child: child,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(26, 40, 26, 30),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              line(
+                                0.35,
+                                0.7,
+                                Text(
+                                  invitation.groomName,
+                                  textAlign: TextAlign.center,
+                                  style: _display(
+                                    41,
+                                    color: Colors.white,
+                                  ).copyWith(shadows: glow(22)),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              line(
+                                0.45,
+                                0.75,
+                                _GoldText('&', size: 24, onDark: true),
+                              ),
+                              const SizedBox(height: 10),
+                              line(
+                                0.5,
+                                0.85,
+                                Text(
+                                  invitation.brideName,
+                                  textAlign: TextAlign.center,
+                                  style: _display(
+                                    41,
+                                    color: Colors.white,
+                                  ).copyWith(shadows: glow(22)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  line(
+                    0.7,
+                    0.95,
+                    Text(
+                      'يسعدنا دعوتكم لمشاركتنا فرحتنا',
+                      textAlign: TextAlign.center,
+                      style: _body(
+                        12.5,
+                        color: Colors.white.withValues(alpha: .85),
+                      ).copyWith(letterSpacing: 1.2),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  line(
+                    0.8,
+                    1.0,
+                    Column(
+                      children: [
+                        Icon(
+                          Icons.keyboard_double_arrow_down_rounded,
+                          color: Colors.white.withValues(alpha: .8),
+                          size: 22,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'مرّر للأسفل',
+                          style: _body(
+                            11.5,
+                            color: Colors.white.withValues(alpha: .75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2987,9 +3958,9 @@ class _SectionBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .82),
+            color: const Color(0xCC0B0C18),
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withValues(alpha: .9)),
+            border: Border.all(color: _Ink.goldInk.withValues(alpha: .35)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: .18),
@@ -3015,8 +3986,10 @@ class _SectionBar extends StatelessWidget {
                         children: [
                           Icon(item.$1, size: 19, color: _Ink.heading),
                           const SizedBox(height: 3),
-                          Text(item.$2,
-                              style: _body(9.5, color: _Ink.body, h: 1.1)),
+                          Text(
+                            item.$2,
+                            style: _body(9.5, color: _Ink.body, h: 1.1),
+                          ),
                         ],
                       ),
                     ),
@@ -3062,8 +4035,11 @@ class _EmbossPainter extends CustomPainter {
 
     for (var i = 0; i < count; i++) {
       final side = i.isEven ? 0.0 : 1.0;
-      final x = w * (side == 0 ? 0.06 + rnd.nextDouble() * 0.20
-                               : 0.74 + rnd.nextDouble() * 0.20);
+      final x =
+          w *
+          (side == 0
+              ? 0.06 + rnd.nextDouble() * 0.20
+              : 0.74 + rnd.nextDouble() * 0.20);
       final y = h * (0.04 + rnd.nextDouble() * 0.92);
       final len = h * (0.10 + rnd.nextDouble() * 0.13);
       _sprig(canvas, Offset(x, y), len, rnd.nextDouble() * 0.5 - 0.25);
@@ -3073,21 +4049,34 @@ class _EmbossPainter extends CustomPainter {
     for (var i = 0; i < daisies; i++) {
       final x = w * (0.05 + rnd.nextDouble() * 0.90);
       final y = h * (0.05 + rnd.nextDouble() * 0.90);
-      _daisy(canvas, Offset(x, y), w * (0.030 + rnd.nextDouble() * 0.026),
-          rnd.nextDouble() * math.pi);
+      _daisy(
+        canvas,
+        Offset(x, y),
+        w * (0.030 + rnd.nextDouble() * 0.026),
+        rnd.nextDouble() * math.pi,
+      );
     }
 
     final buds = (9 * density).round();
     for (var i = 0; i < buds; i++) {
       final x = w * (0.04 + rnd.nextDouble() * 0.92);
       final y = h * (0.04 + rnd.nextDouble() * 0.92);
-      _bud(canvas, Offset(x, y), w * (0.012 + rnd.nextDouble() * 0.012),
-          rnd.nextDouble() * math.pi * 2);
+      _bud(
+        canvas,
+        Offset(x, y),
+        w * (0.012 + rnd.nextDouble() * 0.012),
+        rnd.nextDouble() * math.pi * 2,
+      );
     }
   }
 
   /// Draws [path] three times to fake relief.
-  void _emboss(Canvas canvas, Path path, {bool fill = false, double width = 1.2}) {
+  void _emboss(
+    Canvas canvas,
+    Path path, {
+    bool fill = false,
+    double width = 1.2,
+  }) {
     void pass(Offset d, Color c) {
       final p = Paint()
         ..color = c
@@ -3125,7 +4114,12 @@ class _EmbossPainter extends CustomPainter {
       for (final dir in const [-1.0, 1.0]) {
         final leaf = Path()
           ..moveTo(0, y)
-          ..quadraticBezierTo(dir * s * 0.9, y - s * 0.75, dir * s * 1.7, y - s * 0.30)
+          ..quadraticBezierTo(
+            dir * s * 0.9,
+            y - s * 0.75,
+            dir * s * 1.7,
+            y - s * 0.30,
+          )
           ..quadraticBezierTo(dir * s * 0.8, y + s * 0.10, 0, y);
         _emboss(canvas, leaf, fill: true);
       }
@@ -3141,11 +4135,13 @@ class _EmbossPainter extends CustomPainter {
     for (var k = 0; k < 8; k++) {
       final a = k / 8 * math.pi * 2;
       final petal = Path()
-        ..addOval(Rect.fromCenter(
-          center: Offset(math.cos(a) * r * 0.62, math.sin(a) * r * 0.62),
-          width: r * 0.78,
-          height: r * 0.52,
-        ));
+        ..addOval(
+          Rect.fromCenter(
+            center: Offset(math.cos(a) * r * 0.62, math.sin(a) * r * 0.62),
+            width: r * 0.78,
+            height: r * 0.52,
+          ),
+        );
       canvas.save();
       canvas.translate(math.cos(a) * r * 0.62, math.sin(a) * r * 0.62);
       canvas.rotate(a);
@@ -3153,9 +4149,11 @@ class _EmbossPainter extends CustomPainter {
       _emboss(canvas, petal, fill: true);
       canvas.restore();
     }
-    _emboss(canvas,
-        Path()..addOval(Rect.fromCircle(center: Offset.zero, radius: r * 0.22)),
-        fill: true);
+    _emboss(
+      canvas,
+      Path()..addOval(Rect.fromCircle(center: Offset.zero, radius: r * 0.22)),
+      fill: true,
+    );
     canvas.restore();
   }
 
@@ -3169,7 +4167,13 @@ class _EmbossPainter extends CustomPainter {
       ..quadraticBezierTo(r * 1.1, -r * 0.6, 0, -r * 2.0)
       ..quadraticBezierTo(-r * 1.1, -r * 0.6, 0, 0);
     _emboss(canvas, bud, fill: true);
-    _emboss(canvas, Path()..moveTo(0, 0)..lineTo(0, r * 1.4), width: 0.9);
+    _emboss(
+      canvas,
+      Path()
+        ..moveTo(0, 0)
+        ..lineTo(0, r * 1.4),
+      width: 0.9,
+    );
     canvas.restore();
   }
 

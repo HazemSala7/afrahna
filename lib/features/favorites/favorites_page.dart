@@ -7,6 +7,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/vendor_details_page.dart';
+import '../../widgets/animations.dart';
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
@@ -89,7 +90,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     padding: const EdgeInsets.all(16),
                     itemCount: items.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _FavTile(vendor: items[i]),
+                    itemBuilder: (_, i) => StaggerIn(
+                      index: i,
+                      id: 'favorites',
+                      child: _FavTile(vendor: items[i]),
+                    ),
                   ),
                 );
               },
@@ -115,15 +120,9 @@ class _FavTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppDecor.lift,
         ),
         child: Row(
           children: [

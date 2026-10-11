@@ -9,8 +9,12 @@ import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/feedback_snack.dart';
+import '../trade/trade_timeline.dart';
 import '../vendors/vendor_details_page.dart';
 import 'marketplace.dart';
+import '../../widgets/animations.dart';
+import '../../widgets/celebration.dart';
 
 /// How an order's status is worded and coloured. Kept beside the bookings
 /// styling in spirit: the customer should be able to tell at a glance whether
@@ -31,31 +35,31 @@ class OrderStatusStyle {
       case 'confirmed':
         return const OrderStatusStyle(
           label: 'مؤكّدة',
-          color: Color(0xFF2E9E5B),
+          color: Color(0xFF34D17A),
           icon: Icons.check_circle_rounded,
         );
       case 'preparing':
         return const OrderStatusStyle(
           label: 'قيد التجهيز',
-          color: Color(0xFFD08A2E),
+          color: Color(0xFFF2B35B),
           icon: Icons.soup_kitchen_rounded,
         );
       case 'ready':
         return const OrderStatusStyle(
           label: 'جاهزة',
-          color: Color(0xFF2E8BA8),
+          color: AppColors.holoAqua,
           icon: Icons.inventory_2_rounded,
         );
       case 'completed':
         return const OrderStatusStyle(
           label: 'مكتملة',
-          color: Color(0xFF4B7BA8),
+          color: AppColors.holoLavender,
           icon: Icons.verified_rounded,
         );
       case 'cancelled':
         return const OrderStatusStyle(
           label: 'ملغاة',
-          color: Color(0xFF9A6B5E),
+          color: AppColors.textMuted,
           icon: Icons.block_rounded,
         );
       case 'rejected':
@@ -68,7 +72,7 @@ class OrderStatusStyle {
       default:
         return const OrderStatusStyle(
           label: 'بانتظار رد المتجر',
-          color: AppColors.primary,
+          color: AppColors.accent,
           icon: Icons.hourglass_top_rounded,
         );
     }
@@ -76,12 +80,17 @@ class OrderStatusStyle {
 }
 
 /// «طلباتي» — the orders this customer has placed, with what each contained,
-/// where it is going and how the shop answered.
+/// where it is going and how the shop answered — and, for a shop owner, the
+/// orders their shop received, with the buttons that move each one along.
 ///
-/// Before this screen existed an order vanished the moment it was sent: the
-/// invoice went to the shop and the customer had no way to look it up again.
+/// Every button a shop presses here reaches the customer as a notification;
+/// a customer calling an order off reaches the shop the same way.
 class MyOrdersPage extends StatefulWidget {
-  const MyOrdersPage({super.key, this.highlightId});
+  const MyOrdersPage({
+    super.key,
+    this.highlightId,
+    this.initialIncoming = false,
+  });
 
   /// Scroll to this order and mark it, for arrivals from a notification.
   /// One link serves both sides of an order — the customer whose order
@@ -89,14 +98,17 @@ class MyOrdersPage extends StatefulWidget {
   /// among this account's own purchases the page looks in the shop's inbox.
   final int? highlightId;
 
+  /// Open on the shop's incoming orders rather than this account's purchases.
+  final bool initialIncoming;
+
   @override
   State<MyOrdersPage> createState() => _MyOrdersPageState();
 }
 
 class _MyOrdersPageState extends State<MyOrdersPage> {
   /// False: the orders this account placed. True: the orders its shop
-  /// received — only ever reached from a notification about one of them.
-  bool _incoming = false;
+  /// received.
+  late bool _incoming = widget.initialIncoming;
 
   late Future<List<OrderModel>> _future = _load();
 
@@ -105,10 +117,29 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   bool _didScrollHighlight = false;
   bool _didTryInbox = false;
 
+  /// Orders with a change on its way to the server, so their buttons can't be
+  /// pressed twice.
+  final Set<int> _busy = {};
+
   Future<List<OrderModel>> _load() =>
       OrderService().list(scope: _incoming ? 'vendor' : 'customer');
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+    _future = _load();
+  });
+
+  bool _runsShop(BuildContext context) {
+    final role = context.read<SessionController>().user?.role;
+    return role == 'vendor' || role == 'admin';
+  }
+
+  void _switchTo(bool incoming) {
+    if (_incoming == incoming) return;
+    setState(() {
+      _incoming = incoming;
+      _future = _load();
+    });
+  }
 
   /// Scroll to the highlighted order once laid out, then fade the marking.
   void _scheduleHighlightScroll() {
@@ -136,20 +167,127 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   void _lookInShopInbox(List<OrderModel> orders) {
     if (_highlightId == null || _didTryInbox || _incoming) return;
     if (orders.any((o) => o.id == _highlightId)) return;
-    final role = context.read<SessionController>().user?.role;
-    if (role != 'vendor' && role != 'admin') return;
+    if (!_runsShop(context)) return;
     _didTryInbox = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _incoming = true;
-        _future = _load();
-      });
+      if (mounted) _switchTo(true);
     });
+  }
+
+  /// Asks for an optional reason before a rejection or a cancellation. Null
+  /// when the reader backs out.
+  Future<String?> _askReason({
+    required String title,
+    required String message,
+    required String confirm,
+    required String hint,
+  }) async {
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message, style: const TextStyle(fontSize: 13, height: 1.5)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reason,
+              maxLines: 2,
+              maxLength: 300,
+              decoration: InputDecoration(
+                labelText: 'السبب (اختياري)',
+                hintText: hint,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('تراجع'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.discount,
+              foregroundColor: AppColors.ink,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirm),
+          ),
+        ],
+      ),
+    );
+    final text = reason.text.trim();
+    reason.dispose();
+    return ok == true ? text : null;
+  }
+
+  /// Moves [order] to [status] and says who has been told.
+  Future<void> _move(OrderModel order, String status) async {
+    String? reason;
+    if (status == 'rejected') {
+      reason = await _askReason(
+        title: 'رفض الطلبية',
+        message: 'سيصل ردّك إلى الزبون مباشرة. اكتب سبباً مختصراً إن أمكن.',
+        confirm: 'رفض الطلبية',
+        hint: 'مثال: المنتج غير متوفر حالياً',
+      );
+      if (reason == null) return;
+    } else if (status == 'cancelled') {
+      reason = await _askReason(
+        title: 'إلغاء الطلبية',
+        message: _incoming
+            ? 'سيتم إبلاغ الزبون بالإلغاء.'
+            : 'سيتم إبلاغ المتجر بأنك ألغيت الطلبية.',
+        confirm: 'إلغاء الطلبية',
+        hint: _incoming ? 'مثال: نفدت الكمية' : 'مثال: غيّرت رأيي',
+      );
+      if (reason == null) return;
+    }
+
+    setState(() => _busy.add(order.id));
+    try {
+      await OrderService().updateStatus(order.id, status, reason: reason);
+      if (!mounted) return;
+      if (status == 'confirmed' || status == 'completed') {
+        CelebrationBurst.show(context);
+      }
+      showSuccessSnack(context, _doneMessage(status));
+      _reload();
+    } on ApiException catch (e) {
+      if (mounted) showErrorSnack(context, e.message);
+    } catch (e) {
+      if (mounted) showErrorSnack(context, e);
+    } finally {
+      if (mounted) setState(() => _busy.remove(order.id));
+    }
+  }
+
+  String _doneMessage(String status) {
+    if (!_incoming) return 'تم إلغاء الطلبية وإبلاغ المتجر';
+    switch (status) {
+      case 'confirmed':
+        return 'تم تأكيد الطلبية وإبلاغ الزبون';
+      case 'preparing':
+        return 'بدأ التجهيز — أبلغنا الزبون';
+      case 'ready':
+        return 'الطلبية جاهزة — أبلغنا الزبون';
+      case 'completed':
+        return 'تم تسليم الطلبية وإبلاغ الزبون';
+      case 'rejected':
+        return 'تم رفض الطلبية وإبلاغ الزبون';
+      case 'cancelled':
+        return 'تم إلغاء الطلبية وإبلاغ الزبون';
+    }
+    return 'تم التحديث';
   }
 
   @override
   Widget build(BuildContext context) {
+    final runsShop = _runsShop(context);
     return AppScaffold(
       appBar: PinkAppBar(
         title: _incoming ? 'الطلبات الواردة' : 'طلباتي',
@@ -157,58 +295,94 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
             ? 'الطلبات التي وصلت متجرك'
             : 'مشترياتك من متاجر أفراحنا',
       ),
-      body: FutureBuilder<List<OrderModel>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const CenteredLoader();
-          }
-          if (snap.hasError) {
-            return ErrorState(
-              message: snap.error is ApiException
-                  ? (snap.error as ApiException).message
-                  : 'تعذّر تحميل الطلبات',
-              onRetry: _reload,
-            );
-          }
-          final orders = snap.data ?? const <OrderModel>[];
-          _lookInShopInbox(orders);
-          if (orders.isEmpty) {
-            return EmptyState(
-              icon: Icons.receipt_long_outlined,
-              message: _incoming
-                  ? 'لا توجد طلبات واردة.'
-                  : 'لا توجد طلبات بعد.\nتصفّح المتجر وأضف ما يعجبك.',
-            );
-          }
-          if (_highlightId != null &&
-              orders.any((o) => o.id == _highlightId)) {
-            _scheduleHighlightScroll();
-          }
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () async {
-              _reload();
-              await _future;
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              itemCount: orders.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (_, i) {
-                final o = orders[i];
-                final hi = _highlightId != null && o.id == _highlightId;
-                return _OrderCard(
+      body: Column(
+        children: [
+          // A shop owner shops too: their purchases and their shop's orders
+          // are two lists, one tap apart.
+          if (runsShop)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    label: Text('مشترياتي'),
+                    icon: Icon(Icons.shopping_bag_rounded, size: 17),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    label: Text('طلبات واردة'),
+                    icon: Icon(Icons.inbox_rounded, size: 17),
+                  ),
+                ],
+                selected: {_incoming},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => _switchTo(s.first),
+              ),
+            ),
+          Expanded(child: _list()),
+        ],
+      ),
+    );
+  }
+
+  Widget _list() {
+    return FutureBuilder<List<OrderModel>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const CenteredLoader();
+        }
+        if (snap.hasError) {
+          return ErrorState(
+            message: snap.error is ApiException
+                ? (snap.error as ApiException).message
+                : 'تعذّر تحميل الطلبات',
+            onRetry: _reload,
+          );
+        }
+        final orders = snap.data ?? const <OrderModel>[];
+        _lookInShopInbox(orders);
+        if (orders.isEmpty) {
+          return EmptyState(
+            icon: Icons.receipt_long_outlined,
+            message: _incoming
+                ? 'لا توجد طلبات واردة.\nستصلك هنا وفي الإشعارات فور طلب أي زبون.'
+                : 'لا توجد طلبات بعد.\nتصفّح المتجر وأضف ما يعجبك.',
+          );
+        }
+        if (_highlightId != null && orders.any((o) => o.id == _highlightId)) {
+          _scheduleHighlightScroll();
+        }
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            _reload();
+            await _future;
+          },
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            itemCount: orders.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (_, i) {
+              final o = orders[i];
+              final hi = _highlightId != null && o.id == _highlightId;
+              return StaggerIn(
+                index: i,
+                id: 'orders.$_incoming',
+                child: _OrderCard(
                   key: hi ? _highlightKey : null,
                   order: o,
                   highlighted: hi,
                   incoming: _incoming,
-                );
-              },
-            ),
-          );
-        },
-      ),
+                  busy: _busy.contains(o.id),
+                  onMove: (status) => _move(o, status),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -217,8 +391,10 @@ class _OrderCard extends StatelessWidget {
   const _OrderCard({
     super.key,
     required this.order,
+    required this.onMove,
     this.highlighted = false,
     this.incoming = false,
+    this.busy = false,
   });
 
   final OrderModel order;
@@ -229,32 +405,32 @@ class _OrderCard extends StatelessWidget {
   /// This card is in a shop's inbox rather than a customer's purchases.
   final bool incoming;
 
+  /// A change to this order is on its way to the server.
+  final bool busy;
+
+  final ValueChanged<String> onMove;
+
   @override
   Widget build(BuildContext context) {
     final s = OrderStatusStyle.of(order.status);
-    final df = DateFormat('d MMMM y', 'ar');
+    final df = DateFormat('d MMMM y · h:mm a', 'ar');
     final address = order.addressLine;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.surfaceHigh, AppColors.surface],
+        ),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: highlighted
-              ? AppColors.primary
-              : s.color.withValues(alpha: .22),
+          color: highlighted ? AppColors.accent : s.color.withValues(alpha: .3),
           width: highlighted ? 1.6 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: highlighted
-                ? AppColors.primary.withValues(alpha: .28)
-                : AppColors.cardShadow,
-            blurRadius: highlighted ? 18 : 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppDecor.lift,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,7 +452,7 @@ class _OrderCard extends StatelessWidget {
           if (order.createdAt != null) ...[
             const SizedBox(height: 4),
             Text(
-              df.format(order.createdAt!),
+              df.format(order.createdAt!.toLocal()),
               style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
             ),
           ],
@@ -299,7 +475,7 @@ class _OrderCard extends StatelessWidget {
                 child: Row(
                   children: [
                     const Icon(Icons.storefront_rounded,
-                        size: 16, color: AppColors.primary),
+                        size: 16, color: AppColors.accent),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -319,7 +495,17 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          const Divider(height: 18),
+          // Where it stands and how it got there — the part a customer comes
+          // back to this screen for.
+          TradeTimeline(
+            kind: TradeKind.order,
+            status: order.status,
+            log: order.statusLog,
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+            viewer: incoming ? TradeViewer.shop : TradeViewer.customer,
+          ),
+          const Divider(height: 22),
           for (final item in order.items)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -403,8 +589,9 @@ class _OrderCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: AppColors.background,
+              color: AppColors.surfaceHigh,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.hairline, width: 0.8),
             ),
             child: Row(
               children: [
@@ -430,6 +617,105 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
           ),
+          if (incoming)
+            _ShopActions(status: order.status, busy: busy, onMove: onMove)
+          else if (order.status == 'pending' || order.status == 'confirmed')
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: TextButton.icon(
+                  onPressed: busy ? null : () => onMove('cancelled'),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('إلغاء الطلبية'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.discount,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The shop's next move on an incoming order: one clear step forward, and a
+/// way out while it is still open. Each press reaches the customer.
+class _ShopActions extends StatelessWidget {
+  const _ShopActions({
+    required this.status,
+    required this.busy,
+    required this.onMove,
+  });
+
+  final String status;
+  final bool busy;
+  final ValueChanged<String> onMove;
+
+  /// The one step forward from [status], as (next status, label, icon).
+  (String, String, IconData)? get _next {
+    switch (status) {
+      case 'pending':
+        return ('confirmed', 'تأكيد الطلبية', Icons.check_rounded);
+      case 'confirmed':
+        return ('preparing', 'بدء التجهيز', Icons.soup_kitchen_rounded);
+      case 'preparing':
+        return ('ready', 'الطلبية جاهزة', Icons.inventory_2_rounded);
+      case 'ready':
+        return ('completed', 'تم التسليم', Icons.local_shipping_rounded);
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final next = _next;
+    if (next == null) return const SizedBox.shrink();
+    final (to, label, icon) = next;
+    final pending = status == 'pending';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed:
+                  busy ? null : () => onMove(pending ? 'rejected' : 'cancelled'),
+              icon: Icon(pending ? Icons.close_rounded : Icons.block_rounded,
+                  size: 18),
+              label: Text(pending ? 'رفض' : 'إلغاء', maxLines: 1, softWrap: false),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.discount,
+                side: BorderSide(
+                    color: AppColors.discount.withValues(alpha: 0.6)),
+                // The theme's roomy padding left «رفض» a letter per line.
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              onPressed: busy ? null : () => onMove(to),
+              icon: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.pearl),
+                    )
+                  : Icon(icon, size: 18),
+              label: Text(label, maxLines: 1, softWrap: false),
+              style: FilledButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -452,7 +738,7 @@ class _CustomerRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Icon(Icons.person_rounded, size: 16, color: AppColors.primary),
+          const Icon(Icons.person_rounded, size: 16, color: AppColors.accent),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -472,7 +758,7 @@ class _CustomerRow extends StatelessWidget {
               icon: const Icon(Icons.call_rounded, size: 16),
               label: Text(phone, style: const TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
+                foregroundColor: AppColors.accent,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(0, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -496,6 +782,7 @@ class _StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: style.color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: style.color.withValues(alpha: .35), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

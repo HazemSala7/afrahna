@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/story_viewer_page.dart';
 import '../../widgets/shell_bottom_nav.dart';
+import '../../widgets/animations.dart';
 
 /// App-wide stories screen: every vendor that has active stories, shown as
 /// Instagram-style rings. Tapping a ring opens that vendor's stories in the
@@ -59,7 +60,7 @@ class _AllStoriesPageState extends State<AllStoriesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: const PinkAppBar(title: 'القصص', showBack: false),
       body: FutureBuilder<List<_VendorStories>>(
         future: _future,
@@ -81,8 +82,8 @@ class _AllStoriesPageState extends State<AllStoriesPage> {
               child: ListView(
                 children: [
                   SizedBox(height: MediaQuery.of(context).size.height * 0.28),
-                  const Icon(Icons.auto_awesome_rounded,
-                      size: 64, color: AppColors.primaryLight),
+                  Icon(Icons.auto_awesome_rounded,
+                      size: 64, color: AppColors.primary.withValues(alpha: 0.45)),
                   const SizedBox(height: 14),
                   const Center(
                     child: Text(
@@ -116,7 +117,11 @@ class _AllStoriesPageState extends State<AllStoriesPage> {
                 childAspectRatio: 0.74,
               ),
               itemCount: groups.length,
-              itemBuilder: (_, i) => _StoryRingTile(group: groups[i]),
+              itemBuilder: (_, i) => StaggerIn(
+                index: i,
+                id: 'stories',
+                child: _StoryRingTile(group: groups[i]),
+              ),
             ),
           );
         },
@@ -182,7 +187,7 @@ class _StoryRingTile extends StatelessWidget {
                   padding: const EdgeInsets.all(2.5),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
+                    color: AppColors.surface,
                   ),
                   child: ClipOval(
                     child: AppNetworkImage(
@@ -201,7 +206,7 @@ class _StoryRingTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFE1306C),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: AppColors.hairline, width: 2),
                   ),
                   child: Text(
                     '${group.stories.length}',

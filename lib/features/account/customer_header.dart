@@ -6,6 +6,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/attention.dart';
+import '../../widgets/cosmos.dart';
 import '../../widgets/tier_badge.dart';
 
 /// Header card at the top of a customer's account: who they are on one side,
@@ -65,139 +66,149 @@ class _CustomerHeroCardState extends State<CustomerHeroCard> {
     final u = widget.user;
     final since = _memberSince(u.createdAt);
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFDF0F3), Color(0xFFF8E3E8)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF0D2DA)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    return CustomPaint(
+      foregroundPainter: const HoloBorderPainter(radius: 24, width: 1.2),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          gradient: const RadialGradient(
+            center: AlignmentDirectional(-0.9, -0.8),
+            radius: 1.3,
+            colors: [Color(0xFFA2614A), Color(0xFF6E4133), Color(0xFF4A2C24)],
+            stops: [0, 0.45, 1],
           ),
-        ],
-      ),
-      // Stacked rather than two columns side by side. As columns, the name had
-      // about ninety pixels to live in — every real name arrived as «فؤاد -
-      // م…» — while the points half had room to spare, and both buttons were
-      // squeezed into what was left. Now the identity gets the full width, the
-      // points sit beside it as a small readable badge, and the two actions
-      // share a row of their own. Same height as before.
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _Avatar(url: u.avatar, name: u.name, onTap: widget.onEditProfile),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            u.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textDark,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        TierMedal(rewardsTaken: u.rewardsTaken, size: 20),
-                      ],
-                    ),
-                    if (since.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        since,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                    if (_cityName != null) ...[
-                      const SizedBox(height: 3),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.12),
+              blurRadius: 28,
+              spreadRadius: -6,
+            ),
+          ],
+        ),
+        // Stacked rather than two columns side by side. As columns, the name had
+        // about ninety pixels to live in — every real name arrived as «فؤاد -
+        // م…» — while the points half had room to spare, and both buttons were
+        // squeezed into what was left. Now the identity gets the full width, the
+        // points sit beside it as a small readable badge, and the two actions
+        // share a row of their own. Same height as before.
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _Avatar(
+                  url: u.avatar,
+                  name: u.name,
+                  onTap: widget.onEditProfile,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Row(
                         children: [
-                          const Icon(Icons.place_rounded,
-                              size: 13, color: AppColors.primary),
-                          const SizedBox(width: 3),
                           Flexible(
                             child: Text(
-                              _cityName!,
+                              u.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textDark,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.pearl,
                               ),
                             ),
                           ),
+                          const SizedBox(width: 6),
+                          TierMedal(rewardsTaken: u.rewardsTaken, size: 20),
                         ],
                       ),
+                      if (since.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          since,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.champagne,
+                          ),
+                        ),
+                      ],
+                      if (_cityName != null) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.place_rounded,
+                              size: 13,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                _cityName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.champagne,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              _PointsMini(
-                points: u.pointsBalance,
-                valueLabel: u.pointsValueLabel,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // The level, and the distance left to the next 50 ₪. The card used
-          // to show the balance as a bare number: 6 points says nothing on its
-          // own, «باقي 94 نقطة على 50 شيكل» says what it is for.
-          //
-          // Shown on حسابي, left off the home page: there it sat between the
-          // shops and the offers, one more thing to read on a screen that is
-          // already a long scroll of them.
-          if (widget.showLevel)
-            TierProgressStrip(
-              balance: u.pointsBalance,
-              rewardsTaken: u.rewardsTaken,
-              onTap: widget.onOpenPoints,
+                const SizedBox(width: 10),
+                _PointsMini(
+                  points: u.pointsBalance,
+                  valueLabel: u.pointsValueLabel,
+                ),
+              ],
             ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _PillButton(
-                  icon: Icons.person_rounded,
-                  label: 'الملف الشخصي',
-                  onTap: widget.onEditProfile,
-                ),
+            const SizedBox(height: 12),
+            // The level, and the distance left to the next 50 ₪. The card used
+            // to show the balance as a bare number: 6 points says nothing on its
+            // own, «باقي 94 نقطة على 50 شيكل» says what it is for.
+            //
+            // Shown on حسابي, left off the home page: there it sat between the
+            // shops and the offers, one more thing to read on a screen that is
+            // already a long scroll of them.
+            if (widget.showLevel)
+              TierProgressStrip(
+                balance: u.pointsBalance,
+                rewardsTaken: u.rewardsTaken,
+                onTap: widget.onOpenPoints,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _WalletPill(
-                  onTap: widget.onOpenPoints,
-                  ready: u.pointsBalance >= u.tierGoal,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _PillButton(
+                    icon: Icons.person_rounded,
+                    label: 'الملف الشخصي',
+                    onTap: widget.onEditProfile,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _WalletPill(
+                    onTap: widget.onOpenPoints,
+                    ready: u.pointsBalance >= u.tierGoal,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -213,8 +224,6 @@ class _PointsMini extends StatelessWidget {
   final int points;
   final String valueLabel;
 
-  static const _rose = Color(0xFFD9557B);
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -227,21 +236,36 @@ class _PointsMini extends StatelessWidget {
             Container(
               width: 22,
               height: 22,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE8B33D),
+              decoration: BoxDecoration(
+                gradient: AppColors.goldGradient,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.5),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
-              child: const Icon(Icons.star_rounded,
-                  color: Colors.white, size: 14),
+              child: const Icon(
+                Icons.star_rounded,
+                color: AppColors.ink,
+                size: 14,
+              ),
             ),
             const SizedBox(width: 5),
             Text(
               NumberFormat.decimalPattern('en').format(points),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
-                color: _rose,
+                color: AppColors.primaryDark,
                 height: 1.1,
+                shadows: [
+                  Shadow(
+                    color: AppColors.accent.withValues(alpha: 0.55),
+                    blurRadius: 12,
+                  ),
+                ],
               ),
             ),
           ],
@@ -250,15 +274,16 @@ class _PointsMini extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: _rose.withValues(alpha: .10),
+            color: AppColors.accent.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: AppColors.hairline, width: 0.8),
           ),
           child: Text(
             valueLabel,
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w900,
-              color: _rose,
+              color: AppColors.accent,
             ),
           ),
         ),
@@ -285,21 +310,25 @@ class _Avatar extends StatelessWidget {
           Container(
             width: 58,
             height: 58,
+            padding: const EdgeInsets.all(2.5),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: Colors.white, width: 3),
+              gradient: const SweepGradient(
+                colors: [...AppColors.holoStops, AppColors.accent],
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: AppColors.holoLavender.withValues(alpha: 0.25),
+                  blurRadius: 14,
                 ),
               ],
             ),
             child: ClipOval(
               child: (url?.isNotEmpty ?? false)
-                  ? AppNetworkImage(url: url, fallbackIcon: Icons.person_rounded)
+                  ? AppNetworkImage(
+                      url: url,
+                      fallbackIcon: Icons.person_rounded,
+                    )
                   : Container(
                       color: AppColors.primaryLight,
                       alignment: Alignment.center,
@@ -318,7 +347,7 @@ class _Avatar extends StatelessWidget {
             bottom: -2,
             start: -2,
             child: Material(
-              color: Colors.white,
+              color: AppColors.surface,
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -336,8 +365,11 @@ class _Avatar extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.photo_camera_rounded,
-                      size: 12, color: AppColors.primaryDark),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    size: 12,
+                    color: AppColors.primaryDark,
+                  ),
                 ),
               ),
             ),
@@ -347,7 +379,6 @@ class _Avatar extends StatelessWidget {
     );
   }
 }
-
 
 /// The points wallet, built to be looked at.
 ///
@@ -363,12 +394,21 @@ class _WalletPill extends StatelessWidget {
   final VoidCallback onTap;
   final bool ready;
 
-  static const _rose = [Color(0xFFE0688C), Color(0xFFC33A63)];
-  static const _gold = [Color(0xFFF0C34A), Color(0xFFC98A1E)];
+  static const _gold = [
+    Color(0xFFF7E3C3),
+    Color(0xFFD8A86E),
+    Color(0xFFA8744A),
+  ];
+  static const _holo = [
+    AppColors.champagne,
+    AppColors.holoRose,
+    AppColors.holoLavender,
+    AppColors.holoAqua,
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final colors = ready ? _gold : _rose;
+    final colors = ready ? _holo : _gold;
 
     final pill = Container(
       height: 34,
@@ -382,9 +422,10 @@ class _WalletPill extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withValues(alpha: ready ? .5 : .32),
-            blurRadius: ready ? 14 : 9,
-            offset: const Offset(0, 4),
+            color: (ready ? AppColors.holoLavender : AppColors.accent)
+                .withValues(alpha: ready ? .5 : .3),
+            blurRadius: ready ? 18 : 12,
+            spreadRadius: -3,
           ),
         ],
       ),
@@ -397,7 +438,7 @@ class _WalletPill extends StatelessWidget {
                 ? Icons.card_giftcard_rounded
                 : Icons.account_balance_wallet_rounded,
             size: 15,
-            color: Colors.white,
+            color: AppColors.ink,
           ),
           const SizedBox(width: 5),
           Flexible(
@@ -409,7 +450,7 @@ class _WalletPill extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: AppColors.ink,
                 ),
               ),
             ),
@@ -452,7 +493,7 @@ class _PillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: Colors.white.withValues(alpha: 0.04),
       borderRadius: BorderRadius.circular(99),
       child: InkWell(
         borderRadius: BorderRadius.circular(99),
@@ -464,14 +505,12 @@ class _PillButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
-              color: const Color(0xFFEBC9D2),
-              width: 1.2,
-            ),
+                color: AppColors.champagne.withValues(alpha: 0.45), width: 1.1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: AppColors.textMuted),
+              Icon(icon, size: 14, color: AppColors.champagne),
               const SizedBox(width: 5),
               // Scale the label down rather than clipping it: this pill sits
               // in the narrower half of the card, where «عرض الملف الشخصي»
@@ -487,7 +526,7 @@ class _PillButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
+                      color: AppColors.pearl,
                     ),
                   ),
                 ),
@@ -531,13 +570,17 @@ class CustomerQuickActions extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.surfaceHigh, AppColors.surface],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
           BoxShadow(
             color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -551,7 +594,17 @@ class CustomerQuickActions extends StatelessWidget {
                 Container(
                   width: 1,
                   height: 42,
-                  color: AppColors.primaryLight.withValues(alpha: 0.6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.accent.withValues(alpha: 0),
+                        AppColors.accent.withValues(alpha: 0.35),
+                        AppColors.accent.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
                 ),
               _QuickTile(action: actions[i]),
             ],
@@ -583,19 +636,34 @@ class _QuickTile extends StatelessWidget {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Icon(action.icon, size: 26, color: const Color(0xFFD9557B)),
+                    Icon(
+                      action.icon,
+                      size: 26,
+                      color: AppColors.accent,
+                      shadows: [
+                        Shadow(
+                          color: AppColors.accent.withValues(alpha: 0.6),
+                          blurRadius: 14,
+                        ),
+                      ],
+                    ),
                     if (action.badge > 0)
                       PositionedDirectional(
                         top: -5,
                         start: -7,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 1),
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
                           constraints: const BoxConstraints(minWidth: 16),
                           decoration: BoxDecoration(
                             color: AppColors.discount,
                             borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: Colors.white, width: 1.5),
+                            border: Border.all(
+                              color: AppColors.hairline,
+                              width: 1.5,
+                            ),
                           ),
                           child: Text(
                             action.badge > 99 ? '99+' : '${action.badge}',

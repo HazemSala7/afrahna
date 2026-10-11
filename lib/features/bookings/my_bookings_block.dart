@@ -44,7 +44,11 @@ class MyBookingsBlockState extends State<MyBookingsBlock> {
       MaterialPageRoute(builder: (_) => const BookingsPage(initialMine: true)),
     );
     // The customer may have cancelled something while they were in there.
-    if (mounted) setState(() => _future = _load());
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
   }
 
   @override
@@ -126,7 +130,7 @@ class _BookingMiniCard extends StatelessWidget {
     return SizedBox(
       width: 252,
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -134,7 +138,7 @@ class _BookingMiniCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(26),
               // A shop reply is tinted in its own colour so a confirmation or a
               // rejection is readable at a glance, without opening anything.
               border: Border.all(
@@ -143,13 +147,7 @@ class _BookingMiniCard extends StatelessWidget {
                     : AppColors.primaryLight,
                 width: b.hasVendorReply ? 1.4 : 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              boxShadow: AppDecor.lift,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

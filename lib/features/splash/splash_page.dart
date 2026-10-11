@@ -1,18 +1,32 @@
-import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../core/services/notification_router.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
-import '../../widgets/animations.dart';
+import '../../widgets/cosmos.dart';
 import '../auth/login_page.dart';
 import '../home/home_feed_cache.dart';
 import '../home/home_page.dart';
 import '../reels/reels_cache.dart';
 
+/// The opening: a jump through the stars into the app.
+///
+/// Drawn in code rather than played from a film, so it is sharp at any screen
+/// size, starts on the very first frame (no decoder to wait for), and opens on
+/// exactly the colour the operating system has been showing while the process
+/// started — [AppColors.space], which the Android launch window and the iOS
+/// launch storyboard are painted with too — so there is no flash between them.
+///
+/// The sequence, in seconds:
+///   0.0–1.4  the stars stretch into lines of light, rushing past
+///   0.4–1.3  a ring of holographic light draws itself round the centre
+///   0.8–1.5  the mark materialises inside it, a scan line passing over it
+///   1.3–2.3  «أفراحنا» rises in gold foil, a line of light, then the tagline
+/// after which three particles orbit the ring until the app is ready.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -21,65 +35,30 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage>
-    with TickerProviderStateMixin {
-  late final AnimationController _logoCtrl = AnimationController(
+    with SingleTickerProviderStateMixin {
+  /// A clock, not a tween: every layer reads the same elapsed time.
+  late final AnimationController _clock = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(seconds: _clockSeconds),
   );
-  late final Animation<double> _logoScale = CurvedAnimation(
-    parent: _logoCtrl,
-    curve: Curves.elasticOut,
-  );
-  late final Animation<double> _logoOpacity = CurvedAnimation(
-    parent: _logoCtrl,
-    curve: const Interval(0, 0.5, curve: Curves.easeOut),
-  );
-
-  late final AnimationController _glowCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2400),
-  )..repeat(reverse: true);
-
-  /// The intro film. Null until it is playable, and stays null if it cannot
-  /// be played at all — the animated logo below is a complete splash on its
-  /// own, so a codec that refuses this file can never leave a black screen.
-  VideoPlayerController? _intro;
-
-  /// Resolves to the film once it is playable, or to null if it is not.
-  /// [_introFinished] waits on this rather than reading [_intro], which is
-  /// still null in the frame that wait begins.
-  Future<VideoPlayerController?>? _introReady;
-
-  /// True once the film is known not to be coming — a decoder that refused it,
-  /// or a hold that ran out before it was ready. Until then the screen stays
-  /// deliberately bare: see [build].
-  bool _noIntro = false;
+  static const _clockSeconds = 30;
 
   final Stopwatch _sinceLaunch = Stopwatch()..start();
 
-  /// The film's own background, so the wait before it and its first frame are
-  /// the same colour and the change between them cannot be seen.
-  static const Color _filmGround = Color(0xFFFAF3EC);
-
-  /// The splash never passes faster than this — below it the app flashes by
-  /// rather than opens.
-  static const _minHold = Duration(milliseconds: 2100);
-
-  /// ...and never holds the app longer than this, whatever the film does.
-  static const _maxHold = Duration(milliseconds: 4000);
+  /// The intro is never cut short — below this it flashes by rather than
+  /// opens. Whatever is still loading after it, the app waits for as before.
+  static const _minHold = Duration(milliseconds: 2600);
 
   @override
   void initState() {
     super.initState();
-    _logoCtrl.forward();
-    // Start fetching the home page's data now, in parallel with the splash
-    // animation and session bootstrap, so the home tab shows instantly.
+    // Start fetching the home page's data now, in parallel with the intro and
+    // session bootstrap, so the home tab shows instantly.
     HomeFeedCache.instance.prefetch();
     // The reels tab is the other screen that used to start from nothing:
     // fetch its first page and pull the first videos onto disk while the
     // intro plays, so it opens on a reel instead of a spinner.
     ReelsCache.instance.prefetch();
-    _introReady = _startIntro();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final session = context.read<SessionController>();
       await Future.wait<dynamic>([
@@ -89,11 +68,15 @@ class _SplashPageState extends State<SplashPage>
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 600),
+          transitionDuration: const Duration(milliseconds: 700),
+          // Built by hand, so it brings its own living sky: without it the
+          // first screen would sit over the painted-once backdrop.
           pageBuilder: (_, a, _) => FadeTransition(
-            opacity: a,
-            child:
-                session.isSignedIn ? const HomePage() : const LoginPage(),
+            opacity: CurvedAnimation(parent: a, curve: Curves.easeOut),
+            child: CosmicPage(
+              child:
+                  session.isSignedIn ? const HomePage() : const LoginPage(),
+            ),
           ),
         ),
       );
@@ -107,206 +90,337 @@ class _SplashPageState extends State<SplashPage>
     });
   }
 
-  Future<VideoPlayerController?> _startIntro() async {
-    final c = VideoPlayerController.asset('assets/video/splash.mp4');
-    try {
-      await c.initialize();
-      if (!mounted) {
-        await c.dispose();
-        return null;
-      }
-      // Silent: an app that starts talking the moment it is opened is
-      // startling in company, and the film reads without its sound.
-      await c.setVolume(0);
-      await c.play();
-      setState(() => _intro = c);
-      return c;
-    } catch (_) {
-      await c.dispose();
-      if (mounted) setState(() => _noIntro = true);
-      return null;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      // Reduced motion: the finished frame, straight away.
+      _clock.value = 2.6 / _clockSeconds;
+    } else if (!_clock.isAnimating && _clock.value == 0) {
+      _clock.forward();
     }
   }
 
-  /// Waits for the film to play out, bounded at both ends: never quicker than
-  /// [_minHold], never longer than [_maxHold], so the app neither flashes past
-  /// the intro nor is held shut by a decoder that never starts.
   Future<void> _introFinished() async {
-    Duration remaining() {
-      final left = _maxHold - _sinceLaunch.elapsed;
-      return left > Duration.zero ? left : Duration.zero;
-    }
-
-    final c = await (_introReady ?? Future<VideoPlayerController?>.value())
-        .timeout(remaining(), onTimeout: () => null);
-
-    // Nothing to play, and the wait is over: show the animated splash for what
-    // is left of the hold rather than finishing on an empty screen.
-    if (c == null && mounted && !_noIntro) setState(() => _noIntro = true);
-
-    if (c != null) {
-      final done = Completer<void>();
-      void listener() {
-        final v = c.value;
-        if (!done.isCompleted &&
-            v.isInitialized &&
-            v.position >= v.duration - const Duration(milliseconds: 120)) {
-          done.complete();
-        }
-      }
-
-      c.addListener(listener);
-      await Future.any<void>([done.future, Future<void>.delayed(remaining())]);
-      c.removeListener(listener);
-    }
-
-    final floor = _minHold - _sinceLaunch.elapsed;
-    if (floor > Duration.zero) await Future<void>.delayed(floor);
+    final left = _minHold - _sinceLaunch.elapsed;
+    if (left > Duration.zero) await Future<void>.delayed(left);
   }
 
   @override
   void dispose() {
-    _intro?.dispose();
-    _logoCtrl.dispose();
-    _glowCtrl.dispose();
+    _clock.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final intro = _intro;
-
-    // Opening the app used to show two splashes in a row: the animated logo
-    // for the second or so the film took to decode, and then the film itself.
-    // Two loading screens back to back read as a stall, not as an opening.
-    //
-    // So while the film is still coming, the screen is just its own backdrop
-    // colour — nothing to notice, nothing to replace, and the first frame of
-    // the film lands on a ground that already matches it. The animated splash
-    // is kept for the one case it exists to cover: a device that cannot play
-    // the film at all, where a bare colour would be no splash whatsoever.
-    if (intro != null && intro.value.isInitialized) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: intro.value.size.width,
-              height: intro.value.size.height,
-              child: VideoPlayer(intro),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (!_noIntro) {
-      return const Scaffold(backgroundColor: _filmGround);
-    }
-
     return Scaffold(
-      body: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: _glowCtrl,
-            builder: (_, _) {
-              final t = Curves.easeInOut.transform(_glowCtrl.value);
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment(-1 + t * 0.4, -1),
-                    end: Alignment(1, 1 - t * 0.4),
-                    colors: const [
-                      Color(0xFFFAF3EC),
-                      Color(0xFFF0DDC8),
-                      Color(0xFFEBD7BF),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          const Positioned.fill(child: SparkleOverlay(count: 36)),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedBuilder(
-                  animation: Listenable.merge([_logoCtrl, _glowCtrl]),
-                  builder: (_, _) {
-                    final pulse = 1 +
-                        Curves.easeInOut.transform(_glowCtrl.value) * 0.04;
-                    return Opacity(
-                      opacity: _logoOpacity.value,
-                      child: Transform.scale(
-                        scale: _logoScale.value * pulse,
-                        child: Container(
-                          width: 190,
-                          height: 190,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(40),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary
-                                    .withValues(alpha: 0.35),
-                                blurRadius: 36 + 14 * _glowCtrl.value,
-                                offset: const Offset(0, 14),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(40),
-                            child: Image.asset(AppAssets.logo,
-                                fit: BoxFit.cover),
+      backgroundColor: Colors.transparent,
+      body: AnimatedBuilder(
+        animation: _clock,
+        builder: (context, _) {
+          final t = _clock.value * _clockSeconds;
+          double seg(double a, double b, [Curve curve = Curves.easeOutCubic]) =>
+              curve.transform(((t - a) / (b - a)).clamp(0.0, 1.0));
+
+          final logoIn = seg(0.8, 1.5, Curves.easeOutBack);
+          final titleIn = seg(1.3, 2.0);
+          final lineIn = seg(1.5, 2.2);
+          final tagIn = seg(1.65, 2.3);
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              RepaintBoundary(
+                child: CustomPaint(painter: _WarpPainter(t)),
+              ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 230,
+                      height: 230,
+                      child: CustomPaint(
+                        painter: _RingPainter(t),
+                        child: Center(
+                          child: Opacity(
+                            opacity: logoIn.clamp(0.0, 1.0),
+                            child: Transform.scale(
+                              scale: 0.55 + 0.45 * logoIn,
+                              child: const _Mark(),
+                            ),
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 28),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 700),
-                  child: const Text(
-                    'كل مناسباتك في مكان واحد',
-                    style: TextStyle(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      letterSpacing: 0.3,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 950),
-                  child: Text(
-                    '✨ من أعراس وحفلات إلى تنسيق وتصوير ✨',
-                    style: TextStyle(
-                      color: AppColors.textMuted.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                    const SizedBox(height: 22),
+                    Opacity(
+                      opacity: titleIn,
+                      child: Transform.translate(
+                        offset: Offset(0, 18 * (1 - titleIn)),
+                        child: GoldFoilText(
+                          'أفراحنا',
+                          style: AppTheme.wordmark(46),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 1200),
-                  child: const SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2.4,
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 170 * lineIn,
+                      height: 1.2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [
+                          AppColors.accent.withValues(alpha: 0),
+                          AppColors.accent,
+                          AppColors.holoLavender,
+                          AppColors.accent.withValues(alpha: 0),
+                        ]),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.7),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 14),
+                    Opacity(
+                      opacity: tagIn,
+                      child: const Text(
+                        'كل مناسباتك في مكان واحد',
+                        style: TextStyle(
+                          // The intro opens on ivory, so the line under the
+                          // name is read, not glowed: pearl would be white on
+                          // white.
+                          color: AppColors.primaryDark,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
+}
+
+/// The app's mark on a pane of dark glass with a gold rim.
+class _Mark extends StatelessWidget {
+  const _Mark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 132,
+      height: 132,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.44),
+            blurRadius: 36,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(33),
+        child: Image.asset(AppAssets.logo, fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+/// The jump: stars stretching into lines of light rushing out from the centre,
+/// and the glow that is left behind.
+class _WarpPainter extends CustomPainter {
+  _WarpPainter(this.t);
+  final double t;
+
+  static final List<({double angle, double speed, double phase, bool gold})>
+      _streaks = () {
+    final rnd = math.Random(2026);
+    return List.generate(96, (_) {
+      return (
+        angle: rnd.nextDouble() * math.pi * 2,
+        speed: 0.55 + rnd.nextDouble() * 0.9,
+        phase: rnd.nextDouble(),
+        gold: rnd.nextDouble() < 0.3,
+      );
+    });
+  }();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final c = size.center(const Offset(0, -70));
+    final maxR = size.longestSide * 0.75;
+
+    // The glow at the centre blooms and then settles, and stays.
+    final bloom = ((t - 0.3) / 1.1).clamp(0.0, 1.0);
+    if (bloom > 0) {
+      final r = 80 + 200 * Curves.easeOutCubic.transform(bloom);
+      final a = 0.18 + 0.22 * math.sin(bloom * math.pi);
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..shader = RadialGradient(colors: [
+            AppColors.primary.withValues(alpha: a),
+            AppColors.holoLavender.withValues(alpha: a * 0.35),
+            AppColors.primary.withValues(alpha: 0),
+          ], stops: const [0, 0.55, 1])
+              .createShader(Rect.fromCircle(center: c, radius: r)),
+      );
+    }
+
+    // Streaks: fastest at 0.5s, gone by 1.4s.
+    final fade = t < 0.9 ? 1.0 : (1 - (t - 0.9) / 0.5).clamp(0.0, 1.0);
+    if (fade <= 0) return;
+    final intensity = math.sin((t / 1.4).clamp(0.0, 1.0) * math.pi);
+    for (final s in _streaks) {
+      final d = (t * 1.5 * s.speed + s.phase) % 1.0;
+      final head = maxR * math.pow(d, 2.1);
+      final length = 12 + 240 * d * d * intensity;
+      final dir = Offset(math.cos(s.angle), math.sin(s.angle));
+      final from = c + dir * math.max(0, head - length);
+      final to = c + dir * head;
+      final color = s.gold ? AppColors.accent : AppColors.pearl;
+      final a = (fade * (0.25 + 0.75 * d)).clamp(0.0, 1.0);
+      if (to == from) continue;
+      canvas.drawLine(
+        from,
+        to,
+        Paint()
+          ..strokeWidth = 1 + 1.2 * d
+          ..strokeCap = StrokeCap.round
+          ..shader = LinearGradient(colors: [
+            color.withValues(alpha: 0),
+            color.withValues(alpha: a),
+          ]).createShader(Rect.fromPoints(from, to)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WarpPainter old) => old.t != t;
+}
+
+/// The ring round the mark: drawn on as an arc of holographic light, with a
+/// fainter dashed ring inside it, a scan line crossing the mark once, and
+/// three particles in orbit afterwards.
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.shortestSide / 2 - 10;
+
+    double seg(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
+
+    // ---- the ring drawing itself
+    final draw = Curves.easeInOutCubic.transform(seg(0.4, 1.3));
+    if (draw > 0) {
+      final rect = Rect.fromCircle(center: c, radius: r);
+      final shader = SweepGradient(
+        colors: AppColors.holoStops,
+        transform: GradientRotation(-math.pi / 2 + t * 0.6),
+      ).createShader(rect);
+      final sweep = math.pi * 2 * draw;
+      canvas.drawArc(
+        rect,
+        -math.pi / 2,
+        sweep,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 6)
+          ..shader = shader,
+      );
+      canvas.drawArc(
+        rect,
+        -math.pi / 2,
+        sweep,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round
+          ..shader = shader,
+      );
+    }
+
+    // ---- the dashed inner ring, turning the other way
+    final inner = seg(1.0, 1.6);
+    if (inner > 0) {
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(-t * 0.35);
+      final dash = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = AppColors.pearl.withValues(alpha: 0.28 * inner);
+      final ri = r - 12;
+      for (var i = 0; i < 48; i++) {
+        final a = i / 48 * math.pi * 2;
+        canvas.drawArc(Rect.fromCircle(center: Offset.zero, radius: ri), a,
+            math.pi * 2 / 48 * 0.45, false, dash);
+      }
+      canvas.restore();
+    }
+
+    // ---- the scan line crossing the mark once
+    final scan = seg(1.0, 1.75);
+    if (scan > 0 && scan < 1) {
+      final y = c.dy - 70 + 140 * Curves.easeInOut.transform(scan);
+      final line = Rect.fromLTWH(c.dx - 80, y - 1, 160, 2);
+      canvas.drawRect(
+        line.inflate(6),
+        Paint()
+          ..color = AppColors.champagne.withValues(alpha: 0.25)
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 6),
+      );
+      canvas.drawRect(
+        line,
+        Paint()
+          ..shader = LinearGradient(colors: [
+            AppColors.champagne.withValues(alpha: 0),
+            AppColors.champagne.withValues(alpha: 0.9),
+            AppColors.champagne.withValues(alpha: 0),
+          ]).createShader(line),
+      );
+    }
+
+    // ---- particles in orbit once the ring is whole
+    final orbit = seg(1.3, 1.9);
+    if (orbit > 0) {
+      const colors = [AppColors.accent, AppColors.holoLavender, AppColors.holoAqua];
+      for (var i = 0; i < colors.length; i++) {
+        final a = t * (0.9 + i * 0.35) + i * math.pi * 2 / 3;
+        final o = c + Offset(math.cos(a), math.sin(a)) * r;
+        canvas.drawCircle(
+          o,
+          7,
+          Paint()
+            ..color = colors[i].withValues(alpha: 0.4 * orbit)
+            ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 5),
+        );
+        canvas.drawCircle(
+            o, 2.4, Paint()..color = colors[i].withValues(alpha: orbit));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) => old.t != t;
 }

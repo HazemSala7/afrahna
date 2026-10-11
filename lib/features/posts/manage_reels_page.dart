@@ -33,7 +33,9 @@ class _ManageReelsPageState extends State<ManageReelsPage> {
         perPage: 60,
       );
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+    _future = _load();
+  });
 
   Future<void> _openStudio() async {
     await Navigator.push(
@@ -96,7 +98,7 @@ class _ManageReelsPageState extends State<ManageReelsPage> {
   void _openSheet(PostModel reel) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),

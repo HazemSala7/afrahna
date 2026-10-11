@@ -53,16 +53,11 @@ class _CoordinatorPageState extends State<CoordinatorPage> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('منسق المناسبة'),
-          backgroundColor: AppColors.primaryDark,
-          foregroundColor: Colors.white,
+          // The theme's glass bar; the tabs take the theme's gold and pearl.
           bottom: const TabBar(
-            indicatorColor: Color(0xFFFAD9A7),
-            indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
             tabs: [
               Tab(icon: Icon(Icons.account_balance_wallet), text: 'الميزانية'),
               Tab(icon: Icon(Icons.groups), text: 'المدعوون'),
@@ -261,7 +256,7 @@ class _BudgetSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFCF6EE), Color(0xFFF3E3CC)],
+          colors: [AppColors.surface, AppColors.surface],
           begin: Alignment.topRight, end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(20),
@@ -281,7 +276,7 @@ class _BudgetSummaryCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 10,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface,
               valueColor: const AlwaysStoppedAnimation(AppColors.primary),
             ),
           ),
@@ -307,7 +302,7 @@ class _BudgetTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
       ),
@@ -332,7 +327,7 @@ class _BudgetTile extends StatelessWidget {
         ),
         trailing: IconButton(
           onPressed: onDelete,
-          icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B)),
+          icon: const Icon(Icons.delete_outline, color: Color(0xFFE7A192)),
         ),
       ),
     );
@@ -455,7 +450,6 @@ class _BudgetEditorSheetState extends State<_BudgetEditorSheet> {
             const SizedBox(height: 6),
             SwitchListTile(
               value: _paid,
-              activeThumbColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               title: const Text('تم الدفع', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
               onChanged: (v) => setState(() => _paid = v),
@@ -651,7 +645,7 @@ class _GuestsSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFCF6EE), Color(0xFFF3E3CC)],
+          colors: [AppColors.surface, AppColors.surface],
           begin: Alignment.topRight, end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(20),
@@ -690,7 +684,7 @@ class _GuestTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
       ),
@@ -723,7 +717,7 @@ class _GuestTile extends StatelessWidget {
               child: Text(rsvp.$1, style: TextStyle(color: rsvp.$2, fontSize: 11, fontWeight: FontWeight.w800)),
             ),
           ),
-          IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline, color: Color(0xFFC1452B))),
+          IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline, color: Color(0xFFE7A192))),
         ]),
       ),
     );
@@ -909,7 +903,7 @@ class _StatPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
@@ -994,7 +988,7 @@ class _CurrencySelector extends StatelessWidget {
                       fontSize: 12.5,
                     ),
                     selectedColor: AppColors.primary,
-                    backgroundColor: Colors.white,
+                    backgroundColor: AppColors.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(

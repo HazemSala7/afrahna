@@ -179,6 +179,12 @@ class _PostFeedCardState extends State<PostFeedCard> {
           _liked = res.liked;
           _likes = res.likes;
         });
+        final said = res.reward?.message;
+        if (said != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(said), duration: const Duration(seconds: 2)),
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -227,7 +233,8 @@ class _PostFeedCardState extends State<PostFeedCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.hairline, width: 0.8),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -470,8 +477,8 @@ class _PostGalleryState extends State<PostGallery> {
                         height: 6,
                         decoration: BoxDecoration(
                           color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.6),
+                              ? AppColors.surface
+                              : AppColors.surface.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );

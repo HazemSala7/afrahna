@@ -149,7 +149,7 @@ class _HighlightRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -167,7 +167,7 @@ class _HighlightRow extends StatelessWidget {
                   gradient: SweepGradient(colors: [
                     AppColors.primary,
                     AppColors.accent,
-                    AppColors.primaryDark,
+                    AppColors.goldDeep,
                     AppColors.primary,
                   ]),
                 ),

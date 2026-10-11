@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -14,9 +16,22 @@ import 'core/theme.dart';
 import 'features/auth/register_page.dart';
 import 'features/invitation/invitation_view_page.dart';
 import 'features/splash/splash_page.dart';
+import 'widgets/cosmos.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The typefaces ship inside the app rather than being fetched, so their
+  // licences travel with them. Amiri and Aref Ruqaa are the invitation's
+  // display faces: a guest opens that from a link, often on a weak
+  // connection, and it is the last screen that should be waiting on a
+  // download to show the couple's names in the right lettering.
+  LicenseRegistry.addLicense(() async* {
+    for (final face in const ['tajawal', 'reemkufi', 'amiri', 'arefruqaa']) {
+      final text =
+          await rootBundle.loadString('assets/google_fonts/OFL-$face.txt');
+      yield LicenseEntryWithLineBreaks(const ['google_fonts'], text);
+    }
+  });
   await initializeDateFormatting('ar');
   await LocalFavorites.instance.load();
   await PushNotificationService.instance.init();
@@ -65,7 +80,8 @@ class AfrahnaApp extends StatelessWidget {
         title: 'افراحنا',
         navigatorKey: rootNavigatorKey,
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
+        theme: AppTheme.cosmic(),
+        color: AppColors.background,
         locale: const Locale('ar'),
         supportedLocales: const [Locale('ar'), Locale('en')],
         localizationsDelegates: const [
@@ -74,9 +90,19 @@ class AfrahnaApp extends StatelessWidget {
           GlobalCupertinoLocalizations.delegate,
         ],
         scrollBehavior: const _NoScrollbarBehavior(),
-        builder: (context, child) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: child!,
+        // Every page paints its own living sky (see CosmicPage). This still,
+        // painted-once copy sits behind the navigator for the few routes built
+        // by hand rather than through the theme, so none of them can ever show
+        // an empty black frame.
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: AppTheme.overlay,
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [const CosmicBackdrop(), child!],
+            ),
+          ),
         ),
         home: const SplashPage(),
       ),

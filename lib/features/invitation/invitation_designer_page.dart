@@ -296,7 +296,7 @@ class _InvitationDesignerPageState extends State<InvitationDesignerPage> {
     return Scaffold(
 
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: const PinkAppBar(title: 'صمّم كرت فرحك'),
       body: Stack(
         children: [
@@ -375,7 +375,7 @@ class _InvitationDesignerPageState extends State<InvitationDesignerPage> {
           // ---- Bottom action bar ----
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primaryDark.withValues(alpha: 0.12),
@@ -841,7 +841,7 @@ class _ChoiceChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
+          color: selected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.primaryLight,
@@ -910,7 +910,7 @@ class _FieldEditor extends StatelessWidget {
           decoration: InputDecoration(
             isDense: true,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.surface,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(

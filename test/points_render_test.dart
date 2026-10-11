@@ -13,6 +13,9 @@ import 'package:afrahna/core/api/api_client.dart';
 import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/points/points_page.dart';
 import 'package:afrahna/widgets/shell_bottom_nav.dart';
+import 'package:afrahna/core/theme.dart';
+
+import 'cosmic_harness.dart';
 
 /// Renders «نقاطي» against a canned summary so the rewards ladder can be
 /// looked at, not just compiled. Run with `--update-goldens` to refresh.
@@ -98,9 +101,11 @@ Future<void> _pumpPage(WidgetTester tester, Map<String, dynamic> data) async {
 
   await tester.pumpWidget(MultiProvider(
     providers: [ChangeNotifierProvider<SessionController>(create: (_) => _SignedIn())],
-    child: const MaterialApp(
-      locale: Locale('ar'),
-      home: Directionality(
+    child: MaterialApp(
+      theme: AppTheme.cosmic(),
+      builder: cosmicBuilder,
+      locale: const Locale('ar'),
+      home: const Directionality(
         textDirection: TextDirection.rtl,
         child: PointsPage(),
       ),
@@ -116,6 +121,7 @@ Future<void> _pumpPage(WidgetTester tester, Map<String, dynamic> data) async {
 }
 
 void main() {
+  setUpAll(preloadCosmic);
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
     if (font.existsSync()) {

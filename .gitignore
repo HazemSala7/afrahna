@@ -46,6 +46,7 @@ app.*.map.json
 
 # Deploy secrets
 deploy/.ftp-credentials.json
+deploy/.ftp-credentials-*.json
 deploy/logs/
 .vscode/sftp.json
 

@@ -21,6 +21,10 @@ String arabicInteractions(int n) =>
 /// «يوم واحد / يومان / 5 أيام / 30 يوماً»
 String arabicDays(int n) => _counted(n, 'يوم واحد', 'يومان', 'أيام', 'يوماً');
 
+/// «خدمة واحدة / خدمتان / 5 خدمات / 15 خدمة»
+String arabicServices(int n) =>
+    _counted(n, 'خدمة واحدة', 'خدمتان', 'خدمات', 'خدمة');
+
 String _counted(int n, String one, String two, String few, String many) {
   if (n == 1) return one;
   if (n == 2) return two;

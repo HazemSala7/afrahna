@@ -283,7 +283,7 @@ class _VendorPostsPageState extends State<VendorPostsPage>
         children: [
           if (_vendor != null) _VendorHeader(vendor: _vendor!),
           Container(
-            color: Colors.white,
+            color: AppColors.surface,
             child: TabBar(
               controller: _tabs,
               isScrollable: _tabKinds.length > 3,
@@ -497,7 +497,7 @@ class _VendorHeader extends StatelessWidget {
                   padding: const EdgeInsets.all(2.5),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
+                    color: AppColors.surface,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.25),
@@ -982,7 +982,7 @@ class _PostListState extends State<_PostList>
             return ListView(children: const [
               SizedBox(height: 100),
               Icon(Icons.movie_filter_outlined,
-                  size: 56, color: AppColors.primaryLight),
+                  size: 56, color: Color(0x73C9906B)),
               SizedBox(height: 12),
               Center(child: Text('لا يوجد محتوى بعد')),
             ]);
@@ -1081,12 +1081,12 @@ class _PostCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(Icons.remove_red_eye,
-                          size: 15, color: Colors.grey[600]),
+                          size: 15, color: AppColors.textMuted),
                       const SizedBox(width: 3),
                       Text('${post.viewsCount}',
                           style: const TextStyle(fontSize: 12)),
                       const SizedBox(width: 12),
-                      Icon(Icons.favorite, size: 15, color: Colors.grey[600]),
+                      Icon(Icons.favorite, size: 15, color: AppColors.textMuted),
                       const SizedBox(width: 3),
                       Text('${post.likesCount}',
                           style: const TextStyle(fontSize: 12)),

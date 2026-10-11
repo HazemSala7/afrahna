@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/feature_flags.dart';
 import '../../core/models/models.dart';
@@ -19,14 +19,18 @@ import '../../core/utils/category_icon.dart';
 import '../../core/utils/link_launcher.dart';
 import '../../widgets/animated_invitation_bg.dart';
 import '../../widgets/animations.dart';
+import '../../widgets/invite_friends.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/cosmos.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/festival.dart';
 import '../account/account_page.dart';
 import '../account/customer_header.dart';
 import '../account/edit_profile_page.dart';
 import '../account/followed_vendors_page.dart';
 import '../assistant/assistant_page.dart';
+import '../event_request/event_request_home_card.dart';
 import '../bookings/bookings_page.dart';
 import '../invitations/invitations_page.dart';
 import '../auth/login_page.dart';
@@ -49,6 +53,7 @@ import '../store/my_orders_page.dart';
 import '../vendors/story_viewer_page.dart';
 import '../vendors/vendor_details_page.dart';
 import '../vendors/vendors_page.dart';
+import '../../core/utils/held_future.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.initialTab = 2});
@@ -81,16 +86,16 @@ class _HomePageState extends State<HomePage> {
     // and القصص (stories) on the LEFT, with الرئيسية in the centre.
     // Children order (start→end / right→left): حسابي، خطّطي، الرئيسية، ريلز، القصص.
     final pages = <Widget>[
-      const AccountPage(),          // 0 - حسابي (rightmost)
-      const PlanningHubPage(),      // 1 - خطّطي (planning tools hub)
-      const _HomeTab(),             // 2 - الرئيسية (centre)
-      const ReelsPage(),            // 3 - ريلز
-      const MarketplacePage(),      // 4 - المتجر (leftmost)
+      const AccountPage(), // 0 - حسابي (rightmost)
+      const PlanningHubPage(), // 1 - خطّطي (planning tools hub)
+      const _HomeTab(), // 2 - الرئيسية (centre)
+      const ReelsPage(), // 3 - ريلز
+      const MarketplacePage(), // 4 - المتجر (leftmost)
     ];
 
     return Scaffold(
       extendBody: true,
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: IndexedStack(
         index: _currentTab,
         children: [
@@ -110,8 +115,7 @@ class _HomePageState extends State<HomePage> {
               },
             )
           : null,
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -175,16 +179,16 @@ class _GuestPromoBanner extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [AppColors.primary, AppColors.primaryDark],
+            colors: [AppColors.primary, AppColors.goldDeep],
             begin: Alignment.centerRight,
             end: Alignment.centerLeft,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.3),
+              color: AppColors.accent.withValues(alpha: 0.24),
               blurRadius: 16,
-              offset: const Offset(0, 6),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -197,8 +201,11 @@ class _GuestPromoBanner extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.celebration_rounded,
-                  color: Colors.white, size: 22),
+              child: const Icon(
+                Icons.celebration_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -231,9 +238,12 @@ class _GuestPromoBanner extends StatelessWidget {
             const SizedBox(width: 8),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
+                backgroundColor: AppColors.surface,
                 foregroundColor: AppColors.primaryDark,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
@@ -310,31 +320,40 @@ class _HomeTabState extends State<_HomeTab> {
       _statsFuture = cache.stats!;
       cache.clear();
     } else {
-      _categoriesFuture = CategoryService().list(tree: true);
-      _promosFuture = PromotionService().list();
-      _topVendorsFuture = VendorService().list();
+      // All held: they are stored now and read by a FutureBuilder on the
+      // next frame, and a request that fails in between would otherwise
+      // escape as an unhandled error. See [held].
+      _categoriesFuture = held(CategoryService().list(tree: true));
+      _promosFuture = held(PromotionService().list());
+      _topVendorsFuture = held(VendorService().list());
       // Featured: fresh random order on each load.
-      _featuredVendorsFuture = VendorService()
-          .list(featured: true, perPage: 1000)
-          .then((l) => l..shuffle());
+      _featuredVendorsFuture = held(
+        VendorService()
+            .list(featured: true, perPage: 1000)
+            .then((l) => l..shuffle()),
+      );
       // Hero slider = admin slides + VIP vendors, shuffled fresh each load.
-      _slidersFuture = HomeFeedCache.loadSliders();
-      _statsFuture = StatsService().get();
+      _slidersFuture = held(HomeFeedCache.loadSliders());
+      _statsFuture = held(StatsService().get());
     }
     // Newest shops — the API already returns vendors newest-first, so the
     // first page is exactly the ones that just joined.
-    _newVendorsFuture = VendorService().list(perPage: 12);
-    _storiesFuture = _loadStories();
+    _newVendorsFuture = held(VendorService().list(perPage: 12));
+    _storiesFuture = held(_loadStories());
     // Marketplace: a fresh shuffle of everyone's products on each load.
-    _marketFuture = ProductService()
-        .marketplace(
-          seed: DateTime.now().millisecondsSinceEpoch & 0x7fffffff,
-          perPage: 14,
-        )
-        .then((r) => r.items);
+    _marketFuture = held(
+      ProductService()
+          .marketplace(
+            seed: DateTime.now().millisecondsSinceEpoch & 0x7fffffff,
+            perPage: 14,
+          )
+          .then((r) => r.items),
+    );
     // Latest posts (newest first) for the home "آخر المنشورات" row.
-    _latestPostsFuture = PostService().list(type: PostType.post, perPage: 15);
-    _mainEventFuture = _loadMainEvent();
+    _latestPostsFuture = held(
+      PostService().list(type: PostType.post, perPage: 15),
+    );
+    _mainEventFuture = held(_loadMainEvent());
   }
 
   /// Groups active stories by shop, newest shop first, so the rail shows one
@@ -364,8 +383,12 @@ class _HomeTabState extends State<_HomeTab> {
       // would never be seen at all. Once per load, not per rebuild — the rail
       // must not reshuffle under a finger reaching for it.
       return order
-          .map((id) =>
-              VendorStoriesGroup(vendor: vendors[id]!, stories: byVendor[id]!))
+          .map(
+            (id) => VendorStoriesGroup(
+              vendor: vendors[id]!,
+              stories: byVendor[id]!,
+            ),
+          )
           .toList()
         ..shuffle();
     } catch (_) {
@@ -410,14 +433,20 @@ class _HomeTabState extends State<_HomeTab> {
     // bottom nav (and, for guests, the "join" banner). Reserve exactly their
     // combined height so the last sections are never hidden underneath them.
     final isGuest = !context.watch<SessionController>().isSignedIn;
-    final bottomReserve = AppBottomNav.contentHeight +
+    final bottomReserve =
+        AppBottomNav.contentHeight +
         MediaQuery.of(context).padding.bottom +
         (isGuest ? _kGuestBannerHeight : 0) +
         16;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
+      backgroundColor: Colors.transparent,
+      // One clock for everything on the page that moves with the festival;
+      // the burst of confetti lies over the whole page, once, on arrival.
+      body: FestivalClock(
+        child: Stack(
+          children: [
+      SafeArea(
         bottom: false,
         child: RefreshIndicator(
           color: AppColors.primary,
@@ -425,83 +454,112 @@ class _HomeTabState extends State<_HomeTab> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(0, 4, 0, bottomReserve),
             children: [
-              _hpad(const _TopBar()),
-              const SizedBox(height: 10),
-              _hpad(FadeSlideIn(
-                id: 'home.0',
-                delay: const Duration(milliseconds: 60),
-                child: const _SearchBar(),
-              )),
-              const SizedBox(height: 10),
+              // The crown: the aurora breathes behind the mark, the search
+              // and the stories, and fades into the page below them.
+              Stack(
+                children: [
+                  const Positioned.fill(child: AuroraCrown()),
+                  Column(
+                    children: [
+                      _hpad(const _TopBar()),
+                      const SizedBox(height: 10),
+                      _hpad(
+                        FadeSlideIn(
+                          id: 'home.0',
+                          delay: const Duration(milliseconds: 60),
+                          child: const GlintSweep(child: _SearchBar()),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
 
-              // ---- 1. الستوريز ------------------------------------------
-              // Moved here from its own bottom-nav tab, where it was a whole
-              // screen away from the content it belongs with.
-              FadeSlideIn(
-                id: 'home.1',
-                delay: const Duration(milliseconds: 120),
-                child: _StoriesRail(future: _storiesFuture),
-              ),
-              const SizedBox(height: 10),
+                      // ---- 1. الستوريز ----------------------------------
+                      // Moved here from its own bottom-nav tab, where it was
+                      // a whole screen away from the content it belongs
+                      // with. They sit on an orbit.
+                      FadeSlideIn(
+                        id: 'home.1',
+                        delay: const Duration(milliseconds: 120),
+                        child: OrbitPath(
+                          child: _StoriesRail(future: _storiesFuture),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
 
-              // ---- 2. التصنيفات -----------------------------------------
-              // Full-width auto-scrolling categories (no side gaps).
-              FadeSlideIn(
-                id: 'home.2',
-                delay: const Duration(milliseconds: 200),
-                child: _CategoriesGrid(future: _categoriesFuture),
+                      // ---- 2. التصنيفات ---------------------------------
+                      // Full-width categories (no side gaps), cut as
+                      // crystals, under the same aurora.
+                      FadeSlideIn(
+                        id: 'home.2',
+                        delay: const Duration(milliseconds: 200),
+                        child: _CategoriesGrid(future: _categoriesFuture),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
 
               // ---- 3. السلايدات -----------------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.3',
-                delay: const Duration(milliseconds: 260),
-                child: _HeroBanner(future: _slidersFuture),
-              )),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.3',
+                  delay: const Duration(milliseconds: 260),
+                  child: _HeroBanner(future: _slidersFuture),
+                ),
+              ),
               const SizedBox(height: 20),
 
               // ---- 4. الشركات المميّزة ----------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.4',
-                delay: const Duration(milliseconds: 300),
-                child: SectionHeader(
-                  title: 'الشركات المميّزة',
-                  emoji: '🏆',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VendorsPage(
-                        title: 'الشركات المميّزة',
-                        featuredOnly: true,
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.4',
+                  delay: const Duration(milliseconds: 300),
+                  child: SectionHeader(
+                    festive: true,
+                    title: 'الشركات المميّزة',
+                    emoji: '🏆',
+                    onSeeAll: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VendorsPage(
+                          title: 'الشركات المميّزة',
+                          featuredOnly: true,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.5',
                 delay: const Duration(milliseconds: 320),
                 child: _FeaturedVendorsCarousel(
-                    future: _featuredVendorsFuture, userPos: _userPos),
+                  future: _featuredVendorsFuture,
+                  userPos: _userPos,
+                ),
               ),
               const SizedBox(height: 24),
 
               // ---- 5. المتجر --------------------------------------------
               // Products from every shop, shuffled.
-              _hpad(FadeSlideIn(
-                id: 'home.6',
-                delay: const Duration(milliseconds: 340),
-                child: SectionHeader(
-                  title: 'المتجر',
-                  emoji: '🛍️',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MarketplacePage()),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.6',
+                  delay: const Duration(milliseconds: 340),
+                  child: SectionHeader(
+                    festive: true,
+                    title: 'المتجر',
+                    emoji: '🛍️',
+                    onSeeAll: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MarketplacePage(),
+                      ),
+                    ),
                   ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.7',
@@ -511,18 +569,21 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 22),
 
               // ---- 6. عروض اليوم ----------------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.8',
-                delay: const Duration(milliseconds: 380),
-                child: SectionHeader(
-                  title: 'عروض اليوم',
-                  emoji: '🔥',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const OffersPage()),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.8',
+                  delay: const Duration(milliseconds: 380),
+                  child: SectionHeader(
+                    festive: true,
+                    title: 'عروض اليوم',
+                    emoji: '🔥',
+                    onSeeAll: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const OffersPage()),
+                    ),
                   ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.9',
@@ -532,14 +593,17 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 26),
 
               // ---- 7. آخر المنشورات -------------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.10',
-                delay: const Duration(milliseconds: 420),
-                child: const SectionHeader(
-                  title: 'آخر المنشورات',
-                  emoji: '📝',
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.10',
+                  delay: const Duration(milliseconds: 420),
+                  child: const SectionHeader(
+                    festive: true,
+                    title: 'آخر المنشورات',
+                    emoji: '📝',
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.11',
@@ -551,20 +615,23 @@ class _HomeTabState extends State<_HomeTab> {
               // ---- 8. انضم مؤخراً ------------------------------------
               // Gives a just-joined advertiser immediate exposure instead of
               // waiting to earn a spot in the other rows.
-              _hpad(FadeSlideIn(
-                id: 'home.12',
-                delay: const Duration(milliseconds: 460),
-                child: SectionHeader(
-                  title: 'انضم مؤخراً',
-                  emoji: '✨',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VendorsPage(title: 'انضم مؤخراً'),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.12',
+                  delay: const Duration(milliseconds: 460),
+                  child: SectionHeader(
+                    festive: true,
+                    title: 'انضم مؤخراً',
+                    emoji: '✨',
+                    onSeeAll: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VendorsPage(title: 'انضم مؤخراً'),
+                      ),
                     ),
                   ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.13',
@@ -574,43 +641,54 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 22),
 
               // ---- 9. الأعلى تقييماً ------------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.14',
-                delay: const Duration(milliseconds: 500),
-                child: SectionHeader(
-                  title: 'الأعلى تقييماً',
-                  emoji: '⭐',
-                  onSeeAll: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const VendorsPage()),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.14',
+                  delay: const Duration(milliseconds: 500),
+                  child: SectionHeader(
+                    festive: true,
+                    title: 'الأعلى تقييماً',
+                    emoji: '⭐',
+                    onSeeAll: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VendorsPage()),
+                    ),
                   ),
                 ),
-              )),
+              ),
               const SizedBox(height: 12),
               FadeSlideIn(
                 id: 'home.15',
                 delay: const Duration(milliseconds: 520),
-                child: _TopRatedRow(future: _topVendorsFuture, userPos: _userPos),
+                child: _TopRatedRow(
+                  future: _topVendorsFuture,
+                  userPos: _userPos,
+                ),
               ),
               const SizedBox(height: 22),
 
               // ---- 10. دعوات إلكترونية ----------------------------------
               // The showpiece feature, so it gets a living card rather than
               // another row of tiles.
-              _hpad(FadeSlideIn(
-                id: 'home.16',
-                delay: const Duration(milliseconds: 540),
-                child: const _InvitationPromoCard(),
-              )),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.16',
+                  delay: const Duration(milliseconds: 540),
+                  child: const _InvitationPromoCard(),
+                ),
+              ),
               const SizedBox(height: 22),
 
-              // ---- 11. تواصل معنا ---------------------------------------
-              // The "advertise with us" card, whose action is «تواصل معنا».
-              _hpad(FadeSlideIn(
-                id: 'home.17',
-                delay: const Duration(milliseconds: 560),
-                child: const _AdvertiseCta(),
-              )),
+              // ---- 11. نظّم مناسبتك -------------------------------------
+              // Opens the six-question brief, or the customer's existing
+              // request once one has been submitted.
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.17',
+                  delay: const Duration(milliseconds: 560),
+                  child: const EventRequestHomeCard(),
+                ),
+              ),
               const SizedBox(height: 26),
 
               // ---- 12. نصائح لتخطيط فرحك --------------------------------
@@ -622,11 +700,13 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 26),
 
               // ---- 13. ليش أفراحنا؟ -------------------------------------
-              _hpad(FadeSlideIn(
-                id: 'home.19',
-                delay: const Duration(milliseconds: 600),
-                child: const _WhyAfrahnaSection(),
-              )),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.19',
+                  delay: const Duration(milliseconds: 600),
+                  child: const _WhyAfrahnaSection(),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // ---- Below the numbered order ------------------------------
@@ -637,11 +717,13 @@ class _HomeTabState extends State<_HomeTab> {
               // The member's own card — who they are, what their points are
               // worth, and the shortcuts they use most. Guests get the sign-in
               // call to action in the same slot.
-              _hpad(FadeSlideIn(
-                id: 'home.20',
-                delay: const Duration(milliseconds: 620),
-                child: const _HomeAccountBlock(),
-              )),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.20',
+                  delay: const Duration(milliseconds: 620),
+                  child: const _HomeAccountBlock(),
+                ),
+              ),
               const SizedBox(height: 20),
               // The next event's countdown, when one is scheduled.
               FutureBuilder<EventModel?>(
@@ -652,17 +734,19 @@ class _HomeTabState extends State<_HomeTab> {
                       event.startsAt.isBefore(DateTime.now())) {
                     return const SizedBox.shrink();
                   }
-                  return _hpad(Padding(
-                    padding: const EdgeInsets.only(top: 22),
-                    child: FadeSlideIn(
-                      id: 'home.22',
-                      delay: const Duration(milliseconds: 640),
-                      child: CountdownCard(
-                        title: event.title,
-                        target: event.startsAt,
+                  return _hpad(
+                    Padding(
+                      padding: const EdgeInsets.only(top: 22),
+                      child: FadeSlideIn(
+                        id: 'home.22',
+                        delay: const Duration(milliseconds: 640),
+                        child: CountdownCard(
+                          title: event.title,
+                          target: event.startsAt,
+                        ),
                       ),
                     ),
-                  ));
+                  );
                 },
               ),
               const SizedBox(height: 22),
@@ -670,29 +754,39 @@ class _HomeTabState extends State<_HomeTab> {
               // hidden together with the rest of the points system.
               if (kShowPointsSystem) ...[
                 const SizedBox(height: 22),
-                _hpad(FadeSlideIn(
-                  id: 'home.24',
-                  delay: const Duration(milliseconds: 660),
-                  child: const _InviteFriendsCard(),
-                )),
+                _hpad(
+                  FadeSlideIn(
+                    id: 'home.24',
+                    delay: const Duration(milliseconds: 660),
+                    child: const _InviteFriendsCard(),
+                  ),
+                ),
               ],
               // The reach-statistics band, hidden by default.
               if (kShowHomeStats) ...[
                 const SizedBox(height: 20),
-                _hpad(FadeSlideIn(
-                  id: 'home.25',
-                  delay: const Duration(milliseconds: 670),
-                  child: _StatsBand(future: _statsFuture),
-                )),
+                _hpad(
+                  FadeSlideIn(
+                    id: 'home.25',
+                    delay: const Duration(milliseconds: 670),
+                    child: _StatsBand(future: _statsFuture),
+                  ),
+                ),
               ],
               const SizedBox(height: 26),
-              _hpad(FadeSlideIn(
-                id: 'home.26',
-                delay: const Duration(milliseconds: 680),
-                child: const _AppFooter(),
-              )),
+              _hpad(
+                FadeSlideIn(
+                  id: 'home.26',
+                  delay: const Duration(milliseconds: 680),
+                  child: const _AppFooter(),
+                ),
+              ),
             ],
           ),
+        ),
+      ),
+            const Positioned.fill(child: ConfettiBurst()),
+          ],
         ),
       ),
     );
@@ -718,6 +812,11 @@ class _TopBar extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const FavoritesPage()),
           ),
         ),
+        const SizedBox(width: 8),
+        // Inviting a friend used to be two screens away: the points tab, then
+        // a scroll. It is the one action that grows the app, so it sits where
+        // the eye already is.
+        _InviteButton(onTap: () => openInvite(context)),
         const Spacer(),
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -725,33 +824,41 @@ class _TopBar extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    AppAssets.logo,
-                    width: 28,
-                    height: 28,
-                    fit: BoxFit.cover,
+                // The mark, lit from behind.
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.5),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.4),
+                        blurRadius: 14,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      AppAssets.logo,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  'أفراحنا',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                ),
+                const SizedBox(width: 8),
+                GoldFoilText('أفراحنا', style: AppTheme.wordmark(20)),
               ],
             ),
             const SizedBox(height: 1),
             Text(
               'كل مناسباتك في مكان واحد',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textMuted,
-                    fontSize: 10,
-                  ),
+                color: AppColors.textMuted,
+                fontSize: 10,
+              ),
             ),
           ],
         ),
@@ -776,13 +883,88 @@ class _TopBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.discount,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: AppColors.ink, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.discount.withValues(alpha: 0.8),
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// A gold pill with a gift in it.
+///
+/// Not another glass orb: three identical circles across the top read as a
+/// toolbar, and nothing in a toolbar gets pressed. This is the one warm thing
+/// on the bar, and it breathes very slightly so the eye catches it once.
+class _InviteButton extends StatefulWidget {
+  const _InviteButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_InviteButton> createState() => _InviteButtonState();
+}
+
+class _InviteButtonState extends State<_InviteButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _c,
+          // A circle, the same 44 the other two are: a pill with a word in
+          // it pushed the wordmark off the end of the bar. The colour alone
+          // is enough to separate it from the glass orbs beside it.
+          builder: (context, child) => Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppColors.goldGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(
+                    alpha: 0.26 + 0.16 * _c.value,
+                  ),
+                  blurRadius: 16 + 6 * _c.value,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: child,
+          ),
+          child: const Icon(
+            Icons.card_giftcard_rounded,
+            size: 21,
+            color: AppColors.ink,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -794,28 +976,41 @@ class _CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A glass orb with a gold edge.
     return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 0,
+      type: MaterialType.transparency,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
+        splashColor: AppColors.accent.withValues(alpha: 0.18),
         child: Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.surfaceHigh.withValues(alpha: 0.95),
+                AppColors.surface.withValues(alpha: 0.9),
+              ],
+            ),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardShadow,
+                color: AppColors.accent.withValues(alpha: 0.14),
+                blurRadius: 14,
+              ),
+              const BoxShadow(
+                color: Color(0x66000000),
                 blurRadius: 10,
-                offset: const Offset(0, 4),
+                offset: Offset(0, 4),
               ),
             ],
           ),
           alignment: Alignment.center,
-          child: Icon(icon, color: AppColors.textDark, size: 22),
+          child: Icon(icon, color: AppColors.accent, size: 22),
         ),
       ),
     );
@@ -857,38 +1052,73 @@ class _SearchBarState extends State<_SearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    // A capsule of glass with a hairline edge and a faint gold glow.
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
+        gradient: LinearGradient(
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+          colors: [
+            AppColors.surfaceHigh.withValues(alpha: 0.92),
+            AppColors.surface.withValues(alpha: 0.85),
+          ],
+        ),
+        border: Border.all(color: AppColors.hairline),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.1),
+            blurRadius: 18,
+          ),
+          const BoxShadow(
+            color: Color(0x59000000),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: TextField(
         controller: _controller,
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => _submit(),
+        cursorColor: AppColors.accent,
+        style: const TextStyle(
+          color: AppColors.textDark,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           hintText: 'ابحث عن خدمات، محلات، عروض والمزيد...',
-          hintStyle: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 13,
-          ),
+          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
           filled: false,
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 10,
+          ),
           suffixIcon: GestureDetector(
             onTap: _submit,
             child: Container(
               margin: const EdgeInsetsDirectional.only(end: 6),
               width: 34,
               height: 34,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                gradient: AppColors.goldGradient,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.44),
+                    blurRadius: 12,
+                  ),
+                ],
               ),
-              child: const Icon(Icons.search, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.search_rounded,
+                color: AppColors.ink,
+                size: 19,
+              ),
             ),
           ),
         ),
@@ -914,38 +1144,89 @@ class _StatsBand extends StatelessWidget {
         if (s == null) return const SizedBox.shrink();
         // Coordinated warm pastel palette that harmonizes with the gold band.
         final items =
-            <({IconData icon, int value, String label, Color color, VoidCallback? onTap, bool pulse, bool compact})>[
-          (icon: Icons.store_mall_directory_rounded, value: s.vendors, label: 'شركة',
-              color: Color(0xFFF6B25C), onTap: null, pulse: false, compact: false),
-          (icon: Icons.visibility_rounded, value: s.visitors, label: 'زائر',
-              color: Color(0xFFF48CA0), onTap: null, pulse: false, compact: false),
-          // Users is the only tile shown abbreviated (e.g. 21.2K).
-          (icon: Icons.groups_rounded, value: s.users, label: 'مستخدم',
-              color: Color(0xFF7FC6C0), onTap: null, pulse: false, compact: true),
-          // "عروض" is highlighted + animated + tappable → opens all offers.
-          (icon: Icons.local_fire_department_rounded, value: s.offers, label: 'عروض',
-              color: Color(0xFFF6A93B),
-              onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const OffersPage())),
-              pulse: true, compact: false),
-          (icon: Icons.holiday_village_rounded, value: s.cities, label: 'مدينة',
-              color: Color(0xFFC7A9E0), onTap: null, pulse: false, compact: false),
-        ];
+            <
+              ({
+                IconData icon,
+                int value,
+                String label,
+                Color color,
+                VoidCallback? onTap,
+                bool pulse,
+                bool compact,
+              })
+            >[
+              (
+                icon: Icons.store_mall_directory_rounded,
+                value: s.vendors,
+                label: 'شركة',
+                color: Color(0xFFF6B25C),
+                onTap: null,
+                pulse: false,
+                compact: false,
+              ),
+              (
+                icon: Icons.visibility_rounded,
+                value: s.visitors,
+                label: 'زائر',
+                color: Color(0xFFF48CA0),
+                onTap: null,
+                pulse: false,
+                compact: false,
+              ),
+              // Users is the only tile shown abbreviated (e.g. 21.2K).
+              (
+                icon: Icons.groups_rounded,
+                value: s.users,
+                label: 'مستخدم',
+                color: Color(0xFF7FC6C0),
+                onTap: null,
+                pulse: false,
+                compact: true,
+              ),
+              // "عروض" is highlighted + animated + tappable → opens all offers.
+              (
+                icon: Icons.local_fire_department_rounded,
+                value: s.offers,
+                label: 'عروض',
+                color: Color(0xFFF6A93B),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OffersPage()),
+                ),
+                pulse: true,
+                compact: false,
+              ),
+              (
+                icon: Icons.holiday_village_rounded,
+                value: s.cities,
+                label: 'مدينة',
+                color: Color(0xFFC7A9E0),
+                onTap: null,
+                pulse: false,
+                compact: false,
+              ),
+            ];
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+          // A panel of warm glass with a wash of light inside it.
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: const LinearGradient(
-              colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
+              colors: [Color(0xFF8E5F4A), Color(0xFF55322A), Color(0xFF7E4440)],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),
+            border: Border.all(color: AppColors.hairline),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.35),
+                color: AppColors.accent.withValues(alpha: 0.13),
+                blurRadius: 24,
+              ),
+              const BoxShadow(
+                color: Color(0x73000000),
                 blurRadius: 20,
-                offset: const Offset(0, 6),
+                offset: Offset(0, 8),
               ),
             ],
           ),
@@ -965,10 +1246,21 @@ class _StatsBand extends StatelessWidget {
                   ),
                 ),
                 if (i != items.length - 1)
+                  // A thread of light between two stats.
                   Container(
                     width: 1,
-                    height: 48,
-                    color: Colors.white.withValues(alpha: 0.18),
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppColors.accent.withValues(alpha: 0),
+                          AppColors.accent.withValues(alpha: 0.45),
+                          AppColors.accent.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
                   ),
               ],
             ],
@@ -1003,48 +1295,28 @@ class _StatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A glass orb glowing in the stat's own colour.
     Widget circle = Container(
       width: 48,
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        // Glossy two-tone accent badge.
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        gradient: RadialGradient(
           colors: [
-            Color.lerp(accent, Colors.white, 0.28)!,
-            accent,
-            Color.lerp(accent, Colors.black, 0.12)!,
+            accent.withValues(alpha: 0.34),
+            accent.withValues(alpha: 0.08),
           ],
-          stops: const [0.0, 0.55, 1.0],
         ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.5),
+        border: Border.all(color: accent.withValues(alpha: 0.6), width: 1.2),
         boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.55),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
+          BoxShadow(color: accent.withValues(alpha: 0.38), blurRadius: 16),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Soft glossy highlight near the top.
-          Positioned(
-            top: 6,
-            child: Container(
-              width: 22,
-              height: 9,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-          Icon(icon, color: Colors.white, size: 23),
-        ],
+      child: Icon(
+        icon,
+        color: Color.lerp(accent, Colors.white, 0.25),
+        size: 23,
+        shadows: [Shadow(color: accent, blurRadius: 12)],
       ),
     );
     if (pulse) circle = _Pulse(child: circle);
@@ -1070,8 +1342,11 @@ class _StatCell extends StatelessWidget {
             if (onTap != null)
               const Padding(
                 padding: EdgeInsets.only(right: 2),
-                child: Icon(Icons.chevron_left,
-                    color: Colors.white70, size: 14),
+                child: Icon(
+                  Icons.chevron_left,
+                  color: Colors.white70,
+                  size: 14,
+                ),
               ),
           ],
         ),
@@ -1101,9 +1376,10 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
     vsync: this,
     duration: const Duration(milliseconds: 850),
   )..repeat(reverse: true);
-  late final Animation<double> _a =
-      Tween(begin: 1.0, end: 1.14).animate(
-          CurvedAnimation(parent: _c, curve: Curves.easeInOut));
+  late final Animation<double> _a = Tween(
+    begin: 1.0,
+    end: 1.14,
+  ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
 
   @override
   void dispose() {
@@ -1136,8 +1412,10 @@ class _CountUpState extends State<_CountUp>
     vsync: this,
     duration: const Duration(milliseconds: 1300),
   );
-  late final Animation<double> _a =
-      CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+  late final Animation<double> _a = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   void initState() {
@@ -1171,7 +1449,11 @@ class _CountUpState extends State<_CountUp>
               height: 1.0,
               letterSpacing: 0.2,
               shadows: [
-                Shadow(color: Color(0x55000000), blurRadius: 6, offset: Offset(0, 2)),
+                Shadow(
+                  color: Color(0x55000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
           ),
@@ -1197,25 +1479,11 @@ class _InviteFriendsCard extends StatelessWidget {
     end: Alignment.bottomLeft,
   );
 
-  void _copy(BuildContext context, String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم نسخ كود الدعوة')),
-    );
-  }
-
-  void _share(String code) {
-    Share.share(
-      'انضم إلى تطبيق أفراحنا 🎉\nاستخدم كود الدعوة الخاص بي عند التسجيل: $code',
-      subject: 'دعوة أفراحنا',
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
     final code = session.user?.referralCode ?? '';
-    final signedIn = session.isSignedIn && code.isNotEmpty;
+    final signedIn = session.isSignedIn;
 
     return Container(
       width: double.infinity,
@@ -1238,14 +1506,20 @@ class _InviteFriendsCard extends StatelessWidget {
           Positioned(
             top: -4,
             left: -2,
-            child: Icon(Icons.auto_awesome,
-                color: Colors.white.withValues(alpha: .25), size: 22),
+            child: Icon(
+              Icons.auto_awesome,
+              color: Colors.white.withValues(alpha: .25),
+              size: 22,
+            ),
           ),
           Positioned(
             bottom: -6,
             left: 40,
-            child: Icon(Icons.celebration_rounded,
-                color: Colors.white.withValues(alpha: .18), size: 30),
+            child: Icon(
+              Icons.celebration_rounded,
+              color: Colors.white.withValues(alpha: .18),
+              size: 30,
+            ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1259,10 +1533,15 @@ class _InviteFriendsCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: .18),
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: Colors.white.withValues(alpha: .35), width: 1.2),
+                        color: Colors.white.withValues(alpha: .35),
+                        width: 1.2,
+                      ),
                     ),
-                    child: const Icon(Icons.card_giftcard_rounded,
-                        color: Colors.white, size: 26),
+                    child: const Icon(
+                      Icons.card_giftcard_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1294,73 +1573,31 @@ class _InviteFriendsCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              if (signedIn)
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _copy(context, code),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: .18),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: .4)),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                code,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 17,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                              const Spacer(),
-                              const Icon(Icons.copy_rounded,
-                                  color: Colors.white, size: 18),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => _share(code),
-                      icon: const Icon(Icons.share_rounded, size: 18),
-                      label: const Text('مشاركة'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF8E3B60),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ],
-                )
+              // The same component the points card uses, on the dark
+              // panel: a link, WhatsApp, and the system sheet. This block
+              // used to share the CODE ALONE, with no link at all, so a
+              // friend who received it had to be told what to do with it.
+              // A member whose code has not arrived yet gets a button that
+              // fetches it, not the sign-in button.
+              if (code.isNotEmpty)
+                InviteActions(code: code, onDark: true)
               else
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    onPressed: () => openInvite(context),
+                    icon: Icon(
+                      signedIn ? Icons.link_rounded : Icons.login_rounded,
+                      size: 18,
                     ),
-                    icon: const Icon(Icons.login_rounded, size: 18),
-                    label: const Text('سجّل الدخول وابدأ الدعوة'),
+                    label: Text(signedIn ? 'احصل على رابط الدعوة' : 'سجّل الدخول وابدأ الدعوة'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF8E3B60),
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: const Color(0xFFDB9FB9),
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                      textStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
@@ -1375,8 +1612,11 @@ class _InviteFriendsCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.stars_rounded,
-                          color: Colors.white, size: 16),
+                      const Icon(
+                        Icons.stars_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'كل صديق = 3 نقاط · اعرض نقاطي',
@@ -1387,8 +1627,11 @@ class _InviteFriendsCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 2),
-                      const Icon(Icons.chevron_left_rounded,
-                          color: Colors.white, size: 18),
+                      const Icon(
+                        Icons.chevron_left_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ],
                   ),
                 ),
@@ -1557,15 +1800,15 @@ class _PointsHomeCard extends StatelessWidget {
   }
 
   Widget _badge(IconData icon) => Container(
-        width: 54,
-        height: 54,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .18),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: .4), width: 1.2),
-        ),
-        child: Icon(icon, color: Colors.white, size: 28),
-      );
+    width: 54,
+    height: 54,
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .18),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white.withValues(alpha: .4), width: 1.2),
+    ),
+    child: Icon(icon, color: Colors.white, size: 28),
+  );
 
   Widget _guest(BuildContext context) {
     return Row(
@@ -1579,34 +1822,48 @@ class _PointsHomeCard extends StatelessWidget {
               const Text(
                 'اكسب نقاط أفراحنا 🎁',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900),
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 4),
               const Text(
                 'سجّل الدخول واجمع النقاط مع كل تفاعل ودعوة صديق — كل 100 نقطة'
                 ' تساوي 50 شيكل، وكلما صعدت مستوى زادت مكافآتك.',
                 style: TextStyle(
-                    color: Colors.white, fontSize: 12.5, height: 1.4),
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 9,
+                  horizontal: 18,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.hairline, width: 0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.login_rounded,
-                        color: Color(0xFF95611E), size: 18),
+                    Icon(
+                      Icons.login_rounded,
+                      color: Color(0xFFE9C291),
+                      size: 18,
+                    ),
                     SizedBox(width: 6),
-                    Text('تسجيل الدخول',
-                        style: TextStyle(
-                            color: Color(0xFF95611E),
-                            fontWeight: FontWeight.w800)),
+                    Text(
+                      'تسجيل الدخول',
+                      style: TextStyle(
+                        color: Color(0xFFE9C291),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1784,70 +2041,97 @@ class _HeroBannerState extends State<_HeroBanner> {
           if (_index >= _slides.length) _index = 0;
           WidgetsBinding.instance.addPostFrameCallback((_) => _startTimer());
         }
-        return ClipRRect(
-          // Rounded card that sits within the page's side margins.
-          borderRadius: BorderRadius.circular(18),
-          child: SizedBox(
-            width: double.infinity,
-            height: 240,
-            child: Stack(
-              children: [
-                // Listener, not GestureDetector: the slide itself already
-                // claims the tap to open the advertiser, and a competing
-                // recogniser would have to win an arena fight to see it. A
-                // raw pointer-down is seen either way.
-                Listener(
-                  onPointerDown: (_) => _holdForTouch(),
-                  child: PageView.builder(
-                    controller: _controller,
-                    itemCount: _slides.length,
-                    onPageChanged: (i) => setState(() => _index = i),
-                    itemBuilder: (_, i) => _HeroSlideView(slide: _slides[i]),
+        // A portal: a bead of light circles the frame while the slides pass
+        // behind it.
+        return PortalFrame(
+          radius: 18,
+          child: CustomPaint(
+          // A holographic edge round the banner.
+          foregroundPainter: const HoloBorderPainter(radius: 18, width: 1.2),
+          child: ClipRRect(
+            // Rounded card that sits within the page's side margins.
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              width: double.infinity,
+              height: 240,
+              child: Stack(
+                children: [
+                  // Listener, not GestureDetector: the slide itself already
+                  // claims the tap to open the advertiser, and a competing
+                  // recogniser would have to win an arena fight to see it. A
+                  // raw pointer-down is seen either way.
+                  Listener(
+                    onPointerDown: (_) => _holdForTouch(),
+                    child: PageView.builder(
+                      controller: _controller,
+                      itemCount: _slides.length,
+                      onPageChanged: (i) => setState(() => _index = i),
+                      itemBuilder: (_, i) => _HeroSlideView(slide: _slides[i]),
+                    ),
                   ),
-                ),
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: SparkleOverlay(count: 14),
+                  const Positioned.fill(
+                    child: IgnorePointer(child: SparkleOverlay(count: 14)),
                   ),
-                ),
-                if (_slides.length > 1)
-                  PositionedDirectional(
-                    start: 0,
-                    end: 0,
-                    bottom: 10,
-                    child: Builder(builder: (_) {
-                      // Never render more than 10 dots — with many VIP slides a
-                      // full row becomes a cramped, unreadable line. Slides past
-                      // the 10th keep the last dot active so there's always an
-                      // indicator lit.
-                      const maxDots = 10;
-                      final dotCount = _slides.length > maxDots
-                          ? maxDots
-                          : _slides.length;
-                      final activeDot =
-                          _index >= dotCount ? dotCount - 1 : _index;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(dotCount, (i) {
-                          final active = i == activeDot;
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            margin: const EdgeInsets.symmetric(horizontal: 3),
-                            width: active ? 18 : 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? AppColors.primary
-                                  : Colors.white.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                  if (_slides.length > 1)
+                    PositionedDirectional(
+                      start: 0,
+                      end: 0,
+                      bottom: 10,
+                      child: Builder(
+                        builder: (_) {
+                          // Never render more than 10 dots — with many VIP slides a
+                          // full row becomes a cramped, unreadable line. Slides past
+                          // the 10th keep the last dot active so there's always an
+                          // indicator lit.
+                          const maxDots = 10;
+                          final dotCount = _slides.length > maxDots
+                              ? maxDots
+                              : _slides.length;
+                          final activeDot = _index >= dotCount
+                              ? dotCount - 1
+                              : _index;
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(dotCount, (i) {
+                              final active = i == activeDot;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                width: active ? 18 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  gradient: active
+                                      ? const LinearGradient(
+                                          colors: AppColors.holoStops,
+                                        )
+                                      : null,
+                                  color: active
+                                      ? null
+                                      : AppColors.pearl.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(4),
+                                  boxShadow: active
+                                      ? [
+                                          BoxShadow(
+                                            color: AppColors.accent.withValues(
+                                              alpha: 0.7,
+                                            ),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                              );
+                            }),
                           );
-                        }),
-                      );
-                    }),
-                  ),
-              ],
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
+          ),
           ),
         );
       },
@@ -1874,23 +2158,35 @@ class _HeroSlideView extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           // Image background (falls back to brand gradient on error / empty).
+          // It breathes: a slow zoom in and out, so the slide is a window on
+          // something alive rather than a poster.
           if (slide.image.isNotEmpty)
-            AppNetworkImage(
-              url: slide.image,
-              fallbackIcon: Icons.celebration,
+            ListenableBuilder(
+              listenable: FestivalClock.of(context),
+              builder: (context, _) => Transform.scale(
+                scale: 1.05 + 0.035 * math.sin(FestivalClock.of(context).value * 0.21),
+                child: RepaintBoundary(
+                  child: AppNetworkImage(
+                    url: slide.image,
+                    fallbackIcon: Icons.celebration,
+                  ),
+                ),
+              ),
             )
           else
             Container(
               decoration: const BoxDecoration(
-                  gradient: AppColors.brandDeepGradient),
+                gradient: AppColors.brandDeepGradient,
+              ),
             ),
           // Dark overlay so text stays readable.
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.black.withValues(alpha: 0.10),
-                  Colors.black.withValues(alpha: 0.55),
+                  Colors.black.withValues(alpha: 0.05),
+                  AppColors.ink.withValues(alpha: 0.35),
+                  AppColors.ink.withValues(alpha: 0.85),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -1904,15 +2200,26 @@ class _HeroSlideView extends StatelessWidget {
               start: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.ink.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.6),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                    ),
+                  ],
                 ),
                 child: Text(
                   slide.badge,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.accent,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1935,9 +2242,7 @@ class _HeroSlideView extends StatelessWidget {
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    shadows: [
-                      Shadow(blurRadius: 6, color: Colors.black54),
-                    ],
+                    shadows: [Shadow(blurRadius: 6, color: Colors.black54)],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1956,18 +2261,17 @@ class _HeroSlideView extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const OffersPage()),
+                      MaterialPageRoute(builder: (_) => const OffersPage()),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.ink,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 10),
-                      textStyle: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        horizontal: 18,
+                        vertical: 10,
                       ),
+                      textStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -1987,7 +2291,6 @@ class _HeroSlideView extends StatelessWidget {
 // ===========================================================================
 // CATEGORIES GRID (2 rows × 5 columns)
 // ===========================================================================
-
 
 /// Harmonious warm tints rotated across category tiles so the row feels lively
 /// and distinctive instead of a repeating block of monochrome brown. All hues
@@ -2033,9 +2336,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
         if (snap.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 84,
-            child: Center(
-              child: AfrahnaLoader(size: 42),
-            ),
+            child: Center(child: AfrahnaLoader(size: 42)),
           );
         }
         final all = snap.data ?? const <CategoryModel>[];
@@ -2043,8 +2344,9 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
 
         const showMoreThreshold = 12;
         final showMore = all.length > showMoreThreshold;
-        final visible =
-            showMore ? all.take(showMoreThreshold - 1).toList() : all;
+        final visible = showMore
+            ? all.take(showMoreThreshold - 1).toList()
+            : all;
 
         final items = <Widget>[
           for (final (i, c) in visible.indexed)
@@ -2052,6 +2354,7 @@ class _CategoriesGridState extends State<_CategoriesGrid> {
               label: c.name,
               icon: categoryIcon(c.name),
               tint: _categoryTints[i % _categoryTints.length],
+              phase: i * 0.7,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -2106,11 +2409,16 @@ class _CategoryTile extends StatelessWidget {
     required this.icon,
     required this.tint,
     required this.onTap,
+    this.phase = 0,
   });
   final String label;
   final IconData icon;
   final Color tint;
   final VoidCallback onTap;
+
+  /// Where in its shimmer this tile starts, so a row of them does not blink
+  /// in step.
+  final double phase;
 
   @override
   Widget build(BuildContext context) {
@@ -2119,22 +2427,19 @@ class _CategoryTile extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Soft gradient "squircle" badge with a tinted glow — gives each
-          // category its own colour so the row reads lively, not repetitive.
-          Container(
-            width: 50,
-            height: 50,
-            // A flat tinted square with the icon in the same colour: one
-            // shape, one hue, no gloss. The gradient, the coloured glow and
-            // the little white "shine" dot made each tile look like a sticker
-            // — twelve stickers in a row is a lot of noise for what is really
-            // a list of links.
-            decoration: BoxDecoration(
-              color: Color.alphaBlend(tint.withValues(alpha: 0.14), Colors.white),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: tint.withValues(alpha: 0.22)),
+          // A crystal cut in the category's own colour: a sheen turning
+          // slowly through it, an edge of light turning the other way, so the
+          // row shimmers rather than repeats.
+          CrystalTile(
+            tint: tint,
+            phase: phase,
+            child: Icon(
+              icon,
+              // Deepened, not lightened: the tile is pale, so the icon reads
+              // by being darker than it rather than brighter.
+              color: Color.lerp(tint, AppColors.ink, 0.34),
+              size: 24,
             ),
-            child: Icon(icon, color: tint, size: 24),
           ),
           const SizedBox(height: 6),
           Text(
@@ -2159,7 +2464,6 @@ class _CategoryTile extends StatelessWidget {
 // SECTION HEADER
 // ===========================================================================
 
-
 // ===========================================================================
 // OFFERS ROW
 // ===========================================================================
@@ -2176,9 +2480,7 @@ class _OffersRow extends StatelessWidget {
         future: future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: AfrahnaLoader(size: 42),
-            );
+            return const Center(child: AfrahnaLoader(size: 42));
           }
           final items = snap.data ?? const <PromotionModel>[];
           if (items.isEmpty) {
@@ -2206,22 +2508,14 @@ class _OfferCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => OfferDetailsPage(promo: promo),
-        ),
+        MaterialPageRoute(builder: (_) => OfferDetailsPage(promo: promo)),
       ),
       child: Container(
         width: 180,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: AppDecor.lift,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -2242,7 +2536,9 @@ class _OfferCard extends StatelessWidget {
                       end: 10,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.discount,
                           borderRadius: BorderRadius.circular(10),
@@ -2261,8 +2557,7 @@ class _OfferCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2279,8 +2574,11 @@ class _OfferCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.location_on,
-                          size: 13, color: AppColors.primary),
+                      const Icon(
+                        Icons.location_on,
+                        size: 13,
+                        color: AppColors.primary,
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -2328,7 +2626,9 @@ class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _auto.attach(_controller));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _auto.attach(_controller),
+    );
   }
 
   @override
@@ -2349,16 +2649,16 @@ class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
         future: future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: AfrahnaLoader(size: 42),
-            );
+            return const Center(child: AfrahnaLoader(size: 42));
           }
           if (snap.hasError) {
             return _EmptyMini(text: 'تعذّر تحميل الشركات المميّزة');
           }
           // Trust the server's `featured=1` filter (avoid double-filtering,
           // which hid vendors when the boolean wasn't parsed as expected).
-          final items = List<VendorModel>.from(snap.data ?? const <VendorModel>[]);
+          final items = List<VendorModel>.from(
+            snap.data ?? const <VendorModel>[],
+          );
           _sortByProximity(items, userPos);
           if (items.isEmpty) {
             return _EmptyMini(text: 'لا توجد شركات مميّزة حالياً');
@@ -2372,10 +2672,15 @@ class _FeaturedVendorsCarouselState extends State<_FeaturedVendorsCarousel> {
               controller: _controller,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsetsDirectional.only(
-                  start: 16, end: 16, top: 4, bottom: 4),
+                start: 16,
+                end: 16,
+                top: 4,
+                bottom: 4,
+              ),
               itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(width: 14),
-              itemBuilder: (_, i) => _FeaturedVendorCard(vendor: items[i]),
+              itemBuilder: (_, i) =>
+                  Levitate(index: i, child: _FeaturedVendorCard(vendor: items[i])),
             ),
           );
         },
@@ -2395,10 +2700,7 @@ class _CardCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = (vendor.cover ?? '').isNotEmpty;
     if (hasCover) {
-      return AppNetworkImage(
-        url: vendor.cover,
-        fallbackIcon: Icons.storefront,
-      );
+      return AppNetworkImage(url: vendor.cover, fallbackIcon: Icons.storefront);
     }
     final hasLogo = (vendor.logo ?? '').isNotEmpty;
     if (hasLogo) {
@@ -2413,11 +2715,7 @@ class _CardCover extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFD9B68A),
-            Color(0xFFB8835A),
-            Color(0xFF8B5A3C),
-          ],
+          colors: [Color(0xFFD9B68A), Color(0xFFB8835A), Color(0xFF8B5A3C)],
         ),
       ),
       child: Center(
@@ -2463,7 +2761,7 @@ class _FeaturedVendorCard extends StatelessWidget {
                         Color(0xFFE6B450),
                         AppColors.primary,
                         Color(0xFFF3D9B1),
-                        AppColors.primaryDark,
+                        AppColors.goldDeep,
                         Color(0xFFE6B450),
                       ],
                     ),
@@ -2472,7 +2770,7 @@ class _FeaturedVendorCard extends StatelessWidget {
                     padding: const EdgeInsets.all(2),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: AppColors.surface,
                     ),
                     child: ClipOval(
                       child: AppNetworkImage(
@@ -2490,8 +2788,8 @@ class _FeaturedVendorCard extends StatelessWidget {
                   end: 2,
                   child: TierBadge(
                     vip: vendor.isVip,
-                    featured: vendor.isPremium ||
-                        vendor.activePlan == 'featured',
+                    featured:
+                        vendor.isPremium || vendor.activePlan == 'featured',
                     size: 19,
                   ),
                 ),
@@ -2513,8 +2811,11 @@ class _FeaturedVendorCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.star_rounded,
-                      size: 13, color: Color(0xFFE6A800)),
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 13,
+                    color: Color(0xFFE6A800),
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     vendor.rating!.toStringAsFixed(1),
@@ -2570,14 +2871,13 @@ class _TopRatedRow extends StatelessWidget {
         future: future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: AfrahnaLoader(size: 42),
-            );
+            return const Center(child: AfrahnaLoader(size: 42));
           }
           // "الأعلى تقييماً" — show only vendors with a full 5/5 rating.
           final items = [
-            ...(snap.data ?? const <VendorModel>[])
-                .where((v) => (v.rating ?? 0) >= 5.0),
+            ...(snap.data ?? const <VendorModel>[]).where(
+              (v) => (v.rating ?? 0) >= 5.0,
+            ),
           ];
           _sortByProximity(items, userPos);
           final top = items.take(8).toList();
@@ -2601,7 +2901,6 @@ class _TopRatedRow extends StatelessWidget {
 // COMPACT PLANNING CARD — coordinator / card-designer, side by side
 // ===========================================================================
 
-
 // ===========================================================================
 // LATEST POSTS ROW
 // ===========================================================================
@@ -2621,11 +2920,13 @@ class _LatestPostsRow extends StatelessWidget {
             return const Center(child: AfrahnaLoader(size: 42));
           }
           final items = (snap.data ?? const <PostModel>[])
-              .where((p) =>
-                  p.gallery.isNotEmpty ||
-                  (p.mediaUrl?.isNotEmpty ?? false) ||
-                  ((p.body ?? '').trim().isNotEmpty) ||
-                  ((p.title ?? '').trim().isNotEmpty))
+              .where(
+                (p) =>
+                    p.gallery.isNotEmpty ||
+                    (p.mediaUrl?.isNotEmpty ?? false) ||
+                    ((p.body ?? '').trim().isNotEmpty) ||
+                    ((p.title ?? '').trim().isNotEmpty),
+              )
               .take(12)
               .toList();
           if (items.isEmpty) {
@@ -2666,15 +2967,9 @@ class _LatestPostCard extends StatelessWidget {
       child: Container(
         width: 172,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppDecor.lift,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -2692,8 +2987,11 @@ class _LatestPostCard extends StatelessWidget {
                   : Container(
                       color: AppColors.primaryLight,
                       child: const Center(
-                        child: Icon(Icons.article_rounded,
-                            color: AppColors.primary, size: 34),
+                        child: Icon(
+                          Icons.article_rounded,
+                          color: AppColors.primary,
+                          size: 34,
+                        ),
                       ),
                     ),
             ),
@@ -2712,8 +3010,11 @@ class _LatestPostCard extends StatelessWidget {
                               ? NetworkImage(logo)
                               : null,
                           child: (logo == null || logo.isEmpty)
-                              ? const Icon(Icons.storefront_rounded,
-                                  size: 12, color: AppColors.primaryDark)
+                              ? const Icon(
+                                  Icons.storefront_rounded,
+                                  size: 12,
+                                  color: AppColors.primaryDark,
+                                )
                               : null,
                         ),
                         const SizedBox(width: 6),
@@ -2771,27 +3072,17 @@ class _TopRatedCard extends StatelessWidget {
       child: Container(
         width: 195,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: AppDecor.lift,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              flex: 5,
-              child: _CardCover(vendor: vendor),
-            ),
+            Expanded(flex: 5, child: _CardCover(vendor: vendor)),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2817,8 +3108,11 @@ class _TopRatedCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFFFC107), size: 17),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFFFC107),
+                        size: 17,
+                      ),
                       const Spacer(),
                       if ((vendor.reviewsCount ?? 0) > 0)
                         Text(
@@ -2842,131 +3136,6 @@ class _TopRatedCard extends StatelessWidget {
 }
 
 // ===========================================================================
-// ADVERTISE-WITH-US CTA (direct WhatsApp contact for business owners)
-// ===========================================================================
-
-/// WhatsApp number business owners reach out to when they want to advertise.
-/// Same line the app uses for support elsewhere.
-const String _kAdvertisePhone = '+972599252493';
-
-/// Eye-catching card inviting shop/service owners to advertise on Afrahna,
-/// with a one-tap WhatsApp button that opens a pre-filled message.
-class _AdvertiseCta extends StatelessWidget {
-  const _AdvertiseCta();
-
-  Future<void> _contact() async {
-    final digits = _kAdvertisePhone.replaceAll(RegExp(r'\D'), '');
-    final msg = Uri.encodeComponent(
-        'مرحباً، عندي محل/خدمة وأرغب بالإعلان في تطبيق أفراحنا. ممكن التفاصيل؟');
-    final uri = Uri.parse('https://wa.me/$digits?text=$msg');
-    await openExternal(uri);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Scale the text relative to the screen width so it reads correctly on
-    // every device — small phones (iPhone SE) through tablets — instead of the
-    // fixed sizes that only looked right on one screen. 375 = baseline width.
-    final width = MediaQuery.of(context).size.width;
-    final scale = (width / 375).clamp(0.9, 1.25);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: _contact,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [AppColors.primaryDark, AppColors.primary],
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.3),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.campaign_rounded,
-                    color: Colors.white, size: 26),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'عندك محل أو خدمة؟ 📣',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14.5 * scale,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'أعلن في أفراحنا ووصّل لآلاف العرسان',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11.5 * scale,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: _contact,
-                icon: const Icon(Icons.chat_rounded, size: 18),
-                label: Text(
-                  'تواصل معنا',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5 * scale),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ===========================================================================
 // TIPS SECTION
 // ===========================================================================
 
@@ -2976,31 +3145,31 @@ class _TipsSection extends StatelessWidget {
 
   static const _tips =
       <({IconData icon, String title, String body, Color tint})>[
-    (
-      icon: Icons.savings_rounded,
-      title: 'حدّدي ميزانيتك',
-      body: 'ابدئي التخطيط بميزانية واضحة قبل أي حجز.',
-      tint: Color(0xFFCB9A3E),
-    ),
-    (
-      icon: Icons.event_available_rounded,
-      title: 'احجزي مبكراً',
-      body: 'القاعات والمصوّرون المميّزون بينحجزوا بسرعة.',
-      tint: Color(0xFFDD8A6A),
-    ),
-    (
-      icon: Icons.checklist_rtl_rounded,
-      title: 'نظّمي مهامك',
-      body: 'استخدمي قائمة المهام حتى لا تفوتك أي تفصيلة.',
-      tint: Color(0xFF8FA97E),
-    ),
-    (
-      icon: Icons.reviews_rounded,
-      title: 'قارني وقيّمي',
-      body: 'اقرئي تقييمات العملاء قبل أن تقرّري.',
-      tint: Color(0xFFAF8FC4),
-    ),
-  ];
+        (
+          icon: Icons.savings_rounded,
+          title: 'حدّدي ميزانيتك',
+          body: 'ابدئي التخطيط بميزانية واضحة قبل أي حجز.',
+          tint: Color(0xFFCB9A3E),
+        ),
+        (
+          icon: Icons.event_available_rounded,
+          title: 'احجزي مبكراً',
+          body: 'القاعات والمصوّرون المميّزون بينحجزوا بسرعة.',
+          tint: Color(0xFFDD8A6A),
+        ),
+        (
+          icon: Icons.checklist_rtl_rounded,
+          title: 'نظّمي مهامك',
+          body: 'استخدمي قائمة المهام حتى لا تفوتك أي تفصيلة.',
+          tint: Color(0xFF8FA97E),
+        ),
+        (
+          icon: Icons.reviews_rounded,
+          title: 'قارني وقيّمي',
+          body: 'اقرئي تقييمات العملاء قبل أن تقرّري.',
+          tint: Color(0xFFAF8FC4),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -3025,16 +3194,10 @@ class _TipsSection extends StatelessWidget {
                 width: 212,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(26),
                   border: Border.all(color: t.tint.withValues(alpha: 0.25)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.cardShadow,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  boxShadow: AppDecor.lift,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3126,15 +3289,9 @@ class _WhyAfrahnaSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(color: AppColors.primaryLight),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppDecor.lift,
       ),
       child: Column(
         children: [
@@ -3217,17 +3374,21 @@ class _AppFooterState extends State<_AppFooter> {
   Future<void> _openUrl(String url) => openExternal(Uri.parse(url));
 
   Future<void> _openWhatsapp(String? value) {
-    final raw = (value == null || value.isEmpty) ? _kFooterSupportWhatsapp : value;
+    final raw = (value == null || value.isEmpty)
+        ? _kFooterSupportWhatsapp
+        : value;
     if (raw.startsWith('http')) return openExternal(Uri.parse(raw));
     final digits = raw.replaceAll(RegExp(r'\D'), '');
     return openExternal(Uri.parse('https://wa.me/$digits'));
   }
 
   void _soon() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('قريباً ✨'),
-      backgroundColor: AppColors.primary,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('قريباً ✨'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
   }
 
   void _tap(String? link) {
@@ -3245,16 +3406,16 @@ class _AppFooterState extends State<_AppFooter> {
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: [AppColors.primary, AppColors.goldDeep],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.25),
+            color: AppColors.accent.withValues(alpha: 0.2),
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -3411,10 +3572,8 @@ class _StoryRailTile extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => StoryViewerPage(
-              vendor: vendor,
-              stories: group.stories,
-            ),
+            builder: (_) =>
+                StoryViewerPage(vendor: vendor, stories: group.stories),
           ),
         ),
         child: Column(
@@ -3492,18 +3651,15 @@ class _AllStoriesTile extends StatelessWidget {
               height: 68,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
+                color: AppColors.surface,
                 border: Border.all(color: AppColors.primaryLight, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cardShadow,
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+                boxShadow: AppDecor.lift,
               ),
-              child: const Icon(Icons.grid_view_rounded,
-                  color: AppColors.primary, size: 26),
+              child: const Icon(
+                Icons.grid_view_rounded,
+                color: AppColors.primary,
+                size: 26,
+              ),
             ),
             const SizedBox(height: 5),
             const Text(
@@ -3626,27 +3782,21 @@ class _NewVendorCard extends StatelessWidget {
 
     return SizedBox(
       width: 150,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VendorDetailsPage(vendorId: vendor.id),
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.all(Radius.circular(28)),
+          boxShadow: AppDecor.lift,
+        ),
+        child: Material(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => VendorDetailsPage(vendorId: vendor.id),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3655,7 +3805,8 @@ class _NewVendorCard extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(20)),
+                        top: Radius.circular(28),
+                      ),
                       child: SizedBox(
                         height: 92,
                         width: double.infinity,
@@ -3670,7 +3821,9 @@ class _NewVendorCard extends StatelessWidget {
                       start: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFF34C77B), Color(0xFF1B9C5A)],
@@ -3711,8 +3864,11 @@ class _NewVendorCard extends StatelessWidget {
                           ),
                           if (vendor.isVerified) ...[
                             const SizedBox(width: 3),
-                            const Icon(Icons.verified_rounded,
-                                size: 13, color: AppColors.primary),
+                            const Icon(
+                              Icons.verified_rounded,
+                              size: 13,
+                              color: AppColors.primary,
+                            ),
                           ],
                         ],
                       ),
@@ -3732,8 +3888,11 @@ class _NewVendorCard extends StatelessWidget {
                         const SizedBox(height: 5),
                         Row(
                           children: [
-                            const Icon(Icons.schedule_rounded,
-                                size: 11, color: Color(0xFF1B9C5A)),
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 11,
+                              color: Color(0xFF1B9C5A),
+                            ),
                             const SizedBox(width: 3),
                             Flexible(
                               child: Text(
@@ -3771,11 +3930,11 @@ class _EmptyMini extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.hairline, width: 0.8),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(text,
-            style: const TextStyle(color: AppColors.textMuted)),
+        child: Text(text, style: const TextStyle(color: AppColors.textMuted)),
       ),
     );
   }
@@ -3823,7 +3982,7 @@ class _SearchTabState extends State<_SearchTab> {
       return;
     }
     setState(() {
-      _future = VendorService().list(query: query);
+      _future = held(VendorService().list(query: query));
     });
   }
 
@@ -3843,7 +4002,7 @@ class _SearchTabState extends State<_SearchTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
         child: Padding(
@@ -3877,9 +4036,10 @@ class _SearchTabState extends State<_SearchTab> {
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                    prefixIcon:
-                        Icon(Icons.search, color: AppColors.primary),
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                    prefixIcon: Icon(Icons.search, color: AppColors.primary),
                   ),
                 ),
               ),
@@ -3890,13 +4050,11 @@ class _SearchTabState extends State<_SearchTab> {
                     : FutureBuilder<List<VendorModel>>(
                         future: _future,
                         builder: (context, snap) {
-                          if (snap.connectionState ==
-                              ConnectionState.waiting) {
+                          if (snap.connectionState == ConnectionState.waiting) {
                             return const CenteredLoader();
                           }
                           if (snap.hasError) {
-                            return ErrorState(
-                                message: snap.error.toString());
+                            return ErrorState(message: snap.error.toString());
                           }
                           final items = snap.data ?? const [];
                           if (items.isEmpty) {
@@ -3947,8 +4105,11 @@ class _SearchTabState extends State<_SearchTab> {
           children: [
             Row(
               children: [
-                const Icon(Icons.star_rounded,
-                    color: Color(0xFFFFC107), size: 20),
+                const Icon(
+                  Icons.star_rounded,
+                  color: Color(0xFFFFC107),
+                  size: 20,
+                ),
                 const SizedBox(width: 6),
                 const Text(
                   'المحلات الأعلى تقييماً',
@@ -3988,8 +4149,8 @@ class _SearchResultTile extends StatelessWidget {
         vendor.isVip || vendor.isPremium || vendor.activePlan == 'featured';
     final priceRange = (vendor.minPrice != null && vendor.minPrice! > 0)
         ? (vendor.maxPrice != null && vendor.maxPrice! > vendor.minPrice!
-            ? '${_money(vendor.minPrice!)}–${_money(vendor.maxPrice!)} ₪'
-            : '${_money(vendor.minPrice!)} ₪')
+              ? '${_money(vendor.minPrice!)}–${_money(vendor.maxPrice!)} ₪'
+              : '${_money(vendor.minPrice!)} ₪')
         : null;
 
     return InkWell(
@@ -4003,7 +4164,8 @@ class _SearchResultTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.hairline, width: 0.8),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
@@ -4025,8 +4187,9 @@ class _SearchResultTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: AppColors.primaryLight.withValues(alpha: 0.6),
-                        width: 1.5),
+                      color: AppColors.primaryLight.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
                   ),
                   child: ClipOval(
                     child: SizedBox(
@@ -4046,8 +4209,8 @@ class _SearchResultTile extends StatelessWidget {
                     end: -2,
                     child: TierBadge(
                       vip: vendor.isVip,
-                      featured: vendor.isPremium ||
-                          vendor.activePlan == 'featured',
+                      featured:
+                          vendor.isPremium || vendor.activePlan == 'featured',
                       size: 18,
                     ),
                   ),
@@ -4066,25 +4229,31 @@ class _SearchResultTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              color: AppColors.textDark),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.textDark,
+                          ),
                         ),
                       ),
                       if (vendor.isStore) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text('متجر',
-                              style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w900)),
+                          child: const Text(
+                            'متجر',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -4099,16 +4268,22 @@ class _SearchResultTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700),
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       if (vendor.city != null) ...[
-                        const Text('  ·  ',
-                            style: TextStyle(color: AppColors.textMuted)),
-                        const Icon(Icons.location_on,
-                            size: 12, color: AppColors.textMuted),
+                        const Text(
+                          '  ·  ',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                        const Icon(
+                          Icons.location_on,
+                          size: 12,
+                          color: AppColors.textMuted,
+                        ),
                         const SizedBox(width: 2),
                         Flexible(
                           child: Text(
@@ -4116,7 +4291,9 @@ class _SearchResultTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                color: AppColors.textMuted, fontSize: 12),
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -4132,7 +4309,8 @@ class _SearchResultTile extends StatelessWidget {
                       _Stat(
                         icon: Icons.star_rounded,
                         iconColor: const Color(0xFFFFC107),
-                        text: (vendor.rating ?? 0).toStringAsFixed(1) +
+                        text:
+                            (vendor.rating ?? 0).toStringAsFixed(1) +
                             ((vendor.reviewsCount ?? 0) > 0
                                 ? ' (${vendor.reviewsCount})'
                                 : ''),
@@ -4142,10 +4320,7 @@ class _SearchResultTile extends StatelessWidget {
                         text: _compact(vendor.followersCount),
                       ),
                       if (priceRange != null)
-                        _Stat(
-                          icon: Icons.sell_outlined,
-                          text: priceRange,
-                        ),
+                        _Stat(icon: Icons.sell_outlined, text: priceRange),
                     ],
                   ),
                 ],
@@ -4153,8 +4328,11 @@ class _SearchResultTile extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.only(top: 20),
-              child: Icon(Icons.arrow_back_ios_new,
-                  size: 14, color: AppColors.textMuted),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 14,
+                color: AppColors.textMuted,
+              ),
             ),
           ],
         ),
@@ -4182,11 +4360,14 @@ class _Stat extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: iconColor ?? AppColors.textMuted),
         const SizedBox(width: 3),
-        Text(text,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark)),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textDark,
+          ),
+        ),
       ],
     );
   }
@@ -4248,12 +4429,15 @@ class _InvitationPromoCardState extends State<_InvitationPromoCard> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 4),
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: accent.withValues(alpha: .18),
                           borderRadius: BorderRadius.circular(99),
                           border: Border.all(
-                              color: accent.withValues(alpha: .45)),
+                            color: accent.withValues(alpha: .45),
+                          ),
                         ),
                         child: Text(
                           'جديد',
@@ -4292,19 +4476,26 @@ class _InvitationPromoCardState extends State<_InvitationPromoCard> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 10),
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [
-                            accent,
-                            Color.lerp(accent, Colors.white, .35) ?? accent,
-                          ]),
+                          gradient: LinearGradient(
+                            colors: [
+                              accent,
+                              Color.lerp(accent, Colors.white, .35) ?? accent,
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.mail_outline_rounded,
-                                size: 16, color: bg),
+                            Icon(
+                              Icons.mail_outline_rounded,
+                              size: 16,
+                              color: bg,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'أنشئ دعوتك',
@@ -4327,7 +4518,8 @@ class _InvitationPromoCardState extends State<_InvitationPromoCard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: t.$3.withValues(
-                                alpha: t.$1 == anim ? 1 : .35),
+                              alpha: t.$1 == anim ? 1 : .35,
+                            ),
                           ),
                         ),
                     ],

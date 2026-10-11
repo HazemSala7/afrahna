@@ -335,7 +335,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 border:
                                     Border.all(color: AppColors.primaryLight),
@@ -390,7 +390,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         // A searchable, paged picker — there are hundreds of
                         // shops, far too many to render as chips.
                         Material(
-                          color: Colors.white,
+                          color: AppColors.surface,
                           borderRadius: BorderRadius.circular(16),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
@@ -447,7 +447,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 18, 10, 18, 12 + MediaQuery.of(context).viewPadding.bottom,
               ),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.06),
@@ -642,7 +642,7 @@ class _VendorPickerState extends State<_VendorPicker> {
                             }
                             final v = _items[i];
                             return Material(
-                              color: Colors.white,
+                              color: AppColors.surface,
                               borderRadius: BorderRadius.circular(14),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
@@ -748,7 +748,7 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.primary : Colors.white,
+      color: selected ? AppColors.primary : AppColors.surface,
       borderRadius: BorderRadius.circular(99),
       child: InkWell(
         borderRadius: BorderRadius.circular(99),

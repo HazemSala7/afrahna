@@ -378,11 +378,11 @@ class _ImageUploadFieldState extends State<ImageUploadField> {
               alignment: widget.circular ? Alignment.center : null,
               decoration: BoxDecoration(
                 color: widget.circular
-                    ? Colors.white
+                    ? AppColors.surface
                     : AppColors.primaryLight.withValues(alpha: .3),
                 shape: widget.circular ? BoxShape.circle : BoxShape.rectangle,
                 borderRadius:
-                    widget.circular ? null : BorderRadius.circular(12),
+                    widget.circular ? null : BorderRadius.circular(20),
                 border: Border.all(
                   color: AppColors.primaryLight,
                   width: widget.circular ? 2 : 1,

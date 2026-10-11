@@ -34,7 +34,7 @@ class TierMedal extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: rung.gradient,
         border: showRing
-            ? Border.all(color: Colors.white.withValues(alpha: .75), width: 1.6)
+            ? Border.all(color: AppColors.hairline.withValues(alpha: .75), width: 1.6)
             : null,
         boxShadow: [
           BoxShadow(
@@ -142,7 +142,7 @@ class TierProgressStrip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .62),
+            color: AppColors.surface.withValues(alpha: .62),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: rung.metal.withValues(alpha: .28)),
           ),

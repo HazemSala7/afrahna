@@ -13,6 +13,9 @@ import 'package:afrahna/core/state/session.dart';
 import 'package:afrahna/features/account/edit_profile_page.dart';
 import 'package:afrahna/widgets/image_upload_field.dart';
 import 'package:afrahna/widgets/shell_bottom_nav.dart';
+import 'package:afrahna/core/theme.dart';
+
+import 'cosmic_harness.dart';
 
 /// «تعديل الملف الشخصي»: the avatar must read as an avatar, and the screen
 /// must not be a dead end.
@@ -39,6 +42,7 @@ class _Signed extends SessionController {
 }
 
 void main() {
+  setUpAll(preloadCosmic);
   setUpAll(() async {
     final font = File('C:/Windows/Fonts/tahoma.ttf');
     if (font.existsSync()) {
@@ -64,9 +68,11 @@ void main() {
 
     await tester.pumpWidget(ChangeNotifierProvider<SessionController>.value(
       value: session,
-      child: const MaterialApp(
-        locale: Locale('ar'),
-        home: Directionality(
+      child: MaterialApp(
+        theme: AppTheme.cosmic(),
+        builder: cosmicBuilder,
+        locale: const Locale('ar'),
+        home: const Directionality(
           textDirection: TextDirection.rtl,
           child: EditProfilePage(),
         ),

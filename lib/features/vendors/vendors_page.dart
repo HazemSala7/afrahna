@@ -7,6 +7,7 @@ import '../../core/services/services.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import 'vendor_details_page.dart';
+import '../../widgets/animations.dart';
 
 class VendorsPage extends StatefulWidget {
   const VendorsPage({
@@ -151,15 +152,9 @@ class _VendorsPageState extends State<VendorsPage> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cardShadow,
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(36),
+                boxShadow: AppDecor.lift,
               ),
               child: TextField(
                 controller: _search,
@@ -205,7 +200,11 @@ class _VendorsPageState extends State<VendorsPage> {
                           child: Center(child: AfrahnaLoader(size: 38)),
                         );
                       }
-                      return _VendorTile(vendor: _items[i]);
+                      return StaggerIn(
+                        index: i,
+                        id: 'vendors',
+                        child: _VendorTile(vendor: _items[i]),
+                      );
                     },
                   ),
                 );
@@ -235,15 +234,9 @@ class _VendorTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppDecor.lift,
         ),
         child: Row(
           children: [

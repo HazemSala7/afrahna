@@ -8,6 +8,7 @@ import '../../core/state/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/shell_bottom_nav.dart';
+import '../../widgets/animations.dart';
 
 /// Notifications screen — list user's personal + broadcast notifications.
 class NotificationsPage extends StatefulWidget {
@@ -61,7 +62,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     // Flat, light background (no darkening gradient) so the page reads bright.
     return Scaffold(
       bottomNavigationBar: const ShellBottomNav(),
-      backgroundColor: const Color(0xFFFCF8F3),
+      backgroundColor: Colors.transparent,
       appBar: PinkAppBar(
         title: 'الإشعارات',
         actions: [
@@ -115,7 +116,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 itemBuilder: (_, i) {
                   if (i == 0) return _HeaderStrip(total: items.length, unread: unread);
                   final n = items[i - 1];
-                  return _NotificationTile(n: n, onTap: () => _onTap(n));
+                  return StaggerIn(
+                    index: i,
+                    id: 'notifications',
+                    child: _NotificationTile(n: n, onTap: () => _onTap(n)),
+                  );
                 },
               );
             },
@@ -151,7 +156,7 @@ class _NotificationsToggleState extends State<_NotificationsToggle> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0x14000000)),
       ),
@@ -183,7 +188,6 @@ class _NotificationsToggleState extends State<_NotificationsToggle> {
           else
             Switch(
               value: enabled,
-              activeThumbColor: AppColors.primary,
               onChanged: (v) async {
                 final ctrl = context.read<SessionController>();
                 final messenger = ScaffoldMessenger.of(context);
@@ -328,7 +332,7 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _accent();
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -336,11 +340,11 @@ class _NotificationTile extends StatelessWidget {
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: const Color(0x0F000000),
-              width: 1,
+              color: AppColors.hairline,
+              width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
@@ -386,7 +390,7 @@ class _NotificationTile extends StatelessWidget {
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 15,
-                              color: Color(0xFF2A1A22),
+                              color: AppColors.textDark,
                             ),
                           ),
                         ),

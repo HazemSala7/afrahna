@@ -55,11 +55,11 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final res = await _dio.post('/auth/login', data: {
-        'phone': phone,
-        'password': password,
-      });
-      if (res.statusCode != 200) throw _err(res.data);
+      final res = await _dio.post(
+        '/auth/login',
+        data: {'phone': phone, 'password': password},
+      );
+      if (res.statusCode != 200) throw _err(res.data, res.statusCode);
       return _persist(res.data);
     } catch (e) {
       throw toApiException(e);
@@ -74,17 +74,20 @@ class AuthService {
     String? referralCode,
   }) async {
     try {
-      final res = await _dio.post('/auth/register', data: {
-        'name': name,
-        'phone': phone,
-        'password': password,
-        'password_confirmation': password,
-        if (email != null && email.isNotEmpty) 'email': email,
-        if (referralCode != null && referralCode.trim().isNotEmpty)
-          'referral_code': referralCode.trim().toUpperCase(),
-      });
+      final res = await _dio.post(
+        '/auth/register',
+        data: {
+          'name': name,
+          'phone': phone,
+          'password': password,
+          'password_confirmation': password,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (referralCode != null && referralCode.trim().isNotEmpty)
+            'referral_code': referralCode.trim().toUpperCase(),
+        },
+      );
       if (res.statusCode != 200 && res.statusCode != 201) {
-        throw _err(res.data);
+        throw _err(res.data, res.statusCode);
       }
       return _persist(res.data);
     } catch (e) {
@@ -95,7 +98,7 @@ class AuthService {
   Future<UserModel> me() async {
     try {
       final res = await _dio.get('/auth/me');
-      if (res.statusCode != 200) throw _err(res.data);
+      if (res.statusCode != 200) throw _err(res.data, res.statusCode);
       return UserModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -115,8 +118,10 @@ class AuthService {
   /// Enables/disables the signed-in user's notifications. Returns the new value.
   Future<bool> updateNotifications(bool enabled) async {
     try {
-      final res = await _dio.patch('/auth/notifications',
-          data: {'notifications_enabled': enabled});
+      final res = await _dio.patch(
+        '/auth/notifications',
+        data: {'notifications_enabled': enabled},
+      );
       final data = res.data;
       if (data is Map && data['notifications_enabled'] != null) {
         final v = data['notifications_enabled'];
@@ -132,7 +137,8 @@ class AuthService {
   /// Returns whether it exists, whether it's active, and a masked name so the
   /// user can confirm it's really their account before contacting support.
   Future<({bool exists, bool active, String? name})> checkPhone(
-      String phone) async {
+    String phone,
+  ) async {
     try {
       final res = await _dio.post('/auth/check-phone', data: {'phone': phone});
       // Dio is configured with `validateStatus: < 500`, so a 404/422 arrives
@@ -140,10 +146,10 @@ class AuthService {
       // field reads as false and a real account is reported as "not found" —
       // the caller must be able to tell "no account" from "couldn't check".
       final status = res.statusCode ?? 0;
-      if (status < 200 || status >= 300) throw _err(res.data);
+      if (status < 200 || status >= 300) throw _err(res.data, res.statusCode);
 
       final m = _unwrapObject(res.data);
-      if (m['exists'] == null) throw _err(res.data);
+      if (m['exists'] == null) throw _err(res.data, res.statusCode);
 
       return (
         exists: m['exists'] == true,
@@ -170,19 +176,22 @@ class AuthService {
     String? snapchat,
   }) async {
     try {
-      final res = await _dio.patch('/auth/profile', data: {
-        'name': ?name,
-        'phone': ?phone,
-        'email': ?email,
-        'avatar': ?avatar,
-        'whatsapp': ?whatsapp,
-        'instagram': ?instagram,
-        'facebook': ?facebook,
-        'tiktok': ?tiktok,
-        'snapchat': ?snapchat,
-      });
+      final res = await _dio.patch(
+        '/auth/profile',
+        data: {
+          'name': ?name,
+          'phone': ?phone,
+          'email': ?email,
+          'avatar': ?avatar,
+          'whatsapp': ?whatsapp,
+          'instagram': ?instagram,
+          'facebook': ?facebook,
+          'tiktok': ?tiktok,
+          'snapchat': ?snapchat,
+        },
+      );
       final status = res.statusCode ?? 0;
-      if (status < 200 || status >= 300) throw _err(res.data);
+      if (status < 200 || status >= 300) throw _err(res.data, res.statusCode);
       return UserModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -196,12 +205,15 @@ class AuthService {
     required String newPassword,
   }) async {
     try {
-      final res = await _dio.post('/auth/change-password', data: {
-        'current_password': currentPassword,
-        'password': newPassword,
-        'password_confirmation': newPassword,
-      });
-      if (res.statusCode != 200) throw _err(res.data);
+      final res = await _dio.post(
+        '/auth/change-password',
+        data: {
+          'current_password': currentPassword,
+          'password': newPassword,
+          'password_confirmation': newPassword,
+        },
+      );
+      if (res.statusCode != 200) throw _err(res.data, res.statusCode);
     } catch (e) {
       throw toApiException(e);
     }
@@ -212,7 +224,7 @@ class AuthService {
   Future<void> deleteAccount() async {
     try {
       final res = await _dio.delete('/auth/account');
-      if (res.statusCode != 200) throw _err(res.data);
+      if (res.statusCode != 200) throw _err(res.data, res.statusCode);
       await AuthStorage.instance.clear();
     } catch (e) {
       throw toApiException(e);
@@ -220,7 +232,9 @@ class AuthService {
   }
 
   Future<AuthResult> _persist(dynamic data) async {
-    final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+    final map = data is Map
+        ? Map<String, dynamic>.from(data)
+        : <String, dynamic>{};
     final token = (map['token'] ?? map['access_token'] ?? '').toString();
     final userMap = map['user'] is Map
         ? Map<String, dynamic>.from(map['user'] as Map)
@@ -233,11 +247,11 @@ class AuthService {
     return AuthResult(user: user, token: token);
   }
 
-  Exception _err(dynamic data) => ApiException(
-        (data is Map && data['message'] != null)
-            ? data['message'].toString()
-            : 'فشلت العملية',
-      );
+  // The server's field-level complaints travel with the message, so a form
+  // can put each one under its field; the status comes too, for callers
+  // that treat a 401 and a 422 differently.
+  Exception _err(dynamic data, [int? status]) =>
+      ApiException.fromBody(data, statusCode: status, fallback: 'فشلت العملية');
 }
 
 // ---------------------------------------------------------------------------
@@ -264,9 +278,10 @@ class CategoryService {
   /// nested subcategories on each parent.
   Future<List<CategoryModel>> list({bool tree = false}) async {
     try {
-      final res = await _dio.get('/categories', queryParameters: {
-        if (tree) 'tree': 1,
-      });
+      final res = await _dio.get(
+        '/categories',
+        queryParameters: {if (tree) 'tree': 1},
+      );
       return _unwrapList(res.data).map(CategoryModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -276,10 +291,10 @@ class CategoryService {
   /// Returns the direct children (subcategories) of [parentId].
   Future<List<CategoryModel>> children(int parentId) async {
     try {
-      final res = await _dio.get('/categories', queryParameters: {
-        'parent_id': parentId,
-        'per_page': 200,
-      });
+      final res = await _dio.get(
+        '/categories',
+        queryParameters: {'parent_id': parentId, 'per_page': 200},
+      );
       return _unwrapList(res.data).map(CategoryModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -308,19 +323,22 @@ class VendorService {
     int? perPage,
   }) async {
     try {
-      final res = await _dio.get('/vendors', queryParameters: {
-        'category_id': ?categoryId,
-        'parent_category_id': ?parentCategoryId,
-        'city_id': ?cityId,
-        if (query != null && query.isNotEmpty) 'q': query,
-        if (featured == true) 'featured': 1,
-        if (verified == true) 'verified': 1,
-        if (vip == true) 'vip': 1,
-        'user_id': ?userId,
-        'delegate_id': ?delegateId,
-        if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
-        'per_page': ?perPage,
-      });
+      final res = await _dio.get(
+        '/vendors',
+        queryParameters: {
+          'category_id': ?categoryId,
+          'parent_category_id': ?parentCategoryId,
+          'city_id': ?cityId,
+          if (query != null && query.isNotEmpty) 'q': query,
+          if (featured == true) 'featured': 1,
+          if (verified == true) 'verified': 1,
+          if (vip == true) 'vip': 1,
+          'user_id': ?userId,
+          'delegate_id': ?delegateId,
+          if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
+          'per_page': ?perPage,
+        },
+      );
       return _unwrapList(res.data).map(VendorModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -344,20 +362,23 @@ class VendorService {
     int perPage = 20,
   }) async {
     try {
-      final res = await _dio.get('/vendors', queryParameters: {
-        'category_id': ?categoryId,
-        'parent_category_id': ?parentCategoryId,
-        'city_id': ?cityId,
-        if (query != null && query.isNotEmpty) 'q': query,
-        if (featured == true) 'featured': 1,
-        if (verified == true) 'verified': 1,
-        if (vip == true) 'vip': 1,
-        'user_id': ?userId,
-        'delegate_id': ?delegateId,
-        if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
-        'page': page,
-        'per_page': perPage,
-      });
+      final res = await _dio.get(
+        '/vendors',
+        queryParameters: {
+          'category_id': ?categoryId,
+          'parent_category_id': ?parentCategoryId,
+          'city_id': ?cityId,
+          if (query != null && query.isNotEmpty) 'q': query,
+          if (featured == true) 'featured': 1,
+          if (verified == true) 'verified': 1,
+          if (vip == true) 'vip': 1,
+          'user_id': ?userId,
+          'delegate_id': ?delegateId,
+          if (activeOnly != null) 'active_only': activeOnly ? 1 : 0,
+          'page': page,
+          'per_page': perPage,
+        },
+      );
       final body = res.data;
       final items = _unwrapList(body).map(VendorModel.fromJson).toList();
       var hasMore = false;
@@ -416,8 +437,10 @@ class VendorService {
     int perPage = 30,
   }) async {
     try {
-      final res = await _dio.get('/vendors/$vendorId/followers',
-          queryParameters: {'page': page, 'per_page': perPage});
+      final res = await _dio.get(
+        '/vendors/$vendorId/followers',
+        queryParameters: {'page': page, 'per_page': perPage},
+      );
       final body = res.data;
       final total = (body is Map && body['total'] is num)
           ? (body['total'] as num).toInt()
@@ -431,14 +454,22 @@ class VendorService {
 
   /// Vendor owner sends a notification to all of their followers.
   /// Returns how many followers were notified.
-  Future<int> notifyFollowers(int vendorId,
-      {required String title, String? body}) async {
+  Future<int> notifyFollowers(
+    int vendorId, {
+    required String title,
+    String? body,
+  }) async {
     try {
-      final res = await _dio.post('/vendors/$vendorId/notify-followers', data: {
-        'title': title,
-        if (body != null && body.isNotEmpty) 'body': body,
-      });
-      final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : {};
+      final res = await _dio.post(
+        '/vendors/$vendorId/notify-followers',
+        data: {
+          'title': title,
+          if (body != null && body.isNotEmpty) 'body': body,
+        },
+      );
+      final m = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : {};
       return (m['sent'] is num) ? (m['sent'] as num).toInt() : 0;
     } catch (e) {
       throw toApiException(e);
@@ -453,12 +484,15 @@ class VendorService {
     int perPage = 20,
   }) async {
     try {
-      final res = await _dio.get('/vendors', queryParameters: {
-        if (search != null && search.isNotEmpty) 'search': search,
-        'active_only': 0,
-        'page': page,
-        'per_page': perPage,
-      });
+      final res = await _dio.get(
+        '/vendors',
+        queryParameters: {
+          if (search != null && search.isNotEmpty) 'search': search,
+          'active_only': 0,
+          'page': page,
+          'per_page': perPage,
+        },
+      );
       final body = res.data;
       final items = _unwrapList(body).map(VendorModel.fromJson).toList();
       int current = page, last = page;
@@ -487,6 +521,42 @@ class VendorsResult {
   final int lastPage;
 
   bool get hasMore => currentPage < lastPage;
+}
+
+// ---------------------------------------------------------------------------
+// VENDOR CONTACT TAPS (how often a shop's buttons get pressed)
+// ---------------------------------------------------------------------------
+
+/// Reports a tap on one of a shop's contact buttons so the dashboard can show
+/// the advertiser what his subscription is bringing him.
+///
+/// Deliberately fire-and-forget: the tap itself — placing the call, opening
+/// WhatsApp — must happen whether or not the count reaches the server, so
+/// nothing here is awaited at the call site and every failure is swallowed.
+class VendorContactService {
+  final _dio = ApiClient.instance.dio;
+
+  /// Channel names the server accepts. Anything else is rejected there, so
+  /// they are spelled out here rather than passed through as free text.
+  static const channelPhone = 'phone';
+  static const channelWhatsapp = 'whatsapp';
+  static const channelMap = 'map';
+  static const channelWebsite = 'website';
+  static const channelEmail = 'email';
+  static const channelInstagram = 'instagram';
+  static const channelFacebook = 'facebook';
+  static const channelTiktok = 'tiktok';
+  static const channelSnapchat = 'snapchat';
+  static const channelYoutube = 'youtube';
+  static const channelTelegram = 'telegram';
+
+  void record(int vendorId, String channel) {
+    if (vendorId <= 0 || channel.isEmpty) return;
+    // No await, no rethrow: a counter is never worth a failed phone call.
+    _dio
+        .post('/vendors/$vendorId/contact-click', data: {'channel': channel})
+        .catchError((_) => Response(requestOptions: RequestOptions(path: '')));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -522,10 +592,9 @@ class UploadService {
       );
       final status = res.statusCode ?? 0;
       if (status < 200 || status >= 300) {
-        throw toApiException(DioException(
-          requestOptions: res.requestOptions,
-          response: res,
-        ));
+        throw toApiException(
+          DioException(requestOptions: res.requestOptions, response: res),
+        );
       }
       final body = res.data;
       final url = body is Map ? (body['url'] ?? '').toString() : '';
@@ -546,13 +615,20 @@ class UploadService {
 class ServiceService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<ServiceModel>> list({int? vendorId, int? categoryId, bool mine = false}) async {
+  Future<List<ServiceModel>> list({
+    int? vendorId,
+    int? categoryId,
+    bool mine = false,
+  }) async {
     try {
-      final res = await _dio.get('/services', queryParameters: {
-        'vendor_id': ?vendorId,
-        'category_id': ?categoryId,
-        if (mine) 'mine': 1,
-      });
+      final res = await _dio.get(
+        '/services',
+        queryParameters: {
+          'vendor_id': ?vendorId,
+          'category_id': ?categoryId,
+          if (mine) 'mine': 1,
+        },
+      );
       return _unwrapList(res.data).map(ServiceModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -581,25 +657,29 @@ class ServiceService {
     bool isActive = true,
   }) async {
     try {
-      final res = await _dio.post('/services', data: {
-        'vendor_id': vendorId,
-        'name_ar': nameAr,
-        'name_en': nameEn,
-        'price': price,
-        'description_ar': ?descriptionAr,
-        'description_en': ?descriptionEn,
-        'discount_price': ?discountPrice,
-        'duration': ?duration,
-        'image': ?image,
-        'is_active': isActive,
-      });
+      final res = await _dio.post(
+        '/services',
+        data: {
+          'vendor_id': vendorId,
+          'name_ar': nameAr,
+          'name_en': nameEn,
+          'price': price,
+          'description_ar': ?descriptionAr,
+          'description_en': ?descriptionEn,
+          'discount_price': ?discountPrice,
+          'duration': ?duration,
+          'image': ?image,
+          'is_active': isActive,
+        },
+      );
       return ServiceModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
   }
 
-  Future<ServiceModel> update(int id, {
+  Future<ServiceModel> update(
+    int id, {
     String? nameAr,
     String? nameEn,
     String? descriptionAr,
@@ -611,17 +691,20 @@ class ServiceService {
     bool? isActive,
   }) async {
     try {
-      final res = await _dio.put('/services/$id', data: {
-        'name_ar': ?nameAr,
-        'name_en': ?nameEn,
-        'description_ar': ?descriptionAr,
-        'description_en': ?descriptionEn,
-        'price': ?price,
-        'discount_price': ?discountPrice,
-        'duration': ?duration,
-        'image': ?image,
-        'is_active': ?isActive,
-      });
+      final res = await _dio.put(
+        '/services/$id',
+        data: {
+          'name_ar': ?nameAr,
+          'name_en': ?nameEn,
+          'description_ar': ?descriptionAr,
+          'description_en': ?descriptionEn,
+          'price': ?price,
+          'discount_price': ?discountPrice,
+          'duration': ?duration,
+          'image': ?image,
+          'is_active': ?isActive,
+        },
+      );
       return ServiceModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -648,12 +731,12 @@ class BookingService {
   /// `customer` — bookings this user made (works even for a shop owner, whose
   /// default view is their shop's inbox), `vendor` — requests their shop
   /// received. Omit for the role default.
-  Future<List<BookingModel>> list({String? scope}) async {
+  Future<List<BookingModel>> list({String? scope, String? status}) async {
     try {
-      final res = await _dio.get('/bookings', queryParameters: {
-        'scope': ?scope,
-        'per_page': 50,
-      });
+      final res = await _dio.get(
+        '/bookings',
+        queryParameters: {'scope': ?scope, 'status': ?status, 'per_page': 50},
+      );
       return _unwrapList(res.data).map(BookingModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -667,17 +750,21 @@ class BookingService {
     String? notes,
   }) async {
     try {
-      final res = await _dio.post('/bookings', data: {
-        'service_id': serviceId,
-        'vendor_id': vendorId,
-        'event_date': eventDate.toIso8601String(),
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
-      });
+      final res = await _dio.post(
+        '/bookings',
+        data: {
+          'service_id': serviceId,
+          'vendor_id': vendorId,
+          'event_date': eventDate.toIso8601String(),
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        },
+      );
       if (res.statusCode != 200 && res.statusCode != 201) {
-        throw ApiException((res.data is Map &&
-                res.data['message'] != null)
-            ? res.data['message'].toString()
-            : 'تعذّر إنشاء الحجز');
+        throw ApiException(
+          (res.data is Map && res.data['message'] != null)
+              ? res.data['message'].toString()
+              : 'تعذّر إنشاء الحجز',
+        );
       }
       return BookingModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
@@ -703,10 +790,14 @@ class BookingService {
     String? reason,
   }) async {
     try {
-      final res = await _dio.put('/bookings/$id', data: {
-        'status': status,
-        if (reason != null && reason.isNotEmpty) 'cancellation_reason': reason,
-      });
+      final res = await _dio.put(
+        '/bookings/$id',
+        data: {
+          'status': status,
+          if (reason != null && reason.isNotEmpty)
+            'cancellation_reason': reason,
+        },
+      );
       if (res.statusCode != 200 && res.statusCode != 201) {
         throw ApiException(
           (res.data is Map && res.data['message'] != null)
@@ -734,7 +825,8 @@ class FavoriteService {
       return _unwrapList(res.data).map((m) {
         if (m['vendor'] is Map) {
           return VendorModel.fromJson(
-              Map<String, dynamic>.from(m['vendor'] as Map));
+            Map<String, dynamic>.from(m['vendor'] as Map),
+          );
         }
         return VendorModel.fromJson(m);
       }).toList();
@@ -775,11 +867,14 @@ class PromotionService {
   /// own management screen.
   Future<List<PromotionModel>> listForVendor(int vendorId) async {
     try {
-      final res = await _dio.get('/promotions', queryParameters: {
-        'vendor_id': vendorId,
-        'active_only': 0,
-        'per_page': 50,
-      });
+      final res = await _dio.get(
+        '/promotions',
+        queryParameters: {
+          'vendor_id': vendorId,
+          'active_only': 0,
+          'per_page': 50,
+        },
+      );
       return _unwrapList(res.data).map(PromotionModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -801,21 +896,24 @@ class PromotionService {
     bool isActive = true,
   }) async {
     try {
-      final res = await _dio.post('/promotions', data: {
-        'vendor_id': vendorId,
-        'title_ar': titleAr,
-        'title_en': titleEn.isEmpty ? titleAr : titleEn,
-        if (descriptionAr != null && descriptionAr.isNotEmpty)
-          'description_ar': descriptionAr,
-        if (descriptionEn != null && descriptionEn.isNotEmpty)
-          'description_en': descriptionEn,
-        if (image != null && image.isNotEmpty) 'image': image,
-        'discount_type': discountType,
-        'discount_value': ?discountValue,
-        if (startDate != null) 'start_date': _ymd(startDate),
-        if (endDate != null) 'end_date': _ymd(endDate),
-        'is_active': isActive,
-      });
+      final res = await _dio.post(
+        '/promotions',
+        data: {
+          'vendor_id': vendorId,
+          'title_ar': titleAr,
+          'title_en': titleEn.isEmpty ? titleAr : titleEn,
+          if (descriptionAr != null && descriptionAr.isNotEmpty)
+            'description_ar': descriptionAr,
+          if (descriptionEn != null && descriptionEn.isNotEmpty)
+            'description_en': descriptionEn,
+          if (image != null && image.isNotEmpty) 'image': image,
+          'discount_type': discountType,
+          'discount_value': ?discountValue,
+          if (startDate != null) 'start_date': _ymd(startDate),
+          if (endDate != null) 'end_date': _ymd(endDate),
+          'is_active': isActive,
+        },
+      );
       return PromotionModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -856,13 +954,13 @@ class HomeStats {
   final int cities;
 
   factory HomeStats.fromJson(Map<String, dynamic> json) => HomeStats(
-        vendors: (json['vendors'] as num?)?.toInt() ?? 0,
-        users: (json['users'] as num?)?.toInt() ?? 0,
-        likes: (json['likes'] as num?)?.toInt() ?? 0,
-        visitors: (json['visitors'] as num?)?.toInt() ?? 0,
-        offers: (json['offers'] as num?)?.toInt() ?? 0,
-        cities: (json['cities'] as num?)?.toInt() ?? 0,
-      );
+    vendors: (json['vendors'] as num?)?.toInt() ?? 0,
+    users: (json['users'] as num?)?.toInt() ?? 0,
+    likes: (json['likes'] as num?)?.toInt() ?? 0,
+    visitors: (json['visitors'] as num?)?.toInt() ?? 0,
+    offers: (json['offers'] as num?)?.toInt() ?? 0,
+    cities: (json['cities'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class StatsService {
@@ -887,7 +985,12 @@ class StatsService {
 
 /// Social-media links configured from the admin panel, shown in the app footer.
 class SocialLinks {
-  const SocialLinks({this.instagram, this.facebook, this.tiktok, this.whatsapp});
+  const SocialLinks({
+    this.instagram,
+    this.facebook,
+    this.tiktok,
+    this.whatsapp,
+  });
 
   final String? instagram;
   final String? facebook;
@@ -900,14 +1003,17 @@ class SocialLinks {
   }
 
   factory SocialLinks.fromJson(Map<String, dynamic> json) => SocialLinks(
-        instagram: _clean(json['instagram']),
-        facebook: _clean(json['facebook']),
-        tiktok: _clean(json['tiktok']),
-        whatsapp: _clean(json['whatsapp']),
-      );
+    instagram: _clean(json['instagram']),
+    facebook: _clean(json['facebook']),
+    tiktok: _clean(json['tiktok']),
+    whatsapp: _clean(json['whatsapp']),
+  );
 
   bool get isEmpty =>
-      instagram == null && facebook == null && tiktok == null && whatsapp == null;
+      instagram == null &&
+      facebook == null &&
+      tiktok == null &&
+      whatsapp == null;
 }
 
 class SettingsService {
@@ -937,8 +1043,10 @@ class ReviewService {
 
   Future<List<ReviewModel>> listForVendor(int vendorId) async {
     try {
-      final res = await _dio
-          .get('/reviews', queryParameters: {'vendor_id': vendorId});
+      final res = await _dio.get(
+        '/reviews',
+        queryParameters: {'vendor_id': vendorId},
+      );
       return _unwrapList(res.data).map(ReviewModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -948,13 +1056,16 @@ class ReviewService {
   /// Paginated reviews for a vendor. Returns the page items plus the real
   /// [total] count (from the server's paginator) and whether more pages exist.
   Future<({List<ReviewModel> items, int total, bool hasMore})>
-      listPagedForVendor(int vendorId, {int page = 1, int perPage = 15}) async {
+  listPagedForVendor(int vendorId, {int page = 1, int perPage = 15}) async {
     try {
-      final res = await _dio.get('/reviews', queryParameters: {
-        'vendor_id': vendorId,
-        'page': page,
-        'per_page': perPage,
-      });
+      final res = await _dio.get(
+        '/reviews',
+        queryParameters: {
+          'vendor_id': vendorId,
+          'page': page,
+          'per_page': perPage,
+        },
+      );
       final body = res.data;
       final items = _unwrapList(body).map(ReviewModel.fromJson).toList();
       var total = items.length;
@@ -978,11 +1089,14 @@ class ReviewService {
     String? comment,
   }) async {
     try {
-      final res = await _dio.post('/reviews', data: {
-        'vendor_id': vendorId,
-        'rating': rating.round(),
-        if (comment != null && comment.isNotEmpty) 'comment': comment,
-      });
+      final res = await _dio.post(
+        '/reviews',
+        data: {
+          'vendor_id': vendorId,
+          'rating': rating.round(),
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
+        },
+      );
       return ReviewModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -999,10 +1113,10 @@ class StoryService {
 
   Future<List<StoryModel>> listForVendor(int vendorId) async {
     try {
-      final res = await _dio.get('/stories', queryParameters: {
-        'vendor_id': vendorId,
-        'per_page': 30,
-      });
+      final res = await _dio.get(
+        '/stories',
+        queryParameters: {'vendor_id': vendorId, 'per_page': 30},
+      );
       return _unwrapList(res.data).map(StoryModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1013,9 +1127,10 @@ class StoryService {
   /// newest first — used by the app-wide stories screen.
   Future<List<StoryModel>> listAll({int perPage = 200}) async {
     try {
-      final res = await _dio.get('/stories', queryParameters: {
-        'per_page': perPage,
-      });
+      final res = await _dio.get(
+        '/stories',
+        queryParameters: {'per_page': perPage},
+      );
       return _unwrapList(res.data).map(StoryModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1032,13 +1147,19 @@ class StoryService {
     DateTime? expiresAt,
   }) async {
     try {
-      final res = await _dio.post('/stories', data: {
-        'vendor_id': vendorId,
-        'image': image,
-        if (captionAr != null && captionAr.isNotEmpty) 'caption_ar': captionAr,
-        if (captionEn != null && captionEn.isNotEmpty) 'caption_en': captionEn,
-        if (expiresAt != null) 'expires_at': expiresAt.toUtc().toIso8601String(),
-      });
+      final res = await _dio.post(
+        '/stories',
+        data: {
+          'vendor_id': vendorId,
+          'image': image,
+          if (captionAr != null && captionAr.isNotEmpty)
+            'caption_ar': captionAr,
+          if (captionEn != null && captionEn.isNotEmpty)
+            'caption_en': captionEn,
+          if (expiresAt != null)
+            'expires_at': expiresAt.toUtc().toIso8601String(),
+        },
+      );
       return StoryModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1062,8 +1183,7 @@ class StoryService {
           : (body is List ? List<dynamic>.from(body) : const []);
       return list
           .whereType<Map>()
-          .map((m) => VendorStoriesGroup.fromJson(
-              Map<String, dynamic>.from(m)))
+          .map((m) => VendorStoriesGroup.fromJson(Map<String, dynamic>.from(m)))
           .toList();
     } catch (e) {
       throw toApiException(e);
@@ -1081,10 +1201,10 @@ class HighlightService {
   /// Active highlights (with their items) for a vendor profile.
   Future<List<HighlightModel>> listForVendor(int vendorId) async {
     try {
-      final res = await _dio.get('/highlights', queryParameters: {
-        'vendor_id': vendorId,
-        'per_page': 50,
-      });
+      final res = await _dio.get(
+        '/highlights',
+        queryParameters: {'vendor_id': vendorId, 'per_page': 50},
+      );
       return _unwrapList(res.data).map(HighlightModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1098,12 +1218,16 @@ class HighlightService {
     int? sortOrder,
   }) async {
     try {
-      final res = await _dio.post('/highlights', data: {
-        'vendor_id': vendorId,
-        'title': title,
-        if (coverImage != null && coverImage.isNotEmpty) 'cover_image': coverImage,
-        'sort_order': ?sortOrder,
-      });
+      final res = await _dio.post(
+        '/highlights',
+        data: {
+          'vendor_id': vendorId,
+          'title': title,
+          if (coverImage != null && coverImage.isNotEmpty)
+            'cover_image': coverImage,
+          'sort_order': ?sortOrder,
+        },
+      );
       return HighlightModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1118,12 +1242,15 @@ class HighlightService {
     bool? isActive,
   }) async {
     try {
-      final res = await _dio.put('/highlights/$id', data: {
-        'title': ?title,
-        'cover_image': ?coverImage,
-        'sort_order': ?sortOrder,
-        'is_active': ?isActive,
-      });
+      final res = await _dio.put(
+        '/highlights/$id',
+        data: {
+          'title': ?title,
+          'cover_image': ?coverImage,
+          'sort_order': ?sortOrder,
+          'is_active': ?isActive,
+        },
+      );
       return HighlightModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1147,13 +1274,16 @@ class HighlightService {
     int? sortOrder,
   }) async {
     try {
-      final res = await _dio.post('/highlight-items', data: {
-        'highlight_id': highlightId,
-        'type': type,
-        'media_url': mediaUrl,
-        if (caption != null && caption.isNotEmpty) 'caption': caption,
-        'sort_order': ?sortOrder,
-      });
+      final res = await _dio.post(
+        '/highlight-items',
+        data: {
+          'highlight_id': highlightId,
+          'type': type,
+          'media_url': mediaUrl,
+          if (caption != null && caption.isNotEmpty) 'caption': caption,
+          'sort_order': ?sortOrder,
+        },
+      );
       return HighlightItemModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1178,9 +1308,7 @@ class SliderService {
 
   Future<List<SliderModel>> list({int limit = 10}) async {
     try {
-      final res = await _dio.get('/sliders', queryParameters: {
-        'limit': limit,
-      });
+      final res = await _dio.get('/sliders', queryParameters: {'limit': limit});
       return _unwrapList(res.data).map(SliderModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1195,12 +1323,15 @@ class SliderService {
 class NotificationService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<NotificationModel>> list({int limit = 50, bool unreadOnly = false}) async {
+  Future<List<NotificationModel>> list({
+    int limit = 50,
+    bool unreadOnly = false,
+  }) async {
     try {
-      final res = await _dio.get('/notifications', queryParameters: {
-        'limit': limit,
-        if (unreadOnly) 'unread_only': 1,
-      });
+      final res = await _dio.get(
+        '/notifications',
+        queryParameters: {'limit': limit, if (unreadOnly) 'unread_only': 1},
+      );
       return _unwrapList(res.data).map(NotificationModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1251,13 +1382,16 @@ class ProductService {
     bool availableOnly = false,
   }) async {
     try {
-      final res = await _dio.get('/products', queryParameters: {
-        'vendor_id': ?vendorId,
-        'section_id': ?sectionId,
-        if (mine) 'mine': 1,
-        if (availableOnly) 'available_only': 1,
-        'per_page': 200,
-      });
+      final res = await _dio.get(
+        '/products',
+        queryParameters: {
+          'vendor_id': ?vendorId,
+          'section_id': ?sectionId,
+          if (mine) 'mine': 1,
+          if (availableOnly) 'available_only': 1,
+          'per_page': 200,
+        },
+      );
       return _unwrapList(res.data).map(ProductModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1282,21 +1416,24 @@ class ProductService {
     bool discountedOnly = false,
   }) async {
     try {
-      final res = await _dio.get('/products', queryParameters: {
-        'sort': sort,
-        if (sort == 'random') 'seed': seed,
-        'available_only': 1,
-        'vendor_id': ?vendorId,
-        'category_id': ?categoryId,
-        'city_id': ?cityId,
-        'min_price': ?minPrice,
-        'max_price': ?maxPrice,
-        if (discountedOnly) 'discounted': 1,
-        // A price-sorted list is meaningless with unpriced products in it.
-        if (sort == 'price_asc' || sort == 'price_desc') 'priced_only': 1,
-        'page': page,
-        'per_page': perPage,
-      });
+      final res = await _dio.get(
+        '/products',
+        queryParameters: {
+          'sort': sort,
+          if (sort == 'random') 'seed': seed,
+          'available_only': 1,
+          'vendor_id': ?vendorId,
+          'category_id': ?categoryId,
+          'city_id': ?cityId,
+          'min_price': ?minPrice,
+          'max_price': ?maxPrice,
+          if (discountedOnly) 'discounted': 1,
+          // A price-sorted list is meaningless with unpriced products in it.
+          if (sort == 'price_asc' || sort == 'price_desc') 'priced_only': 1,
+          'page': page,
+          'per_page': perPage,
+        },
+      );
       final body = res.data;
       final items = _unwrapList(body).map(ProductModel.fromJson).toList();
       var hasMore = false;
@@ -1333,25 +1470,29 @@ class ProductService {
     bool isAvailable = true,
   }) async {
     try {
-      final res = await _dio.post('/products', data: {
-        'vendor_id': vendorId,
-        'name_ar': nameAr,
-        'name_en': ?nameEn,
-        'price': price,
-        'discount_price': ?discountPrice,
-        'description_ar': ?descriptionAr,
-        'image': ?image,
-        'images': ?images,
-        'section_id': sectionId,
-        'is_available': isAvailable,
-      });
+      final res = await _dio.post(
+        '/products',
+        data: {
+          'vendor_id': vendorId,
+          'name_ar': nameAr,
+          'name_en': ?nameEn,
+          'price': price,
+          'discount_price': ?discountPrice,
+          'description_ar': ?descriptionAr,
+          'image': ?image,
+          'images': ?images,
+          'section_id': sectionId,
+          'is_available': isAvailable,
+        },
+      );
       return ProductModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
   }
 
-  Future<ProductModel> update(int id, {
+  Future<ProductModel> update(
+    int id, {
     String? nameAr,
     String? nameEn,
     double? price,
@@ -1364,17 +1505,20 @@ class ProductService {
     bool? isAvailable,
   }) async {
     try {
-      final res = await _dio.put('/products/$id', data: {
-        'name_ar': ?nameAr,
-        'name_en': ?nameEn,
-        'price': ?price,
-        'discount_price': ?discountPrice,
-        'description_ar': ?descriptionAr,
-        'image': ?image,
-        'images': ?images,
-        if (clearSection) 'section_id': null else 'section_id': ?sectionId,
-        'is_available': ?isAvailable,
-      });
+      final res = await _dio.put(
+        '/products/$id',
+        data: {
+          'name_ar': ?nameAr,
+          'name_en': ?nameEn,
+          'price': ?price,
+          'discount_price': ?discountPrice,
+          'description_ar': ?descriptionAr,
+          'image': ?image,
+          'images': ?images,
+          if (clearSection) 'section_id': null else 'section_id': ?sectionId,
+          'is_available': ?isAvailable,
+        },
+      );
       return ProductModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1397,13 +1541,19 @@ class ProductService {
 class ProductSectionService {
   final _dio = ApiClient.instance.dio;
 
-  Future<List<ProductSectionModel>> list({int? vendorId, bool mine = false}) async {
+  Future<List<ProductSectionModel>> list({
+    int? vendorId,
+    bool mine = false,
+  }) async {
     try {
-      final res = await _dio.get('/product-sections', queryParameters: {
-        'vendor_id': ?vendorId,
-        if (mine) 'mine': 1,
-        'per_page': 200,
-      });
+      final res = await _dio.get(
+        '/product-sections',
+        queryParameters: {
+          'vendor_id': ?vendorId,
+          if (mine) 'mine': 1,
+          'per_page': 200,
+        },
+      );
       return _unwrapList(res.data).map(ProductSectionModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1416,23 +1566,26 @@ class ProductSectionService {
     int? sort,
   }) async {
     try {
-      final res = await _dio.post('/product-sections', data: {
-        'vendor_id': vendorId,
-        'name_ar': nameAr,
-        'sort': ?sort,
-      });
+      final res = await _dio.post(
+        '/product-sections',
+        data: {'vendor_id': vendorId, 'name_ar': nameAr, 'sort': ?sort},
+      );
       return ProductSectionModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
   }
 
-  Future<ProductSectionModel> update(int id, {String? nameAr, int? sort}) async {
+  Future<ProductSectionModel> update(
+    int id, {
+    String? nameAr,
+    int? sort,
+  }) async {
     try {
-      final res = await _dio.put('/product-sections/$id', data: {
-        'name_ar': ?nameAr,
-        'sort': ?sort,
-      });
+      final res = await _dio.put(
+        '/product-sections/$id',
+        data: {'name_ar': ?nameAr, 'sort': ?sort},
+      );
       return ProductSectionModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1464,12 +1617,15 @@ class OrderService {
     String? scope,
   }) async {
     try {
-      final res = await _dio.get('/orders', queryParameters: {
-        'vendor_id': ?vendorId,
-        'status': ?status,
-        'scope': ?scope,
-        'per_page': 50,
-      });
+      final res = await _dio.get(
+        '/orders',
+        queryParameters: {
+          'vendor_id': ?vendorId,
+          'status': ?status,
+          'scope': ?scope,
+          'per_page': 50,
+        },
+      );
       return _unwrapList(res.data).map(OrderModel.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
@@ -1492,25 +1648,41 @@ class OrderService {
           .where((e) => e.value > 0)
           .map((e) => {'product_id': e.key, 'quantity': e.value})
           .toList();
-      final res = await _dio.post('/orders', data: {
-        'vendor_id': vendorId,
-        'items': items,
-        'customer_name': ?customerName,
-        'customer_phone': ?customerPhone,
-        'city_id': ?cityId,
-        'area': ?area,
-        'landmark': ?landmark,
-        'note': ?note,
-      });
+      final res = await _dio.post(
+        '/orders',
+        data: {
+          'vendor_id': vendorId,
+          'items': items,
+          'customer_name': ?customerName,
+          'customer_phone': ?customerPhone,
+          'city_id': ?cityId,
+          'area': ?area,
+          'landmark': ?landmark,
+          'note': ?note,
+        },
+      );
       return OrderModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
     }
   }
 
-  Future<OrderModel> updateStatus(int id, String status) async {
+  /// Moves an order along. [reason] travels with a rejection or a
+  /// cancellation and reaches the other side word for word.
+  Future<OrderModel> updateStatus(
+    int id,
+    String status, {
+    String? reason,
+  }) async {
     try {
-      final res = await _dio.put('/orders/$id', data: {'status': status});
+      final res = await _dio.put(
+        '/orders/$id',
+        data: {
+          'status': status,
+          if (reason != null && reason.trim().isNotEmpty)
+            'reason': reason.trim(),
+        },
+      );
       return OrderModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1527,13 +1699,16 @@ class CompetitionService {
 
   /// The active competition + the caller's prediction (by account or device).
   Future<({CompetitionModel? competition, PredictionModel? prediction})>
-      getActive({String? deviceId}) async {
+  getActive({String? deviceId}) async {
     try {
-      final res = await _dio.get('/competition/active',
-          queryParameters: {'device_id': ?deviceId});
+      final res = await _dio.get(
+        '/competition/active',
+        queryParameters: {'device_id': ?deviceId},
+      );
       final body = res.data;
-      final map =
-          body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+      final map = body is Map
+          ? Map<String, dynamic>.from(body)
+          : <String, dynamic>{};
       final data = map['data'];
       final pred = map['my_prediction'];
       return (
@@ -1549,20 +1724,25 @@ class CompetitionService {
     }
   }
 
-  Future<PredictionModel> predict(int competitionId,
-      {required String winner,
-      String? score,
-      String? deviceId,
-      String? platform,
-      String? guestName}) async {
+  Future<PredictionModel> predict(
+    int competitionId, {
+    required String winner,
+    String? score,
+    String? deviceId,
+    String? platform,
+    String? guestName,
+  }) async {
     try {
-      final res = await _dio.post('/competition/$competitionId/predict', data: {
-        'winner': winner,
-        'score': ?score,
-        'device_id': ?deviceId,
-        'platform': ?platform,
-        'guest_name': ?guestName,
-      });
+      final res = await _dio.post(
+        '/competition/$competitionId/predict',
+        data: {
+          'winner': winner,
+          'score': ?score,
+          'device_id': ?deviceId,
+          'platform': ?platform,
+          'guest_name': ?guestName,
+        },
+      );
       return PredictionModel.fromJson(_unwrapObject(res.data));
     } catch (e) {
       throw toApiException(e);
@@ -1596,8 +1776,21 @@ class PointsService {
     try {
       final res = await _dio.get('/points/summary');
       final status = res.statusCode ?? 0;
-      if (status < 200 || status >= 300) throw _err(res.data);
+      if (status < 200 || status >= 300) throw _err(res.data, res.statusCode);
       return PointsSummary.fromJson(_unwrapObject(res.data));
+    } catch (e) {
+      throw toApiException(e);
+    }
+  }
+
+  /// Who joined from this member's invitation, newest first.
+  ///
+  /// Names and dates only — the server does not send phone numbers, and a
+  /// friend's number is not the inviter's to receive.
+  Future<List<Invitee>> invitees() async {
+    try {
+      final res = await _dio.get('/points/invitees');
+      return _unwrapList(res.data).map(Invitee.fromJson).toList();
     } catch (e) {
       throw toApiException(e);
     }
@@ -1610,7 +1803,7 @@ class PointsService {
     try {
       final res = await _dio.post('/vendors/$vendorId/redeem-points');
       final status = res.statusCode ?? 0;
-      if (status < 200 || status >= 300) throw _err(res.data);
+      if (status < 200 || status >= 300) throw _err(res.data, res.statusCode);
       final m = _unwrapObject(res.data);
       return RedeemResult(
         balance: (m['balance'] as num?)?.toInt() ?? 0,
@@ -1630,7 +1823,7 @@ class PointsService {
     try {
       final res = await _dio.post('/points/claim-reward');
       final status = res.statusCode ?? 0;
-      if (status < 200 || status >= 300) throw _err(res.data);
+      if (status < 200 || status >= 300) throw _err(res.data, res.statusCode);
       final m = _unwrapObject(res.data);
       return (m['message'] ?? 'تم استلام المكافأة').toString();
     } catch (e) {
@@ -1638,9 +1831,6 @@ class PointsService {
     }
   }
 
-  Exception _err(dynamic data) => ApiException(
-        (data is Map && data['message'] != null)
-            ? data['message'].toString()
-            : 'تعذّرت العملية',
-      );
+  Exception _err(dynamic data, [int? status]) =>
+      ApiException.fromBody(data, statusCode: status, fallback: 'تعذّرت العملية');
 }

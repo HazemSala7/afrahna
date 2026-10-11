@@ -8,6 +8,7 @@ import '../../core/models/models.dart';
 import '../../core/services/services.dart';
 import '../../core/state/session.dart';
 import '../../core/theme.dart';
+import '../../widgets/cosmos.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/tier_badge.dart';
@@ -90,65 +91,76 @@ class _GuestView extends StatelessWidget {
       // login button at the end stays reachable above it.
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 110),
       children: [
-        // Hero header
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF8B5A3C), AppColors.primary, Color(0xFFC79A6A)],
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-            ),
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.35),
-                blurRadius: 22,
-                offset: const Offset(0, 12),
+        // Hero header: an invitation in deep glass — the gift held in a
+        // turning holographic ring, the promise in gold foil.
+        CustomPaint(
+          foregroundPainter: const HoloBorderPainter(radius: 26, width: 1.3),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: const RadialGradient(
+                center: Alignment(0, -0.55),
+                radius: 1.1,
+                colors: [Color(0xFFA2614A), Color(0xFF6E4133), Color(0xFF4A2C24)],
+                stops: [0, 0.5, 1],
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    width: 2,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.16),
+                  blurRadius: 34,
+                  spreadRadius: -8,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                HoloRing(
+                  size: 96,
+                  stroke: 2.2,
+                  gap: 6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppColors.goldGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.45),
+                          blurRadius: 22,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.card_giftcard_rounded,
+                        color: AppColors.ink,
+                        size: 38,
+                      ),
+                    ),
                   ),
                 ),
-                child: const Icon(
-                  Icons.card_giftcard_rounded,
-                  color: Colors.white,
-                  size: 42,
+                const SizedBox(height: 18),
+                GoldFoilText(
+                  'أنشئ حسابك واستفد من العروض',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        height: 1.35,
+                      ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'أنشئ حسابك واستفد من العروض 🎁',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  height: 1.35,
+                const SizedBox(height: 8),
+                const Text(
+                  'سجّل مجانًا ودع أفراحنا يخطّط معك ليومك المميّز',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'سجّل مجانًا ودع أفراحنا يخطّط معك ليومك المميّز',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  fontSize: 13.5,
-                  height: 1.4,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 22),
@@ -164,16 +176,12 @@ class _GuestView extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFD4A373), Color(0xFF8B5A3C)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: const [
+              gradient: AppColors.goldGradient,
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x558B5A3C),
-                  blurRadius: 16,
-                  offset: Offset(0, 8),
+                  color: AppColors.accent.withValues(alpha: 0.32),
+                  blurRadius: 24,
+                  spreadRadius: -6,
                 ),
               ],
             ),
@@ -190,14 +198,14 @@ class _GuestView extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.person_add_alt_1_rounded,
-                      color: Colors.white,
+                      color: AppColors.ink,
                       size: 20,
                     ),
                     SizedBox(width: 8),
                     Text(
                       'أنشئ حساب جديد',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.ink,
                         fontSize: 16.5,
                         fontWeight: FontWeight.w900,
                       ),
@@ -253,15 +261,9 @@ class _BenefitRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         children: [
@@ -269,10 +271,24 @@ class _BenefitRow extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(13),
+              gradient: RadialGradient(colors: [
+                AppColors.accent.withValues(alpha: 0.22),
+                AppColors.accent.withValues(alpha: 0.05),
+              ]),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.hairline),
             ),
-            child: Icon(icon, color: AppColors.primaryDark, size: 24),
+            child: Icon(
+              icon,
+              color: AppColors.accent,
+              size: 24,
+              shadows: [
+                Shadow(
+                  color: AppColors.accent.withValues(alpha: 0.6),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -687,15 +703,9 @@ class _AccountFacts extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppDecor.lift,
       ),
       child: Row(
         children: [

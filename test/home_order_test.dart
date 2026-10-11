@@ -23,7 +23,7 @@ void main() {
       'انضم مؤخراً',
       'الأعلى تقييماً',
       'دعوات إلكترونية',
-      'تواصل معنا',
+      'نظّم مناسبتك',
       'نصائح لتخطيط فرحك',
       'ليش أفراحنا؟',
     ];
@@ -54,7 +54,7 @@ void main() {
       '_NewVendorsRow',
       '_TopRatedRow',
       '_InvitationPromoCard',
-      '_AdvertiseCta',
+      'EventRequestHomeCard',
       '_TipsSection',
       '_WhyAfrahnaSection',
     ];

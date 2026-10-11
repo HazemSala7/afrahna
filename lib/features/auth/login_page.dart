@@ -75,12 +75,11 @@ class _LoginPageState extends State<LoginPage> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: AppColors.primaryDark,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white),
+            const Icon(Icons.error_outline, color: AppColors.discount),
             const SizedBox(width: 10),
             Expanded(child: Text(session.error ?? 'فشل تسجيل الدخول')),
           ],
@@ -97,7 +96,6 @@ class _LoginPageState extends State<LoginPage> {
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: AppColors.primaryDark,
           behavior: SnackBarBehavior.floating,
           content: Text('تعذّر فتح التطبيق المطلوب'),
         ),
@@ -114,7 +112,6 @@ class _LoginPageState extends State<LoginPage> {
     if (phone.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: AppColors.primaryDark,
           behavior: SnackBarBehavior.floating,
           content: Text('أدخل رقم جوالك أولاً لنتحقق من حسابك'),
         ),
@@ -172,6 +169,7 @@ class _LoginPageState extends State<LoginPage> {
       builder: (ctx) => Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.hairline, width: 0.8)),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.fromLTRB(
@@ -224,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
                           ? 'تم العثور على حسابك المرتبط بالرقم $phone'
                           : 'تم العثور على حساب «$accountName» بالرقم $phone',
                       style: const TextStyle(
-                        color: Color(0xFF127a46),
+                        color: Color(0xFF8CEDBD),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         height: 1.4,
@@ -334,7 +332,6 @@ class _LoginPageState extends State<LoginPage> {
                                     label: 'رقم الجوال',
                                     icon: Icons.phone_iphone_rounded,
                                     keyboardType: TextInputType.phone,
-                                    textDirection: TextDirection.ltr,
                                     gradient: AuthField.rtlFill,
                                     validator: (v) {
                                       final s = (v ?? '').replaceAll(RegExp(r'\D'), '');
@@ -442,8 +439,8 @@ class _LoginPageState extends State<LoginPage> {
                                       decoration: BoxDecoration(
                                         gradient: const LinearGradient(
                                           colors: [
-                                            Color(0xFFF6E6D3),
-                                            Color(0xFFFBF4EB)
+                                            AppColors.surface,
+                                            AppColors.surface
                                           ],
                                           begin: Alignment.centerRight,
                                           end: Alignment.centerLeft,
@@ -459,7 +456,8 @@ class _LoginPageState extends State<LoginPage> {
                                             width: 42,
                                             height: 42,
                                             decoration: BoxDecoration(
-                                              color: Colors.white,
+                                              color: AppColors.surface,
+                                              border: Border.all(color: AppColors.hairline, width: 0.8),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),

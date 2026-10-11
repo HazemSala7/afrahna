@@ -123,23 +123,17 @@ class MarketProductCard extends StatelessWidget {
 
     return SizedBox(
       width: width,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => openProduct(context, product),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.all(Radius.circular(28)),
+          boxShadow: AppDecor.lift,
+        ),
+        child: Material(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: () => openProduct(context, product),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -148,8 +142,9 @@ class MarketProductCard extends StatelessWidget {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
                       child: SizedBox(
                         height: 146,
                         width: double.infinity,
@@ -165,7 +160,9 @@ class MarketProductCard extends StatelessWidget {
                         end: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.discount,
                             borderRadius: BorderRadius.circular(99),
@@ -196,7 +193,9 @@ class MarketProductCard extends StatelessWidget {
                         start: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: .55),
                             borderRadius: BorderRadius.circular(99),
@@ -204,8 +203,11 @@ class MarketProductCard extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star_rounded,
-                                  size: 12, color: Color(0xFFFFC961)),
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 12,
+                                color: Color(0xFFFFC961),
+                              ),
                               const SizedBox(width: 2),
                               Text(
                                 product.vendorRating!.toStringAsFixed(1),
@@ -259,8 +261,11 @@ class MarketProductCard extends StatelessWidget {
                               const SizedBox(height: 3),
                               Row(
                                 children: [
-                                  const Icon(Icons.storefront_rounded,
-                                      size: 11, color: AppColors.textMuted),
+                                  const Icon(
+                                    Icons.storefront_rounded,
+                                    size: 11,
+                                    color: AppColors.textMuted,
+                                  ),
                                   const SizedBox(width: 3),
                                   Flexible(
                                     child: Text(
@@ -344,10 +349,12 @@ class MarketProductCard extends StatelessWidget {
                                 ),
                                 transitionBuilder: (child, anim) =>
                                     FadeTransition(
-                                  opacity: anim,
-                                  child: ScaleTransition(
-                                      scale: anim, child: child),
-                                ),
+                                      opacity: anim,
+                                      child: ScaleTransition(
+                                        scale: anim,
+                                        child: child,
+                                      ),
+                                    ),
                                 child: qty > 0
                                     ? _QtyStepper(
                                         key: const ValueKey('qty'),
@@ -360,23 +367,26 @@ class MarketProductCard extends StatelessWidget {
                                           backgroundColor: AppColors.primary,
                                           padding: EdgeInsets.zero,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                         ),
                                         onPressed: product.isAvailable
                                             ? () => addToCart(context, product)
                                             : null,
                                         icon: const Icon(
-                                            Icons.add_shopping_cart_rounded,
-                                            size: 15),
+                                          Icons.add_shopping_cart_rounded,
+                                          size: 15,
+                                        ),
                                         label: Text(
                                           product.isAvailable
                                               ? 'أضف'
                                               : 'غير متوفر',
                                           style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w800),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
                                       ),
                               ),
@@ -499,8 +509,10 @@ class _CartFabState extends State<CartFab> with SingleTickerProviderStateMixin {
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.14), weight: 40),
     TweenSequenceItem(
-      tween: Tween(begin: 1.14, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
+      tween: Tween(
+        begin: 1.14,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.elasticOut)),
       weight: 60,
     ),
   ]).animate(_pulse);
@@ -551,15 +563,20 @@ class _CartFabState extends State<CartFab> with SingleTickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(18),
                   onTap: () => openCart(context),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
                     child: Row(
                       children: [
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            const Icon(Icons.shopping_cart_rounded,
-                                color: Colors.white, size: 23),
+                            const Icon(
+                              Icons.shopping_cart_rounded,
+                              color: Colors.white,
+                              size: 23,
+                            ),
                             PositionedDirectional(
                               top: -6,
                               end: -7,
@@ -587,8 +604,11 @@ class _CartFabState extends State<CartFab> with SingleTickerProviderStateMixin {
                             ),
                           ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.chevron_left_rounded,
-                            color: Colors.white, size: 22),
+                        const Icon(
+                          Icons.chevron_left_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ],
                     ),
                   ),
@@ -649,7 +669,7 @@ class _CountDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.discount,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(color: AppColors.hairline, width: 1.5),
       ),
       child: Text(
         '$count',
@@ -725,8 +745,10 @@ class _CardGalleryState extends State<_CardGallery> {
               top: 8,
               start: 8,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2.5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: .5),
                   borderRadius: BorderRadius.circular(99),
@@ -734,8 +756,11 @@ class _CardGalleryState extends State<_CardGallery> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.collections_rounded,
-                        size: 10, color: Colors.white),
+                    const Icon(
+                      Icons.collections_rounded,
+                      size: 10,
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       '${_page + 1}/${images.length}',
@@ -785,11 +810,9 @@ class _CardDots extends StatelessWidget {
           width: on ? 12 : 5,
           height: 5,
           decoration: BoxDecoration(
-            color: on ? Colors.white : Colors.white60,
+            color: on ? AppColors.surface : AppColors.surface,
             borderRadius: BorderRadius.circular(99),
-            boxShadow: const [
-              BoxShadow(color: Colors.black26, blurRadius: 3),
-            ],
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
           ),
         );
       }),

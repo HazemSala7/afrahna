@@ -7,6 +7,8 @@ import '../../core/utils/category_icon.dart';
 import '../../widgets/app_widgets.dart';
 import '../vendors/vendors_page.dart';
 import 'category_tabs_page.dart';
+import '../../widgets/animations.dart';
+import '../../core/utils/held_future.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -23,12 +25,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
     super.initState();
     // Load the full tree so we know which top-level categories have children
     // (and can pass them straight to the tabs page without a second request).
-    _future = CategoryService().list(tree: true);
+    _future = held(CategoryService().list(tree: true));
   }
 
   void _refresh() {
     setState(() {
-      _future = CategoryService().list(tree: true);
+      _future = held(CategoryService().list(tree: true));
     });
   }
 
@@ -44,7 +46,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
           }
           if (snap.hasError) {
             return ErrorState(
-                message: snap.error.toString(), onRetry: _refresh);
+              message: snap.error.toString(),
+              onRetry: _refresh,
+            );
           }
           final items = snap.data ?? const [];
           if (items.isEmpty) {
@@ -61,58 +65,58 @@ class _CategoriesPageState extends State<CategoriesPage> {
             itemCount: items.length,
             itemBuilder: (_, i) {
               final c = items[i];
-              return InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => c.hasChildren
-                        ? CategoryTabsPage(parent: c)
-                        : VendorsPage(category: c),
+              return StaggerIn(
+                index: i,
+                id: 'categories',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => c.hasChildren
+                          ? CategoryTabsPage(parent: c)
+                          : VendorsPage(category: c),
+                    ),
                   ),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.cardShadow,
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(categoryIcon(c.name),
-                            color: AppColors.primary, size: 28),
-                      ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          c.name,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textDark,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: AppDecor.lift,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            categoryIcon(c.name),
+                            color: AppColors.primary,
+                            size: 28,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            c.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
